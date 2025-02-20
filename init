@@ -1,0 +1,130 @@
+#!/usr/bin/env python3
+import sys
+import os
+import glob
+
+STUNAME = "221180115-黄文睿"
+
+
+def iprint(*args: str, end="\n") -> None:
+    print("\033[0;36m", end="")
+    print(*args, end="")
+    print("\033[0m", end="")
+    print(end, end="")
+
+
+def sprint(*args: str, end="\n") -> None:
+    print("\033[0;33m", end="")
+    print(*args, end="")
+    print("\033[0m", end="")
+    print(end, end="")
+
+
+def eprint(*args: str, end="\n") -> None:
+    print("\033[0;31m", end="")
+    print(*args, end="")
+    print("\033[0m", end="")
+    print(end, end="")
+
+
+def crun(cmd: str) -> None:
+    exit_code = os.system(cmd)
+    if exit_code != 0:
+        eprint(f"Error when running command '{cmd}'")
+        sys.exit(exit_code)
+
+
+class CommandSpace:
+    def bear(self, *_: str):
+        self.clean()
+        crun("bear -- make -B")
+
+    def build(self, *_: str, clean_build: bool = False):
+        if clean_build:
+            self.clean()
+        crun("make")
+
+    def b(self, *args: str):
+        self.build(*args)
+
+    def cb(self, *args: str):
+        self.build(*args, clean_build=True)
+
+    def clean(self, *_: str):
+        crun("make clean")
+
+    def format(self, *_: str):
+        suffixes = ["c", "cc", "cpp", "h", "hpp"]
+        files = []
+        for suffix in suffixes:
+            files.extend(glob.glob(f"./src/*.{suffix}"))
+            files.extend(glob.glob(f"./tests/*.{suffix}"))
+        crun(f"clang-format -i {' '.join(files)}")
+
+    def test(self, *test_patterns: str):
+        self.build()
+        test_arg = " ".join(test_patterns)
+        crun(f"make testvg ARGS='{test_arg}'")
+
+    def t(self, *args: str):
+        self.test(*args)
+
+    def prepare(self, *_: str):
+        self.clean()
+        if not os.path.exists("./build"):
+            crun("mkdir ./build")
+        crun("cp -r ./Original-Lab ./build/Lab")
+        suffixes = ["c", "h", "l", "y"]
+        files = []
+        files_to_delete = []
+        for suffix in suffixes:
+            files.extend(glob.glob(f"./src/*.{suffix}"))
+            files_to_delete.extend(glob.glob(f"./build/Lab/Code/*.{suffix}"))
+        crun(f"rm -f {' '.join(files_to_delete)}")
+        crun(f"cp {' '.join(files)} ./build/Lab/Code")
+
+
+#     def report(self, *_: str):
+#         crun(f"typst c report/report.typ {STUNAME}.pdf")
+#
+#     def zip(self, *_: str):
+#         self.report()
+#         crun("mkdir -p ./build")
+#         submit_dir = "./build/fla-submit"
+#         crun(f"rm -rf {submit_dir}")
+#         crun(f"mkdir -p {submit_dir}")
+#         crun(
+#             f"cp -r fla-project README.md pda tm CMakeLists.txt {STUNAME}.pdf -t {submit_dir}"
+#         )
+#         crun(
+#             f"rm -f {submit_dir}/pda/anbn.pda {submit_dir}/tm/palindrome_detector_2tapes.tm"
+#         )
+#         crun(
+#             f"""\
+# cd {submit_dir}
+# rm ../{STUNAME}.zip
+# zip -r ../{STUNAME}.zip *
+# cp ../{STUNAME}.zip ~/Downloads
+# """
+#         )
+
+
+def print_help_and_quit():
+    functions = "|".join([f for f in dir(CommandSpace) if not f.startswith("_")])
+    print(f"Usage: {sys.argv[0]} {{{functions}}}")
+    sys.exit(1)
+
+
+def run():
+    if len(sys.argv) <= 1:
+        print_help_and_quit()
+    cs = CommandSpace()
+    if hasattr(cs, sys.argv[1]):
+        getattr(cs, sys.argv[1])(*sys.argv[2:])
+    else:
+        eprint(f"Unknown command: {sys.argv[1]}\n")
+        print_help_and_quit()
+
+
+if __name__ == "__main__":
+    run()
