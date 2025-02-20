@@ -1,3 +1,4 @@
+CC = gcc
 SRCS = $(notdir $(shell find ./ -name "*.c"))
 DEPS = $(addprefix $(BUILD_DIR)/tests/, $(addsuffix .d,$(SRCS)))
 OBJS = $(addprefix $(BUILD_DIR)/tests/, $(addsuffix .o,$(SRCS)))

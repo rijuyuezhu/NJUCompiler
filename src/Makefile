@@ -29,7 +29,7 @@ $(BUILD_DIR)/libcompiler.a: $(YFO) $(filter-out $(LFO) $(BUILD_DIR)/src/./main.o
 
 $(YFO): $(LFC) $(YFC)
 	@echo + CC src/$(notdir $(YFC)) >&2
-	# @$(CC) -c $(YFC) -o $(YFO)
+	@$(CC) -c $(YFC) -o $(YFO)
 
 $(LFC): $(LFILE)
 	@echo + FLEX src/$(notdir $(LFILE)) >&2
@@ -37,7 +37,7 @@ $(LFC): $(LFILE)
 
 $(YFC): $(YFILE)
 	@echo + BISON src/$(notdir $(YFILE)) >&2
-	# @$(BISON) -o $(YFC) -d -v $(YFILE)
+	@$(BISON) -o $(YFC) -d -v $(YFILE)
 
 $(BUILD_DIR)/src/%.o: %.c
 	@echo + CC src/$(notdir $<) >&2
@@ -47,5 +47,5 @@ $(BUILD_DIR)/src/%.o: %.c
 
 .PHONY: clean test all
 
-test:
-	@./parser ../Test/test1.cmm
+# test:
+# 	@./parser ../Test/test1.cmm
