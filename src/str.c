@@ -24,7 +24,7 @@ String NSMTD(String, from_f, /, const char *format, ...) {
 String NSMTD(String, from_fv, /, const char *format, va_list args) {
     String ret = CREOBJ(String, /);
     int v = CALL(String, ret, pushfv, /, format, args);
-    ASSERT(v >= 0);
+    ASSERT(v >= 0, "pushfv failed");
     return ret;
 }
 

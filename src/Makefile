@@ -20,7 +20,7 @@ YFO := $(addprefix $(BUILD_DIR)/src/,$(YFO))
 all: $(BUILD_DIR)/src/parser $(BUILD_DIR)/libcompiler.a
 
 $(BUILD_DIR)/src/parser: $(YFO) $(filter-out $(LFO),$(OBJS))
-	@echo + LD src/$(notdir $<) >&2
+	@echo + LD src/$(notdir $@) >&2
 	@$(CC) -o $@ $(filter-out $(LFO),$(OBJS)) # -lfl -ly
 
 $(BUILD_DIR)/libcompiler.a: $(YFO) $(filter-out $(LFO) $(BUILD_DIR)/src/./main.o,$(OBJS))
@@ -45,7 +45,9 @@ $(BUILD_DIR)/src/%.o: %.c
 
 -include $(DEPS)
 
-.PHONY: clean test all
+.PHONY: clean all
 
+clean:
+	@rm -f *.yy.c *.tab.c *.tab.h syntax.output
 # test:
 # 	@./parser ../Test/test1.cmm

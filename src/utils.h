@@ -20,6 +20,11 @@
 #define CONCATENATE3(x, y, z) CONCATENATE(CONCATENATE(x, y), z)
 #undef CONCATENATE4
 #define CONCATENATE4(x, y, z, w) CONCATENATE(CONCATENATE3(x, y, z), w)
+#define VA_OPT_IDENTITY(x) x
+#define VA_OPT_EMPTY(x)
+#define CHOOSE_3rd(a, b, c, ...) c
+#define VA_OPT_ONE(s, ...)                                                     \
+    CHOOSE_3rd(_0, ##__VA_ARGS__, VA_OPT_IDENTITY, VA_OPT_EMPTY)(s)
 
 #define typeof __typeof__
 

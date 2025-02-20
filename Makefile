@@ -16,6 +16,8 @@ lib:
 	@$(MAKE) -C src --no-print-directory -s
 
 clean:
+	@$(MAKE) -C src clean --no-print-directory -s
+	@$(MAKE) -C tests clean --no-print-directory -s
 	@rm -rf $(BUILD_DIR) compile_commands.json $(WORK_DIR)/tests/vgcore.*
 
 .PHONY: all test testvg lib  clean
