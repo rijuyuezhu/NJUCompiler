@@ -4,18 +4,15 @@ BISON = bison
 CFLAGS = -std=c99
 $(shell mkdir -p $(BUILD_DIR)/src)
 
-CFILES = $(shell find ./ -name "*.c")
-OBJS := $(CFILES:.c=.o)
-OBJS := $(addprefix $(BUILD_DIR)/src/,$(OBJS))
-DEPS = $(addprefix $(BUILD_DIR)/src/, $(addsuffix .d,$(CFILES)))
+SRCS = $(shell find ./ -name "*.c")
+DEPS = $(addprefix $(BUILD_DIR)/src/, $(addsuffix .d,$(SRCS)))
+OBJS = $(addprefix $(BUILD_DIR)/src/, $(addsuffix .o,$(SRCS)))
 LFILE = $(shell find ./ -name "*.l")
 YFILE = $(shell find ./ -name "*.y")
 LFC = $(shell find ./ -name "*.l" | sed s/[^/]*\\.l/lex.yy.c/)
 YFC = $(shell find ./ -name "*.y" | sed s/[^/]*\\.y/syntax.tab.c/)
-LFO := $(LFC:.c=.o)
-LFO := $(addprefix $(BUILD_DIR)/src/,$(LFO))
-YFO := $(YFC:.c=.o)
-YFO := $(addprefix $(BUILD_DIR)/src/,$(YFO))
+LFO = $(addprefix $(BUILD_DIR)/src/, $(addsuffix .o,$(LFC)))
+YFO = $(addprefix $(BUILD_DIR)/src/, $(addsuffix .o,$(YFC)))
 
 all: $(BUILD_DIR)/src/parser $(BUILD_DIR)/libcompiler.a
 
@@ -23,7 +20,7 @@ $(BUILD_DIR)/src/parser: $(YFO) $(filter-out $(LFO),$(OBJS))
 	@echo + LD src/$(notdir $@) >&2
 	@$(CC) -o $@ $(filter-out $(LFO),$(OBJS)) # -lfl -ly
 
-$(BUILD_DIR)/libcompiler.a: $(YFO) $(filter-out $(LFO) $(BUILD_DIR)/src/./main.o,$(OBJS))
+$(BUILD_DIR)/libcompiler.a: $(YFO) $(filter-out $(LFO) $(BUILD_DIR)/src/./main.c.o,$(OBJS))
 	@echo + AR $(notdir $@) >&2
 	@ar rcs $@ $(filter-out $(LFO) $(BUILD_DIR)/src/./main.o,$(OBJS)) 
 
@@ -39,7 +36,7 @@ $(YFC): $(YFILE)
 	@echo + BISON src/$(notdir $(YFILE)) >&2
 	@$(BISON) -o $(YFC) -d -v $(YFILE)
 
-$(BUILD_DIR)/src/%.o: %.c
+$(BUILD_DIR)/src/%.c.o: %.c
 	@echo + CC src/$(notdir $<) >&2
 	@$(CC) $(CFLAGS) -c $< -o $@ -MMD
 
