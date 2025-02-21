@@ -82,6 +82,11 @@ class CommandSpace:
             files_to_delete.extend(glob.glob(f"./build/Lab/Code/*.{suffix}"))
         crun(f"rm -f {' '.join(files_to_delete)}")
         crun(f"cp {' '.join(files)} ./build/Lab/Code")
+        iprint("Preparation done. Try to compile")
+        crun("cd ./build/Lab/Code/ && make")
+        crun("cp ./build/Lab/Code/parser ./build/Lab/parser")
+        iprint("Compilation done. Try to test")
+        crun("cd ./build/Lab/Code/ && make test")
 
 
 #     def report(self, *_: str):
