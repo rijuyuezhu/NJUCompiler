@@ -3,35 +3,10 @@ import sys
 import os
 import glob
 
+from init_lib.utils import iprint, eprint, sprint, crun
+from init_lib import TestMain
+
 STUNAME = "221180115-黄文睿"
-
-
-def iprint(*args: str, end="\n") -> None:
-    print("\033[0;36m", end="")
-    print(*args, end="")
-    print("\033[0m", end="")
-    print(end, end="")
-
-
-def sprint(*args: str, end="\n") -> None:
-    print("\033[0;33m", end="")
-    print(*args, end="")
-    print("\033[0m", end="")
-    print(end, end="")
-
-
-def eprint(*args: str, end="\n") -> None:
-    print("\033[0;31m", end="")
-    print(*args, end="")
-    print("\033[0m", end="")
-    print(end, end="")
-
-
-def crun(cmd: str) -> None:
-    exit_code = os.system(cmd)
-    if exit_code != 0:
-        eprint(f"Error when running command '{cmd}'")
-        sys.exit(exit_code)
 
 
 class CommandSpace:
@@ -64,7 +39,44 @@ class CommandSpace:
     def test(self, *test_patterns: str):
         self.build()
         test_arg = " ".join(test_patterns)
+        iprint("===== Unit        Tests =====")
         crun(f"make testvg ARGS='{test_arg}'")
+        iprint("")
+        iprint("===== Integration Tests =====")
+        test_main = TestMain()
+        tests: list[str] = sorted([f for f in dir(TestMain) if not f.startswith("_")])
+        tests_run: list[str] = []
+        tests_filtered: list[str] = []
+        tests_not_found: list[str] = []
+        pos_pattern = (
+            [p for p in test_patterns if not p.startswith("-") and not p.startswith("+")] +
+            [p[1:] for p in test_patterns if p.startswith("+")
+        ])  # fmt: skip
+        neg_pattern = [p[1:] for p in test_patterns if p.startswith("-")]
+        for t in tests:
+            if (not pos_pattern or any(pattern in t for pattern in pos_pattern)) and (
+                not neg_pattern or not any(pattern in t for pattern in neg_pattern)
+            ):
+                if hasattr(test_main, t):
+                    tests_run.append(t)
+                else:
+                    tests_not_found.append(t)
+            else:
+                tests_filtered.append(t)
+        iprint("tests to run    : ", end="")
+        sprint(" ".join(tests_run))
+        iprint("tests filtered  : ", end="")
+        sprint(" ".join(tests_filtered))
+        iprint("tests not found : ", end="")
+        sprint(" ".join(tests_not_found))
+        iprint("")
+        for t in tests_run:
+            iprint(":: Start running test: ", end="")
+            sprint(t)
+            getattr(test_main, t)()
+            iprint(":: End   running test: ", end="")
+            sprint(t)
+        iprint("All tests finished")
 
     def t(self, *args: str):
         self.test(*args)

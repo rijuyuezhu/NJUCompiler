@@ -8,8 +8,8 @@
 DECLARE_PLAIN_VEC(VecTest, TestEntry, FUNC_STATIC);
 DEFINE_PLAIN_VEC(VecTest, TestEntry, FUNC_STATIC);
 
-/// @return: exit or not
-static bool fork_to_run_test(const TestEntry *test);
+static void fork_to_run_test(const TestEntry *test, bool *shall_exit,
+                             int *exit_code);
 
 int main(int argc, char *argv[]) {
     const TestEntry tests[] = {
@@ -77,15 +77,17 @@ int main(int argc, char *argv[]) {
 
     for (usize i = 0; i < test_run.size; i++) {
         const TestEntry *test = test_run.data + i;
-        bool to_exit = fork_to_run_test(test);
-        if (to_exit) {
+        bool shall_exit = false;
+        int exit_code = 0;
+        fork_to_run_test(test, &shall_exit, &exit_code);
+        if (shall_exit) {
             // subprocess, free the vectors to avoid memory leak false positive
             // in valgrind. Not necessary in normal execution.
             DROPOBJ(VecTest, test_filter);
             DROPOBJ(VecTest, test_run);
             DROPOBJ(VecCString, minus_pat);
             DROPOBJ(VecCString, plus_pat);
-            exit(0);
+            exit(exit_code);
         }
     }
 
@@ -97,30 +99,34 @@ int main(int argc, char *argv[]) {
     DROPOBJ(VecCString, plus_pat);
 }
 
-static bool fork_to_run_test(const TestEntry *test) {
+static void fork_to_run_test(const TestEntry *test, bool *shall_exit,
+                             int *exit_code) {
     printf("\033[0;36m:: Start running test: \033[0m\033[0;33m%s\033[0m\n",
            test->test_name);
 
     pid_t pid = fork();
     if (pid == -1) {
         perror("fork");
-        return true;
+        *shall_exit = true;
+        *exit_code = EXIT_FAILURE;
     } else if (pid == 0) {
         test->test_fn();
-        return true;
+        *shall_exit = true;
+        *exit_code = EXIT_SUCCESS;
     } else {
         int status;
         waitpid(pid, &status, 0);
-        if (!(WIFEXITED(status) && WEXITSTATUS(status) == 0)) {
+        if (!(WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS)) {
             printf(
                 "\033[0;31m!! Failure on    test: \033[0m\033[0;33m%s\033[0m\n",
                 test->test_name);
-            return true;
+            *shall_exit = true;
+            *exit_code = EXIT_FAILURE;
         } else {
             printf(
                 "\033[0;36m:: End   running test: \033[0m\033[0;33m%s\033[0m\n",
                 test->test_name);
-            return false;
+            *shall_exit = false;
         }
     }
 }

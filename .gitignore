@@ -5,6 +5,7 @@
 !*.h
 !*.l
 !*.y
+!*.py
 
 !Makefile
 !README.md
