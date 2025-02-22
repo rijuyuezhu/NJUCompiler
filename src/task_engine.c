@@ -5,11 +5,11 @@
 void MTD(TaskEngine, init, /, const char *file) {
     self->input_file = file;
     self->ast_root = NULL;
+    self->ast_error = false;
 }
 
 void MTD(TaskEngine, drop, /) {
-
-    if (self->ast_root != NULL) {
+    if (self->ast_root && !self->ast_error) {
         DROPOBJHEAP(AstNode, self->ast_root);
         self->ast_root = NULL;
     }
@@ -20,7 +20,7 @@ extern FILE *yyin;
 extern void yyrestart(FILE *input_file);
 extern void yylex_destroy();
 
-void MTD(TaskEngine, analyze_ast, /) {
+void MTD(TaskEngine, parse_ast, /) {
     ASSERT(self->ast_root == NULL, "AST already analyzed");
 
     FILE *fp = fopen(self->input_file, "r");
@@ -29,7 +29,7 @@ void MTD(TaskEngine, analyze_ast, /) {
         exit(EXIT_FAILURE);
     }
     yyrestart(fp);
-    yyparse(&self->ast_root);
+    yyparse(self);
     yylex_destroy();
     fclose(fp);
 }

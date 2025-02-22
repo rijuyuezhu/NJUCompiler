@@ -5,6 +5,7 @@
 #include "syntax.tab.h"
 #include <stdio.h>
 static int yycolumn = 1;
+bool has_lexical_err = false;
 #define YY_USER_ACTION                                                         \
     yylloc.first_line = yylloc.last_line = yylineno;                           \
     yylloc.first_column = yycolumn;                                            \
@@ -42,12 +43,9 @@ static float parse_to_float(const char *str) {
 
 
 
-%x BLOCKCOMMENT
-
 newline \n
 whitespace [ \t\r]+
 blockcomment_start "/*"
-blockcomment_end "*/"
 
 linecomment "//".*
 digit [0-9]
@@ -57,21 +55,40 @@ decimal [1-9][0-9]*
 octal 0[0-7]*
 hexadecimal 0[xX][0-9a-fA-F]+
 
-float_normal [0-9]*\.[0-9]+|[0-9]+\.
-float_exp {float_normal}[eE]([+-]?)[0-9]+
+float_normal [0-9]+\.[0-9]+
+float_exp_m [0-9]*\.[0-9]+|[0-9]+\. 
+float_exp {float_exp_m}[eE]([+-]?)[0-9]+
 
 ident {letter_}({letter_}|{digit})*
 
 %%
 
-<BLOCKCOMMENT>{newline} { yycolumn = 1; }
-<BLOCKCOMMENT>{blockcomment_end} { BEGIN(INITIAL); }
-<BLOCKCOMMENT>. {}
-<BLOCKCOMMENT><<EOF>> { printf("Error type A at Line %d: Missing */ for block comment.\n", yylineno); }
+{blockcomment_start} {
+    while (true) {
+        int c = input();
+        if (c == 0) {
+            printf("Error type A at Line %d: No matched block comment.\n", yylineno);
+            has_lexical_err = true;
+            return 0;
+        } else if (c == '\n') {
+            yycolumn = 1;
+        } else {
+            if (c == '*') {
+                if ((c = input()) == '/') {
+                    break;
+                } else {
+                    unput(c);
+                }
+            }
+            yyleng = 1;
+            YY_USER_ACTION
+        }
+    }
+}
 
 {newline} { yycolumn = 1; }
+
 {linecomment} {}
-{blockcomment_start} { BEGIN(BLOCKCOMMENT); }
 
 {whitespace} {}
 ";" { LEX_BASIC_ACTION(SEMI); }
@@ -103,5 +120,5 @@ int|float { yylval = LEX_CREATE_ASTNODE_STR("TYPE", yytext); return TK_TYPE; }
 {float_exp}|{float_normal} { yylval = LEX_CREATE_ASTNODE(float, "FLOAT", parse_to_float(yytext)); return TK_FLOAT; }
 {ident} { yylval = LEX_CREATE_ASTNODE_STR("ID", yytext); return TK_ID; }
 
-. { printf("Error type A at Line %d: Mystrerious character \"%d\".\n", yylineno, (int)yytext[0]); }
+. { printf("Error type A at Line %d: Mystrerious character \"%c\".\n", yylineno, yytext[0]); has_lexical_err = true; }
 %%

@@ -21,7 +21,7 @@ $(BUILD_DIR)/tests/%.c.o: %.c
 
 $(TEST_EXE): $(OBJS) $(BUILD_DIR)/libcompiler.a
 	@echo + LD tests/$(notdir $@) >&2
-	@$(CC) $(CFLAGS) $^ -o $@ -L$(BUILD_DIR) -lcompiler -lfl -ly
+	@$(CC) $(CFLAGS) $^ -o $@ -L$(BUILD_DIR) -lcompiler # -lfl -ly
 
 clean:
 

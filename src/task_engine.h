@@ -6,9 +6,10 @@ typedef struct TaskEngine {
     const char *input_file;
 
     AstNode *ast_root;
+    bool ast_error;
 } TaskEngine;
 
 void MTD(TaskEngine, init, /, const char *file);
 void MTD(TaskEngine, drop, /);
-void MTD(TaskEngine, analyze_ast, /);
+void MTD(TaskEngine, parse_ast, /);
 void MTD(TaskEngine, output_ast, /);

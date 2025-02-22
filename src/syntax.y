@@ -1,56 +1,64 @@
 %code requires {
-#include "ast.h"
+#include "task_engine.h"
 }
 %{
 #include "ast.h"
 #include "lex.yy.c"
 #include "utils.h"
 #include <stdio.h>
-static void yyerror(AstNode **root, char *msg) {
-    printf("Error type B at line %d: \n", yylloc.first_line, msg);
+extern bool has_lexical_err;
+static void yyerror(TaskEngine *engine, char *msg) {
+    if (!has_lexical_err) {
+        printf("Error type B at line %d: %s.\n", yylloc.first_line, msg);
+    }
+    engine->ast_error = true;
 }
 
-#define SYNTAX_BASIC_ACTION(name, line_no)                                              \
+#define SYNTAX_BASIC_ACTION(name, line_no)                                     \
     ({                                                                         \
         String MPROT(s) = NSCALL(String, from_raw, /, name);                   \
-        NSCALL(AstNode, creheap_inner, /, line_no, MPROT(s));        \
+        NSCALL(AstNode, creheap_inner, /, line_no, MPROT(s));                  \
     })
 
-#define SYNTAX_BASIC_ACTION1(name, line_no, arg1)                                       \
+#define SYNTAX_BASIC_ACTION1(name, line_no, arg1)                              \
     ({                                                                         \
         String MPROT(s) = NSCALL(String, from_raw, /, name);                   \
         AstNode *MPROT(n) =                                                    \
-            NSCALL(AstNode, creheap_inner, /, line_no, MPROT(s));    \
+            NSCALL(AstNode, creheap_inner, /, line_no, MPROT(s));              \
+        CALL(VecPtr, MPROT(n)->children, reserve, /, 1);                       \
         NSCALL(AstNode, add_child, /, MPROT(n), arg1);                         \
         MPROT(n);                                                              \
     })
 
-#define SYNTAX_BASIC_ACTION2(name, line_no, arg1, arg2)                                 \
+#define SYNTAX_BASIC_ACTION2(name, line_no, arg1, arg2)                        \
     ({                                                                         \
         String MPROT(s) = NSCALL(String, from_raw, /, name);                   \
         AstNode *MPROT(n) =                                                    \
-            NSCALL(AstNode, creheap_inner, /, line_no, MPROT(s));    \
+            NSCALL(AstNode, creheap_inner, /, line_no, MPROT(s));              \
+        CALL(VecPtr, MPROT(n)->children, reserve, /, 2);                       \
         NSCALL(AstNode, add_child, /, MPROT(n), arg1);                         \
         NSCALL(AstNode, add_child, /, MPROT(n), arg2);                         \
         MPROT(n);                                                              \
     })
 
-#define SYNTAX_BASIC_ACTION3(name, line_no, arg1, arg2, arg3)                           \
+#define SYNTAX_BASIC_ACTION3(name, line_no, arg1, arg2, arg3)                  \
     ({                                                                         \
         String MPROT(s) = NSCALL(String, from_raw, /, name);                   \
         AstNode *MPROT(n) =                                                    \
-            NSCALL(AstNode, creheap_inner, /, line_no, MPROT(s));    \
+            NSCALL(AstNode, creheap_inner, /, line_no, MPROT(s));              \
+        CALL(VecPtr, MPROT(n)->children, reserve, /, 3);                       \
         NSCALL(AstNode, add_child, /, MPROT(n), arg1);                         \
         NSCALL(AstNode, add_child, /, MPROT(n), arg2);                         \
         NSCALL(AstNode, add_child, /, MPROT(n), arg3);                         \
         MPROT(n);                                                              \
     })
 
-#define SYNTAX_BASIC_ACTION4(name, line_no, arg1, arg2, arg3, arg4)                     \
+#define SYNTAX_BASIC_ACTION4(name, line_no, arg1, arg2, arg3, arg4)            \
     ({                                                                         \
         String MPROT(s) = NSCALL(String, from_raw, /, name);                   \
         AstNode *MPROT(n) =                                                    \
-            NSCALL(AstNode, creheap_inner, /, line_no, MPROT(s));    \
+            NSCALL(AstNode, creheap_inner, /, line_no, MPROT(s));              \
+        CALL(VecPtr, MPROT(n)->children, reserve, /, 4);                       \
         NSCALL(AstNode, add_child, /, MPROT(n), arg1);                         \
         NSCALL(AstNode, add_child, /, MPROT(n), arg2);                         \
         NSCALL(AstNode, add_child, /, MPROT(n), arg3);                         \
@@ -58,11 +66,12 @@ static void yyerror(AstNode **root, char *msg) {
         MPROT(n);                                                              \
     })
 
-#define SYNTAX_BASIC_ACTION5(name, line_no, arg1, arg2, arg3, arg4, arg5)               \
+#define SYNTAX_BASIC_ACTION5(name, line_no, arg1, arg2, arg3, arg4, arg5)      \
     ({                                                                         \
         String MPROT(s) = NSCALL(String, from_raw, /, name);                   \
         AstNode *MPROT(n) =                                                    \
-            NSCALL(AstNode, creheap_inner, /, line_no, MPROT(s));    \
+            NSCALL(AstNode, creheap_inner, /, line_no, MPROT(s));              \
+        CALL(VecPtr, MPROT(n)->children, reserve, /, 5);                       \
         NSCALL(AstNode, add_child, /, MPROT(n), arg1);                         \
         NSCALL(AstNode, add_child, /, MPROT(n), arg2);                         \
         NSCALL(AstNode, add_child, /, MPROT(n), arg3);                         \
@@ -71,11 +80,13 @@ static void yyerror(AstNode **root, char *msg) {
         MPROT(n);                                                              \
     })
 
-#define SYNTAX_BASIC_ACTION6(name, line_no, arg1, arg2, arg3, arg4, arg5, arg6)         \
+#define SYNTAX_BASIC_ACTION6(name, line_no, arg1, arg2, arg3, arg4, arg5,      \
+                             arg6)                                             \
     ({                                                                         \
         String MPROT(s) = NSCALL(String, from_raw, /, name);                   \
         AstNode *MPROT(n) =                                                    \
-            NSCALL(AstNode, creheap_inner, /, line_no, MPROT(s));    \
+            NSCALL(AstNode, creheap_inner, /, line_no, MPROT(s));              \
+        CALL(VecPtr, MPROT(n)->children, reserve, /, 6);                       \
         NSCALL(AstNode, add_child, /, MPROT(n), arg1);                         \
         NSCALL(AstNode, add_child, /, MPROT(n), arg2);                         \
         NSCALL(AstNode, add_child, /, MPROT(n), arg3);                         \
@@ -85,11 +96,13 @@ static void yyerror(AstNode **root, char *msg) {
         MPROT(n);                                                              \
     })
 
-#define SYNTAX_BASIC_ACTION7(name, line_no, arg1, arg2, arg3, arg4, arg5, arg6, arg7)   \
+#define SYNTAX_BASIC_ACTION7(name, line_no, arg1, arg2, arg3, arg4, arg5,      \
+                             arg6, arg7)                                       \
     ({                                                                         \
         String MPROT(s) = NSCALL(String, from_raw, /, name);                   \
         AstNode *MPROT(n) =                                                    \
-            NSCALL(AstNode, creheap_inner, /, line_no, MPROT(s));    \
+            NSCALL(AstNode, creheap_inner, /, line_no, MPROT(s));              \
+        CALL(VecPtr, MPROT(n)->children, reserve, /, 7);                       \
         NSCALL(AstNode, add_child, /, MPROT(n), arg1);                         \
         NSCALL(AstNode, add_child, /, MPROT(n), arg2);                         \
         NSCALL(AstNode, add_child, /, MPROT(n), arg3);                         \
@@ -102,7 +115,7 @@ static void yyerror(AstNode **root, char *msg) {
 %}
 
 %define api.value.type { typeof(AstNode*) }
-%parse-param { typeof(AstNode**) root }
+%parse-param { typeof(TaskEngine) *engine }
 %locations
 
 %token TK_SEMI TK_COMMA
@@ -135,7 +148,7 @@ static void yyerror(AstNode **root, char *msg) {
 /* High-level Definitions */
 
 Program
-    : ExtDefList { *root = SYNTAX_BASIC_ACTION1("Program", @$.first_line, $1); }
+    : ExtDefList { engine->ast_root = SYNTAX_BASIC_ACTION1("Program", @$.first_line, $1); }
     ;
 
 ExtDefList
@@ -147,7 +160,8 @@ ExtDef
     : Specifier ExtDecList TK_SEMI { $$ = SYNTAX_BASIC_ACTION3("ExtDef", @$.first_line, $1, $2, $3); }
     | Specifier TK_SEMI { $$ = SYNTAX_BASIC_ACTION2("ExtDef", @$.first_line, $1, $2); }
     | Specifier FunDec CompSt { $$ = SYNTAX_BASIC_ACTION3("ExtDef", @$.first_line, $1, $2, $3); }
-    ;
+    | Specifier error CompSt
+    | Specifier error TK_SEMI
 
 ExtDecList
     : VarDec { $$ = SYNTAX_BASIC_ACTION1("ExtDecList", @$.first_line, $1); }
@@ -164,6 +178,7 @@ Specifier
 StructSpecifier
     : TK_STRUCT OptTag TK_LC DefList TK_RC { $$ = SYNTAX_BASIC_ACTION5("StructSpecifier", @$.first_line, $1, $2, $3, $4, $5); }
     | TK_STRUCT Tag { $$ = SYNTAX_BASIC_ACTION2("StructSpecifier", @$.first_line, $1, $2); }
+    | TK_STRUCT OptTag TK_LC error TK_RC
     ;
 
 OptTag
@@ -180,11 +195,14 @@ Tag
 VarDec
     : TK_ID { $$ = SYNTAX_BASIC_ACTION1("VarDec", @$.first_line, $1); }
     | VarDec TK_LB TK_INT TK_RB { $$ = SYNTAX_BASIC_ACTION4("VarDec", @$.first_line, $1, $2, $3, $4); }
+    | VarDec TK_LB error TK_RB
     ;
 
 FunDec
     : TK_ID TK_LP VarList TK_RP { $$ = SYNTAX_BASIC_ACTION4("FunDec", @$.first_line, $1, $2, $3, $4); }
     | TK_ID TK_LP TK_RP { $$ = SYNTAX_BASIC_ACTION3("FunDec", @$.first_line, $1, $2, $3); }
+    | TK_ID TK_LP error TK_RP
+    | error TK_LP VarList TK_RP
     ;
 
 VarList
@@ -200,6 +218,7 @@ ParamDec
 
 CompSt
     : TK_LC DefList StmtList TK_RC { $$ = SYNTAX_BASIC_ACTION4("CompSt", @$.first_line, $1, $2, $3, $4); }
+    | error TK_RC
     ;
 
 StmtList
@@ -214,6 +233,8 @@ Stmt
     | TK_IF TK_LP Exp TK_RP Stmt %prec LOWER_THAN_ELSE { $$ = SYNTAX_BASIC_ACTION5("Stmt", @$.first_line, $1, $2, $3, $4, $5); }
     | TK_IF TK_LP Exp TK_RP Stmt TK_ELSE Stmt { $$ = SYNTAX_BASIC_ACTION7("Stmt", @$.first_line, $1, $2, $3, $4, $5, $6, $7); }
     | TK_WHILE TK_LP Exp TK_RP Stmt { $$ = SYNTAX_BASIC_ACTION5("Stmt", @$.first_line, $1, $2, $3, $4, $5); }
+    | TK_IF error TK_RP Stmt %prec LOWER_THAN_ELSE
+    | TK_IF error TK_RP Stmt TK_ELSE Stmt
     ;
 
 /* Local Definitions */
@@ -225,6 +246,7 @@ DefList
 
 Def
     : Specifier DecList TK_SEMI { $$ = SYNTAX_BASIC_ACTION3("Def", @$.first_line, $1, $2, $3); }
+    | Specifier error TK_SEMI
     ;
 
 DecList
@@ -258,6 +280,7 @@ Exp
     | TK_ID { $$ = SYNTAX_BASIC_ACTION1("Exp", @$.first_line, $1); }
     | TK_INT { $$ = SYNTAX_BASIC_ACTION1("Exp", @$.first_line, $1); }
     | TK_FLOAT { $$ = SYNTAX_BASIC_ACTION1("Exp", @$.first_line, $1); }
+    | error
     ;
 
 Args

@@ -15,8 +15,6 @@ int main(int argc, char *argv[]) {
     const TestEntry tests[] = {
         TESTENTRY(plain_vec), TESTENTRY(class_vec), TESTENTRY(map),
         TESTENTRY(hstr),
-        // TESTENTRY(lexical), // stage-used test
-        TESTENTRY(syntax), // stage-used test
     };
 
     const usize n_tests = LENGTH(tests);
