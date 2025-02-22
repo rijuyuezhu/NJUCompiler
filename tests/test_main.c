@@ -17,6 +17,8 @@ int main(int argc, char *argv[]) {
         TESTENTRY(class_vec),
         TESTENTRY(map),
         TESTENTRY(hstr),
+        // TESTENTRY(lexical), // stage-used test
+        TESTENTRY(syntax), // stage-used test
     };
 
     const usize n_tests = LENGTH(tests);
@@ -90,8 +92,6 @@ int main(int argc, char *argv[]) {
             exit(exit_code);
         }
     }
-
-    printf("\033[0;36mAll tests finished\033[0m\n");
 
     DROPOBJ(VecTest, test_filter);
     DROPOBJ(VecTest, test_run);

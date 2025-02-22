@@ -18,7 +18,7 @@ all: $(BUILD_DIR)/src/parser $(BUILD_DIR)/libcompiler.a
 
 $(BUILD_DIR)/src/parser: $(YFO) $(filter-out $(LFO),$(OBJS))
 	@echo + LD src/$(notdir $@) >&2
-	@$(CC) -o $@ $(filter-out $(LFO),$(OBJS)) # -lfl -ly
+	@$(CC) -o $@ $(filter-out $(LFO),$(OBJS)) -lfl -ly
 
 $(BUILD_DIR)/libcompiler.a: $(YFO) $(filter-out $(LFO) $(BUILD_DIR)/src/./main.c.o,$(OBJS))
 	@echo + AR $(notdir $@) >&2
@@ -46,5 +46,3 @@ $(BUILD_DIR)/src/%.c.o: %.c
 
 clean:
 	@rm -f *.yy.c *.tab.c *.tab.h syntax.output
-# test:
-# 	@./parser ../Test/test1.cmm

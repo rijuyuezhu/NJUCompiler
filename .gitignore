@@ -6,6 +6,7 @@
 !*.l
 !*.y
 !*.py
+!*.cmm
 
 !Makefile
 !README.md

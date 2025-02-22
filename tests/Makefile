@@ -19,9 +19,9 @@ $(BUILD_DIR)/tests/%.c.o: %.c
 	@echo + CC tests/$(notdir $<) >&2
 	@$(CC) $(CFLAGS) -c $< -o $@ -MMD
 
-$(TEST_EXE): $(OBJS)
+$(TEST_EXE): $(OBJS) $(BUILD_DIR)/libcompiler.a
 	@echo + LD tests/$(notdir $@) >&2
-	@$(CC) $(CFLAGS) $^ -o $@ -L$(BUILD_DIR) -lcompiler
+	@$(CC) $(CFLAGS) $^ -o $@ -L$(BUILD_DIR) -lcompiler -lfl -ly
 
 clean:
 
