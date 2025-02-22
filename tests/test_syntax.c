@@ -1,12 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "ast.h"
 #include "syntax.tab.h"
 
 extern FILE *yyin;
 
 extern void yyrestart(FILE *input_file);
-
 extern void yylex_destroy();
 
 void test_syntax() {
@@ -16,7 +16,9 @@ void test_syntax() {
         exit(EXIT_FAILURE);
     }
     yyrestart(fp);
-    yyparse();
+    AstNode *root = NULL;
+    yyparse(&root);
     yylex_destroy();
     fclose(fp);
+    DROPOBJHEAP(AstNode, root);
 }

@@ -16,6 +16,7 @@ build
 *.yy.c
 *.tab.c
 *.tab.h
-
+__pycache__
+.vscode
 
 !/Original-Lab/**/*

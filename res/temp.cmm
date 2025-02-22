@@ -1,9 +1,4 @@
 int main() {
-  int arr[5], ;
-  int sum = 0, i = 0;
-  while (i < 5) {
-    sum = sum + arr[i];
-    i = i + 1;
-  }
-  return 0;
+    float num1 = 0.23e-4;
+    float num2 = -9.99E6;
 }

@@ -1,7 +1,6 @@
 CC = gcc
 FLEX = flex
 BISON = bison
-CFLAGS = -std=c99
 $(shell mkdir -p $(BUILD_DIR)/src)
 
 SRCS = $(shell find ./ -name "*.c")
