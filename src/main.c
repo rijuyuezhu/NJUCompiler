@@ -6,7 +6,7 @@ int main(int argc, char *argv[]) {
     TaskEngine engine = CREOBJ(TaskEngine, /, argv[1]);
     CALL(TaskEngine, engine, parse_ast, /);
     if (engine.ast_root && !engine.ast_error) { // No error in parsing
-        CALL(TaskEngine, engine, output_ast, /);
+        CALL(TaskEngine, engine, print_ast, /);
     }
     DROPOBJ(TaskEngine, engine);
 }

@@ -7,12 +7,10 @@
 static int yycolumn = 1;
 bool has_lexical_err = false;
 #define YY_USER_ACTION                                                         \
-    ({                                                                         \
-        yylloc.first_line = yylloc.last_line = yylineno;                       \
-        yylloc.first_column = yycolumn;                                        \
-        yylloc.last_column = yycolumn + yyleng - 1;                            \
-        yycolumn += yyleng;                                                    \
-    })
+    yylloc.first_line = yylloc.last_line = yylineno;                           \
+    yylloc.first_column = yycolumn;                                            \
+    yylloc.last_column = yycolumn + yyleng - 1;                                \
+    yycolumn += yyleng;                                                        \
 
 #define LEX_CREATE_ASTNODE(kind, name, ...)                                    \
     ({                                                                         \
