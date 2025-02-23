@@ -36,5 +36,5 @@ AstNode *NSMTD(AstNode, creheap_string, /, int line_no, String grammar_name,
 AstNode *NSMTD(AstNode, creheap_inner, /, int line_no, String grammar_name);
 
 void MTD(AstNode, add_child, /, AstNode *child);
-void MTD(AstNode, print_subtree, /, int depth);
+void MTD(AstNode, print_subtree, /, usize depth);
 void MTD(AstNode, drop, /);

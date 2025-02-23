@@ -54,8 +54,8 @@ void MTD(AstNode, add_child, /, AstNode *child) {
     CALL(VecPtr, self->children, push_back, /, child);
 }
 
-void MTD(AstNode, print_subtree, /, int depth) {
-    for (int i = 0; i < depth; i++) {
+void MTD(AstNode, print_subtree, /, usize depth) {
+    for (usize i = 0; i < depth; i++) {
         printf("  ");
     }
     switch (self->type) {

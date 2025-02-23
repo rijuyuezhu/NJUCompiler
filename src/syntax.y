@@ -8,7 +8,7 @@
 #include <stdio.h>
 extern bool has_lexical_err;
 static void yyerror(TaskEngine *engine, char *msg) {
-    if (!has_lexical_err) {
+    if (!has_lexical_err) { // lexical error has higher priority
         printf("Error type B at line %d: %s.\n", yylloc.first_line, msg);
     }
     engine->ast_error = true;

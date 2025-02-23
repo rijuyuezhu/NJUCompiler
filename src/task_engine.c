@@ -34,7 +34,7 @@ void MTD(TaskEngine, parse_ast, /) {
     fclose(fp);
 }
 
-void MTD(TaskEngine, output_ast, /) {
+void MTD(TaskEngine, print_ast, /) {
     ASSERT(self->ast_root != NULL, "AST not analyzed yet");
     CALL(AstNode, *self->ast_root, print_subtree, /, 0);
 }

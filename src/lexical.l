@@ -7,10 +7,12 @@
 static int yycolumn = 1;
 bool has_lexical_err = false;
 #define YY_USER_ACTION                                                         \
-    yylloc.first_line = yylloc.last_line = yylineno;                           \
-    yylloc.first_column = yycolumn;                                            \
-    yylloc.last_column = yycolumn + yyleng - 1;                                \
-    yycolumn += yyleng;
+    ({                                                                         \
+        yylloc.first_line = yylloc.last_line = yylineno;                       \
+        yylloc.first_column = yycolumn;                                        \
+        yylloc.last_column = yycolumn + yyleng - 1;                            \
+        yycolumn += yyleng;                                                    \
+    })
 
 #define LEX_CREATE_ASTNODE(kind, name, ...)                                    \
     ({                                                                         \
@@ -67,7 +69,8 @@ ident {letter_}({letter_}|{digit})*
     while (true) {
         int c = input();
         if (c == 0) {
-            printf("Error type A at Line %d: No matched block comment.\n", yylineno);
+            printf("Error type A at Line %d: No matched block comment.\n",
+                yylineno);
             has_lexical_err = true;
             return 0;
         } else if (c == '\n') {
@@ -75,13 +78,15 @@ ident {letter_}({letter_}|{digit})*
         } else {
             if (c == '*') {
                 if ((c = input()) == '/') {
+                    yyleng = 2;
+                    YY_USER_ACTION;
                     break;
                 } else {
                     unput(c);
                 }
             }
             yyleng = 1;
-            YY_USER_ACTION
+            YY_USER_ACTION;
         }
     }
 }
@@ -120,5 +125,5 @@ int|float { yylval = LEX_CREATE_ASTNODE_STR("TYPE", yytext); return TK_TYPE; }
 {float_exp}|{float_normal} { yylval = LEX_CREATE_ASTNODE(float, "FLOAT", parse_to_float(yytext)); return TK_FLOAT; }
 {ident} { yylval = LEX_CREATE_ASTNODE_STR("ID", yytext); return TK_ID; }
 
-. { printf("Error type A at Line %d: Mystrerious character \"%c\".\n", yylineno, yytext[0]); has_lexical_err = true; }
+. { printf("Error type A at Line %d: Mysterious character \"%c\".\n", yylineno, yytext[0]); has_lexical_err = true; }
 %%

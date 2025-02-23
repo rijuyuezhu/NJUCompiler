@@ -7,11 +7,14 @@
 !*.y
 !*.py
 !*.cmm
+!*.typ
 
 !Makefile
 !README.md
 !.gitignore
 !init
+
+
 build
 *.yy.c
 *.tab.c

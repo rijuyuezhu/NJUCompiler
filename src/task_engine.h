@@ -12,4 +12,4 @@ typedef struct TaskEngine {
 void MTD(TaskEngine, init, /, const char *file);
 void MTD(TaskEngine, drop, /);
 void MTD(TaskEngine, parse_ast, /);
-void MTD(TaskEngine, output_ast, /);
+void MTD(TaskEngine, print_ast, /);
