@@ -97,12 +97,23 @@ class CommandSpace:
         iprint("Preparation done. Try to compile")
         crun("cd ./build/Lab/Code/ && make")
         crun("cp ./build/Lab/Code/parser ./build/Lab/parser")
+        crun("chmod +x ./build/Lab/parser")
         iprint("Compilation done. Try to test")
-        crun("cd ./build/Lab/Code/ && make test")
+        crun("cd ./build/Lab/Code/ && make test | head -n8")
+        iprint("Test done. Clean up")
+        crun("cd ./build/Lab/Code/ && make clean")
+        iprint("Generate report")
+        crun("typst c report/report.typ ./build/Lab/report.pdf")
+        iprint("Zipping files")
+        crun("cd ./build/Lab && zip -r 221180115.zip *")
+        target = "~/Downloads/"
+        iprint(f"Copy zip to {target}")
+        crun(f"cp ./build/Lab/221180115.zip {target}")
+
+    # def report(self, *_: str):
+    #     crun(f"typst c report/report.typ {STUNAME}.pdf")
 
 
-#     def report(self, *_: str):
-#         crun(f"typst c report/report.typ {STUNAME}.pdf")
 #
 #     def zip(self, *_: str):
 #         self.report()
