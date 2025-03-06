@@ -1,21 +1,22 @@
 %option yylineno
 
 %{
+#include <stdio.h>
+#include <string.h>
+
 #include "ast.h"
 #include "syntax.tab.h"
-#include <stdio.h>
 static int yycolumn = 1;
 bool has_lexical_err = false;
 #define YY_USER_ACTION                                                         \
     yylloc.first_line = yylloc.last_line = yylineno;                           \
     yylloc.first_column = yycolumn;                                            \
     yylloc.last_column = yycolumn + yyleng - 1;                                \
-    yycolumn += yyleng;                                                        \
+    yycolumn += yyleng;
 
 #define LEX_CREATE_ASTNODE(kind, name, ...)                                    \
     ({                                                                         \
-        String MPROT(s) = NSCALL(String, from_raw, /, name);                   \
-        NSCALL(AstNode, CONCATENATE(creheap_, kind), /, yylineno, MPROT(s),    \
+        NSCALL(AstNode, CONCATENATE(creheap_, kind), /, yylineno, name,        \
                ##__VA_ARGS__);                                                 \
     })
 #define LEX_CREATE_ASTNODE_STR(name, attr)                                     \
@@ -38,6 +39,29 @@ static float parse_to_float(const char *str) {
     float ret;
     sscanf(str, "%f", &ret);
     return ret;
+}
+static RelopKind parse_to_relop(const char *str) {
+    usize len = strlen(str);
+    ASSERT(1 <= len && len <= 2);
+    if (len == 1) {
+        if (str[0] == '>') {
+            return RelopGT;
+        } else if (str[0] == '<') {
+            return RelopLT;
+        }
+    } else {
+        ASSERT(str[1] == '=');
+        if (str[0] == '>') {
+            return RelopGE;
+        } else if (str[0] == '<') {
+            return RelopLE;
+        } else if (str[0] == '!') {
+            return RelopNE;
+        } else if (str[0] == '=') {
+            return RelopEQ;
+        }
+    }
+    ASSERT(false);
 }
 %}
 
@@ -97,7 +121,7 @@ ident {letter_}({letter_}|{digit})*
 ";" { LEX_BASIC_ACTION(SEMI); }
 "," { LEX_BASIC_ACTION(COMMA); }
 "=" { LEX_BASIC_ACTION(ASSIGNOP); }
->|<|>=|<=|==|!= { LEX_BASIC_ACTION(RELOP); }
+>|<|>=|<=|==|!= { yylval = LEX_CREATE_ASTNODE(relop, "RELOP", parse_to_relop(yytext)); return TK_RELOP; } 
 "+" { LEX_BASIC_ACTION(PLUS); }
 "-" { LEX_BASIC_ACTION(MINUS); }
 "*" { LEX_BASIC_ACTION(STAR); }
