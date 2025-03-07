@@ -27,4 +27,4 @@ clean:
 
 -include $(DEPS)
 
-.PHONY: all test testvg clean
+.PHONY: all test testvg clean run runvg

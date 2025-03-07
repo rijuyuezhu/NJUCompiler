@@ -9,7 +9,7 @@ void MTD(TaskEngine, init, /, const char *file) {
 }
 
 void MTD(TaskEngine, drop, /) {
-    if (self->ast_root && !self->ast_error) {
+    if (self->ast_root) {
         DROPOBJHEAP(AstNode, self->ast_root);
         self->ast_root = NULL;
     }
@@ -35,6 +35,7 @@ void MTD(TaskEngine, parse_ast, /) {
 }
 
 void MTD(TaskEngine, print_ast, /) {
-    ASSERT(self->ast_root != NULL, "AST not analyzed yet");
+    ASSERT(self->ast_root != NULL && !self->ast_error,
+           "AST not analyzed yet, or error occurred");
     CALL(AstNode, *self->ast_root, print_subtree, /, 0);
 }

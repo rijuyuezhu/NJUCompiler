@@ -15,6 +15,12 @@ YFO = $(addprefix $(BUILD_DIR)/src/, $(addsuffix .o,$(YFC)))
 
 all: $(BUILD_DIR)/src/parser $(BUILD_DIR)/libcompiler.a
 
+run: $(BUILD_DIR)/src/parser
+	@$(BUILD_DIR)/src/parser $(ARGS)
+
+runvg: $(BUILD_DIR)/src/parser
+	@valgrind $(VALGRIND_ARGS) $(BUILD_DIR)/src/parser $(ARGS)
+
 $(BUILD_DIR)/src/parser: $(YFO) $(filter-out $(LFO),$(OBJS))
 	@echo + LD src/$(notdir $@) >&2
 	@$(CC) -o $@ $(filter-out $(LFO),$(OBJS)) -lfl -ly

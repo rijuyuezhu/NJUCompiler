@@ -104,10 +104,66 @@ static void yyerror(TaskEngine *engine, char *msg) {
         NSCALL(AstNode, add_child, /, MPROT(n), arg7);                         \
         MPROT(n);                                                              \
     })
+#define FACING_ERROR1(it, arg1)                                                \
+    ({                                                                         \
+        DROPOBJHEAP(AstNode, arg1);                                            \
+        it = NULL;                                                             \
+    })
+#define FACING_ERROR2(it, arg1, arg2)                                          \
+    ({                                                                         \
+        DROPOBJHEAP(AstNode, arg1);                                            \
+        DROPOBJHEAP(AstNode, arg2);                                            \
+        it = NULL;                                                             \
+    })
+#define FACING_ERROR3(it, arg1, arg2, arg3)                                    \
+    ({                                                                         \
+        DROPOBJHEAP(AstNode, arg1);                                            \
+        DROPOBJHEAP(AstNode, arg2);                                            \
+        DROPOBJHEAP(AstNode, arg3);                                            \
+        it = NULL;                                                             \
+    })
+#define FACING_ERROR4(it, arg1, arg2, arg3, arg4)                              \
+    ({                                                                         \
+        DROPOBJHEAP(AstNode, arg1);                                            \
+        DROPOBJHEAP(AstNode, arg2);                                            \
+        DROPOBJHEAP(AstNode, arg3);                                            \
+        DROPOBJHEAP(AstNode, arg4);                                            \
+        it = NULL;                                                             \
+    })
+#define FACING_ERROR5(it, arg1, arg2, arg3, arg4, arg5)                        \
+    ({                                                                         \
+        DROPOBJHEAP(AstNode, arg1);                                            \
+        DROPOBJHEAP(AstNode, arg2);                                            \
+        DROPOBJHEAP(AstNode, arg3);                                            \
+        DROPOBJHEAP(AstNode, arg4);                                            \
+        DROPOBJHEAP(AstNode, arg5);                                            \
+        it = NULL;                                                             \
+    })
+#define FACING_ERROR6(it, arg1, arg2, arg3, arg4, arg5, arg6)                  \
+    ({                                                                         \
+        DROPOBJHEAP(AstNode, arg1);                                            \
+        DROPOBJHEAP(AstNode, arg2);                                            \
+        DROPOBJHEAP(AstNode, arg3);                                            \
+        DROPOBJHEAP(AstNode, arg4);                                            \
+        DROPOBJHEAP(AstNode, arg5);                                            \
+        DROPOBJHEAP(AstNode, arg6);                                            \
+        it = NULL;                                                             \
+    })
+#define FACING_ERROR7(it, arg1, arg2, arg3, arg4, arg5, arg6, arg7)            \
+    ({                                                                         \
+        DROPOBJHEAP(AstNode, arg1);                                            \
+        DROPOBJHEAP(AstNode, arg2);                                            \
+        DROPOBJHEAP(AstNode, arg3);                                            \
+        DROPOBJHEAP(AstNode, arg4);                                            \
+        DROPOBJHEAP(AstNode, arg5);                                            \
+        DROPOBJHEAP(AstNode, arg6);                                            \
+        DROPOBJHEAP(AstNode, arg7);                                            \
+        it = NULL;                                                             \
+    })
 %}
 
 %define api.value.type { typeof(AstNode*) }
-%parse-param { typeof(TaskEngine) *engine }
+%parse-param { TaskEngine *engine }
 %locations
 
 %token TK_SEMI TK_COMMA
@@ -134,13 +190,14 @@ static void yyerror(TaskEngine *engine, char *msg) {
 
 %nonassoc LOWER_THAN_ELSE
 %nonassoc TK_ELSE
+%destructor { if ($$) { printf("Recall!\n"); DROPOBJHEAP(AstNode, $$); $$ = NULL; } } <>
 
 %%
 
 /* High-level Definitions */
 
 Program
-    : ExtDefList { engine->ast_root = SYNTAX_BASIC_ACTION1(Program, @$.first_line, $1); }
+    : ExtDefList { engine->ast_root = SYNTAX_BASIC_ACTION1(Program, @$.first_line, $1); $$ = NULL; }
     ;
 
 ExtDefList
@@ -152,8 +209,8 @@ ExtDef
     : Specifier ExtDecList TK_SEMI { $$ = SYNTAX_BASIC_ACTION3(ExtDef, @$.first_line, $1, $2, $3); }
     | Specifier TK_SEMI { $$ = SYNTAX_BASIC_ACTION2(ExtDef, @$.first_line, $1, $2); }
     | Specifier FunDec CompSt { $$ = SYNTAX_BASIC_ACTION3(ExtDef, @$.first_line, $1, $2, $3); }
-    | Specifier error CompSt
-    | Specifier error TK_SEMI
+    | Specifier error CompSt { FACING_ERROR2($$, $1, $3); }
+    | Specifier error TK_SEMI { FACING_ERROR2($$, $1, $3); }
 
 ExtDecList
     : VarDec { $$ = SYNTAX_BASIC_ACTION1(ExtDecList, @$.first_line, $1); }
@@ -170,7 +227,7 @@ Specifier
 StructSpecifier
     : TK_STRUCT OptTag TK_LC DefList TK_RC { $$ = SYNTAX_BASIC_ACTION5(StructSpecifier, @$.first_line, $1, $2, $3, $4, $5); }
     | TK_STRUCT Tag { $$ = SYNTAX_BASIC_ACTION2(StructSpecifier, @$.first_line, $1, $2); }
-    | TK_STRUCT OptTag TK_LC error TK_RC
+    | TK_STRUCT OptTag TK_LC error TK_RC { FACING_ERROR4($$, $1, $2, $3, $5); }
     ;
 
 OptTag
@@ -187,14 +244,14 @@ Tag
 VarDec
     : TK_ID { $$ = SYNTAX_BASIC_ACTION1(VarDec, @$.first_line, $1); }
     | VarDec TK_LB TK_INT TK_RB { $$ = SYNTAX_BASIC_ACTION4(VarDec, @$.first_line, $1, $2, $3, $4); }
-    | VarDec TK_LB error TK_RB
+    | VarDec TK_LB error TK_RB { FACING_ERROR3($$, $1, $2, $4); }
     ;
 
 FunDec
     : TK_ID TK_LP VarList TK_RP { $$ = SYNTAX_BASIC_ACTION4(FunDec, @$.first_line, $1, $2, $3, $4); }
     | TK_ID TK_LP TK_RP { $$ = SYNTAX_BASIC_ACTION3(FunDec, @$.first_line, $1, $2, $3); }
-    | TK_ID TK_LP error TK_RP
-    | error TK_LP VarList TK_RP
+    | TK_ID TK_LP error TK_RP { FACING_ERROR3($$, $1, $2, $4); }
+    | error TK_LP VarList TK_RP { FACING_ERROR3($$, $2, $3, $4); }
     ;
 
 VarList
@@ -210,7 +267,7 @@ ParamDec
 
 CompSt
     : TK_LC DefList StmtList TK_RC { $$ = SYNTAX_BASIC_ACTION4(CompSt, @$.first_line, $1, $2, $3, $4); }
-    | error TK_RC
+    | error TK_RC { FACING_ERROR1($$, $2); }
     ;
 
 StmtList
@@ -225,8 +282,8 @@ Stmt
     | TK_IF TK_LP Exp TK_RP Stmt %prec LOWER_THAN_ELSE { $$ = SYNTAX_BASIC_ACTION5(Stmt, @$.first_line, $1, $2, $3, $4, $5); }
     | TK_IF TK_LP Exp TK_RP Stmt TK_ELSE Stmt { $$ = SYNTAX_BASIC_ACTION7(Stmt, @$.first_line, $1, $2, $3, $4, $5, $6, $7); }
     | TK_WHILE TK_LP Exp TK_RP Stmt { $$ = SYNTAX_BASIC_ACTION5(Stmt, @$.first_line, $1, $2, $3, $4, $5); }
-    | TK_IF error TK_RP Stmt %prec LOWER_THAN_ELSE
-    | TK_IF error TK_RP Stmt TK_ELSE Stmt
+    | TK_IF error TK_RP Stmt %prec LOWER_THAN_ELSE { FACING_ERROR3($$, $1, $3, $4); }
+    | TK_IF error TK_RP Stmt TK_ELSE Stmt { FACING_ERROR5($$, $1, $3, $4, $5, $6); }
     ;
 
 /* Local Definitions */
@@ -238,7 +295,7 @@ DefList
 
 Def
     : Specifier DecList TK_SEMI { $$ = SYNTAX_BASIC_ACTION3(Def, @$.first_line, $1, $2, $3); }
-    | Specifier error TK_SEMI
+    | Specifier error TK_SEMI { FACING_ERROR2($$, $1, $3); }
     ;
 
 DecList
@@ -272,7 +329,7 @@ Exp
     | TK_ID { $$ = SYNTAX_BASIC_ACTION1(Exp, @$.first_line, $1); }
     | TK_INT { $$ = SYNTAX_BASIC_ACTION1(Exp, @$.first_line, $1); }
     | TK_FLOAT { $$ = SYNTAX_BASIC_ACTION1(Exp, @$.first_line, $1); }
-    | error
+    | error { $$ = NULL; }
     ;
 
 Args

@@ -119,8 +119,10 @@
 #define DROPOBJHEAP(cls, ptr)                                                  \
     ({                                                                         \
         typeof(cls) *MPROT(temp) = (ptr);                                      \
-        CALL(cls, *MPROT(temp), drop, /);                                      \
-        free(MPROT(temp));                                                     \
+        if (MPROT(temp)) {                                                     \
+            CALL(cls, *MPROT(temp), drop, /);                                  \
+            free(MPROT(temp));                                                 \
+        }                                                                      \
     })
 
 /// helper macros for defining default initializers and dropers
