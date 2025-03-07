@@ -101,7 +101,7 @@
 #undef CREOBJRAWHEAP
 #define CREOBJRAWHEAP(cls)                                                     \
     ({                                                                         \
-        typeof(cls) *MPROT(temp) = (cls *)malloc(sizeof(cls));                 \
+        typeof(cls) *MPROT(temp) = (typeof(cls) *)malloc(sizeof(cls));         \
         ASSERT(MPROT(temp));                                                   \
         MPROT(temp);                                                           \
     })
