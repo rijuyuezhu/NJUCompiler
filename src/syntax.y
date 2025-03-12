@@ -190,7 +190,7 @@ static void yyerror(TaskEngine *engine, char *msg) {
 
 %nonassoc LOWER_THAN_ELSE
 %nonassoc TK_ELSE
-%destructor { if ($$) { printf("Recall!\n"); DROPOBJHEAP(AstNode, $$); $$ = NULL; } } <>
+%destructor { if ($$) { DROPOBJHEAP(AstNode, $$); $$ = NULL; } } <>
 
 %%
 
