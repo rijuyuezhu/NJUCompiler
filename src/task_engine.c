@@ -15,8 +15,6 @@ void MTD(TaskEngine, drop, /) {
     }
 }
 
-extern FILE *yyin;
-
 extern void yyrestart(FILE *input_file);
 extern void yylex_destroy();
 
