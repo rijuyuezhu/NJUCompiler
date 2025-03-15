@@ -7,7 +7,7 @@
 #include "utils.h"
 #include <stdio.h>
 extern bool has_lexical_err;
-static void yyerror(TaskEngine *engine, char *msg) {
+static void yyerror(TaskEngine *engine, const char *msg) {
     if (!has_lexical_err) { // lexical error has higher priority
         printf("Error type B at line %d: %s.\n", yylloc.first_line, msg);
     } else {
@@ -165,6 +165,7 @@ static void yyerror(TaskEngine *engine, char *msg) {
 %define api.value.type { typeof(AstNode*) }
 %parse-param { TaskEngine *engine }
 %locations
+%define parse.error verbose
 
 %token TK_SEMI TK_COMMA
 %token TK_ASSIGNOP TK_RELOP
