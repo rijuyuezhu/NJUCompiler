@@ -20,18 +20,27 @@
 #define CONCATENATE3(x, y, z) CONCATENATE(CONCATENATE(x, y), z)
 #undef CONCATENATE4
 #define CONCATENATE4(x, y, z, w) CONCATENATE(CONCATENATE3(x, y, z), w)
+#undef VA_OPT_IDENTITY
 #define VA_OPT_IDENTITY(x) x
+#undef VA_OPT_EMPTY
 #define VA_OPT_EMPTY(x)
+#undef CHOOSE_3rd
 #define CHOOSE_3rd(a, b, c, ...) c
+#undef VA_OPT_ONE
 #define VA_OPT_ONE(s, ...)                                                     \
     CHOOSE_3rd(_0, ##__VA_ARGS__, VA_OPT_IDENTITY, VA_OPT_EMPTY)(s)
 
+#undef typeof
 #define typeof __typeof__
 
+#undef LENGTH
 #define LENGTH(array) (sizeof(array) / sizeof((array)[0]))
 
+#undef ATTR_UNUSED
 #define ATTR_UNUSED __attribute__((unused))
+#undef FUNC_STATIC
 #define FUNC_STATIC ATTR_UNUSED static
+#undef FUNC_EXTERN
 #define FUNC_EXTERN extern
 
 /// Macro protector

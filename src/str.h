@@ -58,6 +58,7 @@ int MTD(String, pushfv, /, const char *format, va_list args) __attribute__((form
 /* String.compare(const String *a, const String *b) -> int */
 int NSMTD(String, compare, /, const String *a, const String *b);
 
+#undef STRING_C_STR
 #define STRING_C_STR(s) CALL(String, s, c_str, /)
 
 /// HString
