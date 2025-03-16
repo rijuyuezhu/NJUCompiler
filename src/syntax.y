@@ -213,6 +213,9 @@ ExtDef
 
     | Specifier error CompSt { FACING_ERROR2($$, $1, $3); }
     | Specifier error TK_SEMI { FACING_ERROR2($$, $1, $3); }
+    | error CompSt { FACING_ERROR1($$, $2);  }
+    | error TK_SEMI { FACING_ERROR1($$, $2);  }
+    ;
 
 ExtDecList
     : VarDec { $$ = SYNTAX_BASIC_ACTION1(ExtDecList, @$.first_line, $1); }
@@ -230,7 +233,7 @@ StructSpecifier
     : TK_STRUCT OptTag TK_LC DefList TK_RC { $$ = SYNTAX_BASIC_ACTION5(StructSpecifier, @$.first_line, $1, $2, $3, $4, $5); }
     | TK_STRUCT Tag { $$ = SYNTAX_BASIC_ACTION2(StructSpecifier, @$.first_line, $1, $2); }
 
-    | TK_STRUCT OptTag TK_LC error TK_RC { FACING_ERROR4($$, $1, $2, $3, $5); }
+    | TK_STRUCT error TK_LC error TK_RC { FACING_ERROR3($$, $1, $3, $5); }
     ;
 
 OptTag
@@ -255,8 +258,7 @@ FunDec
     : TK_ID TK_LP VarList TK_RP { $$ = SYNTAX_BASIC_ACTION4(FunDec, @$.first_line, $1, $2, $3, $4); }
     | TK_ID TK_LP TK_RP { $$ = SYNTAX_BASIC_ACTION3(FunDec, @$.first_line, $1, $2, $3); }
 
-    | TK_ID TK_LP error TK_RP { FACING_ERROR3($$, $1, $2, $4); }
-    | error TK_LP VarList TK_RP { FACING_ERROR3($$, $2, $3, $4); }
+    | error TK_LP error TK_RP { FACING_ERROR2($$, $2, $4);  }
     ;
 
 VarList
@@ -294,6 +296,7 @@ Stmt
     | TK_IF error TK_RP Stmt TK_ELSE Stmt { FACING_ERROR5($$, $1, $3, $4, $5, $6); }
     | TK_IF error CompSt %prec LOWER_THAN_ELSE { FACING_ERROR2($$, $1, $3); }
     | TK_IF error CompSt TK_ELSE Stmt { FACING_ERROR4($$, $1, $3, $4, $5); }
+    | TK_IF error TK_ELSE Stmt { FACING_ERROR3($$, $1, $3, $4); }
     ;
 
 /* Local Definitions */
