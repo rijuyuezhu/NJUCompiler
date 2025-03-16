@@ -31,13 +31,25 @@ bool has_lexical_err = false;
         return CONCATENATE(TK_, name);                                         \
     })
 static int parse_to_int(const char *str) {
-    int ret;
-    sscanf(str, "%i", &ret);
-    return ret;
+    char *endptr;
+    long ret = strtol(str, &endptr, 0);
+    if (*endptr != '\0') {
+        printf("Error type A at Line %d: \"%s\" is not a valid integer.\n",
+            yylineno, str);
+        has_lexical_err = true;
+        return 0;
+    }
+    return (int)ret;
 }
 static float parse_to_float(const char *str) {
-    float ret;
-    sscanf(str, "%f", &ret);
+    char *endptr;
+    float ret = strtof(str, &endptr);
+    if (*endptr != '\0') {
+        printf("Error type A at Line %d: \"%s\" is not a valid float.\n",
+            yylineno, str);
+        has_lexical_err = true;
+        return 0;
+    }
     return ret;
 }
 static RelopKind parse_to_relop(const char *str) {
