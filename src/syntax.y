@@ -210,6 +210,7 @@ ExtDef
     : Specifier ExtDecList TK_SEMI { $$ = SYNTAX_BASIC_ACTION3(ExtDef, @$.first_line, $1, $2, $3); }
     | Specifier TK_SEMI { $$ = SYNTAX_BASIC_ACTION2(ExtDef, @$.first_line, $1, $2); }
     | Specifier FunDec CompSt { $$ = SYNTAX_BASIC_ACTION3(ExtDef, @$.first_line, $1, $2, $3); }
+
     | Specifier error CompSt { FACING_ERROR2($$, $1, $3); }
     | Specifier error TK_SEMI { FACING_ERROR2($$, $1, $3); }
 
@@ -228,6 +229,7 @@ Specifier
 StructSpecifier
     : TK_STRUCT OptTag TK_LC DefList TK_RC { $$ = SYNTAX_BASIC_ACTION5(StructSpecifier, @$.first_line, $1, $2, $3, $4, $5); }
     | TK_STRUCT Tag { $$ = SYNTAX_BASIC_ACTION2(StructSpecifier, @$.first_line, $1, $2); }
+
     | TK_STRUCT OptTag TK_LC error TK_RC { FACING_ERROR4($$, $1, $2, $3, $5); }
     ;
 
@@ -245,12 +247,14 @@ Tag
 VarDec
     : TK_ID { $$ = SYNTAX_BASIC_ACTION1(VarDec, @$.first_line, $1); }
     | VarDec TK_LB TK_INT TK_RB { $$ = SYNTAX_BASIC_ACTION4(VarDec, @$.first_line, $1, $2, $3, $4); }
+
     | VarDec TK_LB error TK_RB { FACING_ERROR3($$, $1, $2, $4); }
     ;
 
 FunDec
     : TK_ID TK_LP VarList TK_RP { $$ = SYNTAX_BASIC_ACTION4(FunDec, @$.first_line, $1, $2, $3, $4); }
     | TK_ID TK_LP TK_RP { $$ = SYNTAX_BASIC_ACTION3(FunDec, @$.first_line, $1, $2, $3); }
+
     | TK_ID TK_LP error TK_RP { FACING_ERROR3($$, $1, $2, $4); }
     | error TK_LP VarList TK_RP { FACING_ERROR3($$, $2, $3, $4); }
     ;
@@ -268,7 +272,6 @@ ParamDec
 
 CompSt
     : TK_LC DefList StmtList TK_RC { $$ = SYNTAX_BASIC_ACTION4(CompSt, @$.first_line, $1, $2, $3, $4); }
-    | error TK_RC { FACING_ERROR1($$, $2); }
     ;
 
 StmtList
@@ -283,8 +286,14 @@ Stmt
     | TK_IF TK_LP Exp TK_RP Stmt %prec LOWER_THAN_ELSE { $$ = SYNTAX_BASIC_ACTION5(Stmt, @$.first_line, $1, $2, $3, $4, $5); }
     | TK_IF TK_LP Exp TK_RP Stmt TK_ELSE Stmt { $$ = SYNTAX_BASIC_ACTION7(Stmt, @$.first_line, $1, $2, $3, $4, $5, $6, $7); }
     | TK_WHILE TK_LP Exp TK_RP Stmt { $$ = SYNTAX_BASIC_ACTION5(Stmt, @$.first_line, $1, $2, $3, $4, $5); }
+
+    | TK_SEMI  { yyerror(engine, "Only one semicolon"); FACING_ERROR1($$, $1); }
+    | Exp error  { FACING_ERROR1($$, $1); }
+    | TK_WHILE TK_LP error CompSt { FACING_ERROR3($$, $1, $2, $4); }
     | TK_IF error TK_RP Stmt %prec LOWER_THAN_ELSE { FACING_ERROR3($$, $1, $3, $4); }
     | TK_IF error TK_RP Stmt TK_ELSE Stmt { FACING_ERROR5($$, $1, $3, $4, $5, $6); }
+    | TK_IF error CompSt %prec LOWER_THAN_ELSE { FACING_ERROR2($$, $1, $3); }
+    | TK_IF error CompSt TK_ELSE Stmt { FACING_ERROR4($$, $1, $3, $4, $5); }
     ;
 
 /* Local Definitions */
@@ -296,6 +305,7 @@ DefList
 
 Def
     : Specifier DecList TK_SEMI { $$ = SYNTAX_BASIC_ACTION3(Def, @$.first_line, $1, $2, $3); }
+
     | Specifier error TK_SEMI { FACING_ERROR2($$, $1, $3); }
     ;
 
@@ -330,6 +340,7 @@ Exp
     | TK_ID { $$ = SYNTAX_BASIC_ACTION1(Exp, @$.first_line, $1); }
     | TK_INT { $$ = SYNTAX_BASIC_ACTION1(Exp, @$.first_line, $1); }
     | TK_FLOAT { $$ = SYNTAX_BASIC_ACTION1(Exp, @$.first_line, $1); }
+
     | error { $$ = NULL; }
     ;
 
