@@ -3,7 +3,7 @@
 #include "utils.h"
 #define APPLY_GRAMMAR_SYMBOL(f)                                                \
                                                                                \
-    /* Error */ f(Error)                                                       \
+    /* Invalid */ f(Invalid)                                                   \
                                                                                \
         /* Lexical Symbols */ f(SEMI) f(COMMA) f(ASSIGNOP) f(RELOP) f(PLUS)    \
             f(MINUS) f(STAR) f(DIV) f(AND) f(OR) f(DOT) f(NOT) f(LP) f(RP)     \

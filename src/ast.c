@@ -14,14 +14,14 @@ static AstNode *common_init(int line_no, int grammar_symbol,
 AstNode *NSMTD(AstNode, creheap_basic, /, int line_no, int grammar_symbol,
                const char *grammar_name) {
     AstNode *node = common_init(line_no, grammar_symbol, grammar_name);
-    node->type = AstNodeBasic;
+    node->kind = AstNodeBasic;
     return node;
 }
 
 AstNode *NSMTD(AstNode, creheap_int, /, int line_no, int grammar_symbol,
                const char *grammar_name, int val) {
     AstNode *node = common_init(line_no, grammar_symbol, grammar_name);
-    node->type = AstNodeInt;
+    node->kind = AstNodeInt;
     node->int_val = val;
     return node;
 }
@@ -29,7 +29,7 @@ AstNode *NSMTD(AstNode, creheap_int, /, int line_no, int grammar_symbol,
 AstNode *NSMTD(AstNode, creheap_float, /, int line_no, int grammar_symbol,
                const char *grammar_name, float val) {
     AstNode *node = common_init(line_no, grammar_symbol, grammar_name);
-    node->type = ASTNodeFloat;
+    node->kind = ASTNodeFloat;
     node->float_val = val;
     return node;
 }
@@ -37,7 +37,7 @@ AstNode *NSMTD(AstNode, creheap_float, /, int line_no, int grammar_symbol,
 AstNode *NSMTD(AstNode, creheap_string, /, int line_no, int grammar_symbol,
                const char *grammar_name, String val) {
     AstNode *node = common_init(line_no, grammar_symbol, grammar_name);
-    node->type = ASTNodeString;
+    node->kind = ASTNodeString;
     node->str_val = val;
     return node;
 }
@@ -45,7 +45,7 @@ AstNode *NSMTD(AstNode, creheap_string, /, int line_no, int grammar_symbol,
 AstNode *NSMTD(AstNode, creheap_relop, /, int line_no, int grammar_symbol,
                const char *grammar_name, RelopKind val) {
     AstNode *node = common_init(line_no, grammar_symbol, grammar_name);
-    node->type = ASTNodeRelop;
+    node->kind = ASTNodeRelop;
     node->relop_val = val;
     return node;
 }
@@ -53,7 +53,7 @@ AstNode *NSMTD(AstNode, creheap_relop, /, int line_no, int grammar_symbol,
 AstNode *NSMTD(AstNode, creheap_inner, /, int line_no, int grammar_symbol,
                const char *grammar_name) {
     AstNode *node = common_init(line_no, grammar_symbol, grammar_name);
-    node->type = ASTNodeInner;
+    node->kind = ASTNodeInner;
     node->children = CREOBJ(VecPtr, /);
     return node;
 }
@@ -62,7 +62,7 @@ void MTD(AstNode, add_child, /, AstNode *child) {
     if (child == NULL) {
         return;
     }
-    ASSERT(self->type == ASTNodeInner, "Cannot add child to non-inner node");
+    ASSERT(self->kind == ASTNodeInner, "Cannot add child to non-inner node");
     CALL(VecPtr, self->children, push_back, /, child);
 }
 
@@ -70,7 +70,7 @@ void MTD(AstNode, print_subtree, /, usize depth) {
     for (usize i = 0; i < depth; i++) {
         printf("  ");
     }
-    switch (self->type) {
+    switch (self->kind) {
     case AstNodeBasic:
     case ASTNodeRelop:
         printf("%s\n", self->grammar_name);
@@ -97,13 +97,13 @@ void MTD(AstNode, print_subtree, /, usize depth) {
 }
 
 void MTD(AstNode, drop, /) {
-    if (self->type == ASTNodeString) {
+    if (self->kind == ASTNodeString) {
         DROPOBJ(String, self->str_val);
-    } else if (self->type == ASTNodeInner) {
+    } else if (self->kind == ASTNodeInner) {
         for (usize i = 0; i < self->children.size; i++) {
             DROPOBJHEAP(AstNode, self->children.data[i]);
         }
         DROPOBJ(VecPtr, self->children);
     }
-    self->type = ASTNodeInvalid;
+    self->kind = ASTNodeInvalid;
 }

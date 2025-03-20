@@ -38,8 +38,10 @@
 
 #undef ATTR_UNUSED
 #define ATTR_UNUSED __attribute__((unused))
+#undef UNREACHABLE
+#define UNREACHABLE __builtin_unreachable()
 #undef FUNC_STATIC
-#define FUNC_STATIC ATTR_UNUSED static
+#define FUNC_STATIC ATTR_UNUSED static inline
 #undef FUNC_EXTERN
 #define FUNC_EXTERN extern
 
@@ -154,8 +156,21 @@
 
 #undef DEFAULT_CLONER
 #define DEFAULT_CLONER(cls)                                                    \
-    void MTD(cls, clone_from, /, T * MPROT(other)) { *this = *MPROT(other); }  \
-    DEFAULT_DERIVE_CLONE(cls, /)
+    void MTD(cls, clone_from, /, const typeof(cls) *MPROT(other)) {            \
+        *self = *MPROT(other);                                                 \
+    }
+
+#undef DELETED_CLONER
+#define DELETED_CLONER(cls, STORAGE)                                           \
+    STORAGE void MTD(cls, clone_from, /,                                       \
+                     ATTR_UNUSED const typeof(cls) *MPROT(other)) {            \
+        PANIC("Cloning is not allowed for " #cls);                             \
+        UNREACHABLE;                                                           \
+    }                                                                          \
+    STORAGE typeof(cls) MTDCONST(cls, clone, /) {                              \
+        PANIC("Cloning is not allowed for " #cls);                             \
+        UNREACHABLE;                                                           \
+    }
 
 /* type definitions */
 

@@ -25,7 +25,7 @@ typedef enum RelopKind {
 } RelopKind;
 
 typedef struct AstNode {
-    AstNodeKind type;
+    AstNodeKind kind;
 
     /* Basic Information */
     int line_no;
