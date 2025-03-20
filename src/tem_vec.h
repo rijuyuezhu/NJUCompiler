@@ -1,5 +1,5 @@
 // clang-format off
-/// vec_template.h: provides a template for implementing a vector-like data structure.
+/// tem_vec.h: provides a template for implementing a vector-like data structure.
 ///
 /// Macros:
 ///     DECLARE_PLAIN_VEC(Vec, T, STORAGE): declare a plain vector-like data structure.

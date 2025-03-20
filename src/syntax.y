@@ -289,7 +289,7 @@ Stmt
     | TK_IF TK_LP Exp TK_RP Stmt TK_ELSE Stmt { $$ = SYNTAX_BASIC_ACTION7(Stmt, @$.first_line, $1, $2, $3, $4, $5, $6, $7); }
     | TK_WHILE TK_LP Exp TK_RP Stmt { $$ = SYNTAX_BASIC_ACTION5(Stmt, @$.first_line, $1, $2, $3, $4, $5); }
 
-    | TK_SEMI  { yyerror(engine, "Only one semicolon"); FACING_ERROR1($$, $1); }
+    | TK_SEMI  { yyerror(engine, "syntax error, only one semicolon"); FACING_ERROR1($$, $1); }
     | Exp error  { FACING_ERROR1($$, $1); }
     | TK_WHILE TK_LP error CompSt { FACING_ERROR3($$, $1, $2, $4); }
     | TK_IF error TK_RP Stmt %prec LOWER_THAN_ELSE { FACING_ERROR3($$, $1, $3, $4); }

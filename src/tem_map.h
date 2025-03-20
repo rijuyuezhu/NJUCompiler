@@ -1,5 +1,5 @@
 // clang-format off
-/// mapping.h: provides a template for implementing a mapping-like data structure.
+/// tem_map.h: provides a template for implementing a mapping-like data structure.
 ///
 /// Macros:
 ///     DECLARE_MAPPING(Mapping, K, V, STORAGE, key_gen, value_gen, com_gen): declare a mapping.
