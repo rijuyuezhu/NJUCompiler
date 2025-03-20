@@ -5,8 +5,12 @@
 typedef struct TaskEngine {
     const char *input_file;
 
+    // Lexical & Syntax analysis
     AstNode *ast_root;
     bool ast_error;
+
+    // Semantic analysis
+
 } TaskEngine;
 
 void MTD(TaskEngine, init, /, const char *file);

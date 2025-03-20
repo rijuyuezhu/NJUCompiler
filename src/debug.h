@@ -19,6 +19,13 @@
         }                                                                      \
     })
 
+#undef PANIC
+#define PANIC(...)                                                             \
+    ({                                                                         \
+        fprintf(stderr, "Panic: %s", __VA_ARGS__);                             \
+        abort();                                                               \
+    })
+
 #undef ASSERT_EQ
 #define ASSERT_EQ(x, y, fmtid, ...)                                            \
     ({                                                                         \

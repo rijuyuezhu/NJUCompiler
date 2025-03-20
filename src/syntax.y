@@ -2,27 +2,24 @@
 #include "task_engine.h"
 }
 %{
+#include <stdio.h>
+
 #include "ast.h"
 #include "lex.yy.c"
 #include "utils.h"
-#include <stdio.h>
-extern bool has_lexical_err;
-static void yyerror(TaskEngine *engine, const char *msg) {
-    if (!has_lexical_err) { // lexical error has higher priority
-        printf("Error type B at line %d: %s.\n", yylloc.first_line, msg);
-    } else {
-        has_lexical_err = false;
-    }
-    engine->ast_error = true;
-}
+
+#define TO_GS(x) CONCATENATE(GS_, x)
 
 #define SYNTAX_BASIC_ACTION(name, line_no)                                     \
-    ({ NSCALL(AstNode, creheap_inner, /, line_no, STRINGIFY(name)); })
+    ({                                                                         \
+        NSCALL(AstNode, creheap_inner, /, line_no, TO_GS(name),                \
+               STRINGIFY(name));                                               \
+    })
 
 #define SYNTAX_BASIC_ACTION1(name, line_no, arg1)                              \
     ({                                                                         \
-        AstNode *MPROT(n) =                                                    \
-            NSCALL(AstNode, creheap_inner, /, line_no, STRINGIFY(name));       \
+        AstNode *MPROT(n) = NSCALL(AstNode, creheap_inner, /, line_no,         \
+                                   TO_GS(name), STRINGIFY(name));              \
         CALL(VecPtr, MPROT(n)->children, reserve, /, 1);                       \
         NSCALL(AstNode, add_child, /, MPROT(n), arg1);                         \
         MPROT(n);                                                              \
@@ -30,8 +27,8 @@ static void yyerror(TaskEngine *engine, const char *msg) {
 
 #define SYNTAX_BASIC_ACTION2(name, line_no, arg1, arg2)                        \
     ({                                                                         \
-        AstNode *MPROT(n) =                                                    \
-            NSCALL(AstNode, creheap_inner, /, line_no, STRINGIFY(name));       \
+        AstNode *MPROT(n) = NSCALL(AstNode, creheap_inner, /, line_no,         \
+                                   TO_GS(name), STRINGIFY(name));              \
         CALL(VecPtr, MPROT(n)->children, reserve, /, 2);                       \
         NSCALL(AstNode, add_child, /, MPROT(n), arg1);                         \
         NSCALL(AstNode, add_child, /, MPROT(n), arg2);                         \
@@ -40,8 +37,8 @@ static void yyerror(TaskEngine *engine, const char *msg) {
 
 #define SYNTAX_BASIC_ACTION3(name, line_no, arg1, arg2, arg3)                  \
     ({                                                                         \
-        AstNode *MPROT(n) =                                                    \
-            NSCALL(AstNode, creheap_inner, /, line_no, STRINGIFY(name));       \
+        AstNode *MPROT(n) = NSCALL(AstNode, creheap_inner, /, line_no,         \
+                                   TO_GS(name), STRINGIFY(name));              \
         CALL(VecPtr, MPROT(n)->children, reserve, /, 3);                       \
         NSCALL(AstNode, add_child, /, MPROT(n), arg1);                         \
         NSCALL(AstNode, add_child, /, MPROT(n), arg2);                         \
@@ -51,8 +48,8 @@ static void yyerror(TaskEngine *engine, const char *msg) {
 
 #define SYNTAX_BASIC_ACTION4(name, line_no, arg1, arg2, arg3, arg4)            \
     ({                                                                         \
-        AstNode *MPROT(n) =                                                    \
-            NSCALL(AstNode, creheap_inner, /, line_no, STRINGIFY(name));       \
+        AstNode *MPROT(n) = NSCALL(AstNode, creheap_inner, /, line_no,         \
+                                   TO_GS(name), STRINGIFY(name));              \
         CALL(VecPtr, MPROT(n)->children, reserve, /, 4);                       \
         NSCALL(AstNode, add_child, /, MPROT(n), arg1);                         \
         NSCALL(AstNode, add_child, /, MPROT(n), arg2);                         \
@@ -63,8 +60,8 @@ static void yyerror(TaskEngine *engine, const char *msg) {
 
 #define SYNTAX_BASIC_ACTION5(name, line_no, arg1, arg2, arg3, arg4, arg5)      \
     ({                                                                         \
-        AstNode *MPROT(n) =                                                    \
-            NSCALL(AstNode, creheap_inner, /, line_no, STRINGIFY(name));       \
+        AstNode *MPROT(n) = NSCALL(AstNode, creheap_inner, /, line_no,         \
+                                   TO_GS(name), STRINGIFY(name));              \
         CALL(VecPtr, MPROT(n)->children, reserve, /, 5);                       \
         NSCALL(AstNode, add_child, /, MPROT(n), arg1);                         \
         NSCALL(AstNode, add_child, /, MPROT(n), arg2);                         \
@@ -77,8 +74,8 @@ static void yyerror(TaskEngine *engine, const char *msg) {
 #define SYNTAX_BASIC_ACTION6(name, line_no, arg1, arg2, arg3, arg4, arg5,      \
                              arg6)                                             \
     ({                                                                         \
-        AstNode *MPROT(n) =                                                    \
-            NSCALL(AstNode, creheap_inner, /, line_no, STRINGIFY(name));       \
+        AstNode *MPROT(n) = NSCALL(AstNode, creheap_inner, /, line_no,         \
+                                   TO_GS(name), STRINGIFY(name));              \
         CALL(VecPtr, MPROT(n)->children, reserve, /, 6);                       \
         NSCALL(AstNode, add_child, /, MPROT(n), arg1);                         \
         NSCALL(AstNode, add_child, /, MPROT(n), arg2);                         \
@@ -92,8 +89,8 @@ static void yyerror(TaskEngine *engine, const char *msg) {
 #define SYNTAX_BASIC_ACTION7(name, line_no, arg1, arg2, arg3, arg4, arg5,      \
                              arg6, arg7)                                       \
     ({                                                                         \
-        AstNode *MPROT(n) =                                                    \
-            NSCALL(AstNode, creheap_inner, /, line_no, STRINGIFY(name));       \
+        AstNode *MPROT(n) = NSCALL(AstNode, creheap_inner, /, line_no,         \
+                                   TO_GS(name), STRINGIFY(name));              \
         CALL(VecPtr, MPROT(n)->children, reserve, /, 7);                       \
         NSCALL(AstNode, add_child, /, MPROT(n), arg1);                         \
         NSCALL(AstNode, add_child, /, MPROT(n), arg2);                         \
@@ -104,17 +101,20 @@ static void yyerror(TaskEngine *engine, const char *msg) {
         NSCALL(AstNode, add_child, /, MPROT(n), arg7);                         \
         MPROT(n);                                                              \
     })
+
 #define FACING_ERROR1(it, arg1)                                                \
     ({                                                                         \
         DROPOBJHEAP(AstNode, arg1);                                            \
         it = NULL;                                                             \
     })
+
 #define FACING_ERROR2(it, arg1, arg2)                                          \
     ({                                                                         \
         DROPOBJHEAP(AstNode, arg1);                                            \
         DROPOBJHEAP(AstNode, arg2);                                            \
         it = NULL;                                                             \
     })
+
 #define FACING_ERROR3(it, arg1, arg2, arg3)                                    \
     ({                                                                         \
         DROPOBJHEAP(AstNode, arg1);                                            \
@@ -122,6 +122,7 @@ static void yyerror(TaskEngine *engine, const char *msg) {
         DROPOBJHEAP(AstNode, arg3);                                            \
         it = NULL;                                                             \
     })
+
 #define FACING_ERROR4(it, arg1, arg2, arg3, arg4)                              \
     ({                                                                         \
         DROPOBJHEAP(AstNode, arg1);                                            \
@@ -130,6 +131,7 @@ static void yyerror(TaskEngine *engine, const char *msg) {
         DROPOBJHEAP(AstNode, arg4);                                            \
         it = NULL;                                                             \
     })
+
 #define FACING_ERROR5(it, arg1, arg2, arg3, arg4, arg5)                        \
     ({                                                                         \
         DROPOBJHEAP(AstNode, arg1);                                            \
@@ -139,6 +141,7 @@ static void yyerror(TaskEngine *engine, const char *msg) {
         DROPOBJHEAP(AstNode, arg5);                                            \
         it = NULL;                                                             \
     })
+
 #define FACING_ERROR6(it, arg1, arg2, arg3, arg4, arg5, arg6)                  \
     ({                                                                         \
         DROPOBJHEAP(AstNode, arg1);                                            \
@@ -149,6 +152,7 @@ static void yyerror(TaskEngine *engine, const char *msg) {
         DROPOBJHEAP(AstNode, arg6);                                            \
         it = NULL;                                                             \
     })
+
 #define FACING_ERROR7(it, arg1, arg2, arg3, arg4, arg5, arg6, arg7)            \
     ({                                                                         \
         DROPOBJHEAP(AstNode, arg1);                                            \
@@ -160,6 +164,16 @@ static void yyerror(TaskEngine *engine, const char *msg) {
         DROPOBJHEAP(AstNode, arg7);                                            \
         it = NULL;                                                             \
     })
+
+extern bool has_lexical_err;
+static void yyerror(TaskEngine *engine, const char *msg) {
+    if (!has_lexical_err) { // lexical error has higher priority
+        printf("Error type B at line %d: %s.\n", yylloc.first_line, msg);
+    } else {
+        has_lexical_err = false;
+    }
+    engine->ast_error = true;
+}
 %}
 
 %define api.value.type { typeof(AstNode*) }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "general_vec.h"
+#include "grammar_symbol.h"
 #include "str.h"
 #include "utils.h"
 
@@ -25,9 +26,13 @@ typedef enum RelopKind {
 
 typedef struct AstNode {
     AstNodeKind type;
+
+    /* Basic Information */
     int line_no;
+    GrammarSymbol grammar_symbol;
     const char *grammar_name;
 
+    /* Attribute_value */
     union {
         int int_val;
         float float_val;
@@ -37,17 +42,17 @@ typedef struct AstNode {
     };
 } AstNode;
 
-AstNode *NSMTD(AstNode, creheap_basic, /, int line_no,
+AstNode *NSMTD(AstNode, creheap_basic, /, int line_no, int grammar_symbol,
                const char *grammar_name);
-AstNode *NSMTD(AstNode, creheap_int, /, int line_no, const char *grammar_name,
-               int val);
-AstNode *NSMTD(AstNode, creheap_float, /, int line_no, const char *grammar_name,
-               float val);
-AstNode *NSMTD(AstNode, creheap_string, /, int line_no,
+AstNode *NSMTD(AstNode, creheap_int, /, int line_no, int grammar_symbol,
+               const char *grammar_name, int val);
+AstNode *NSMTD(AstNode, creheap_float, /, int line_no, int grammar_symbol,
+               const char *grammar_name, float val);
+AstNode *NSMTD(AstNode, creheap_string, /, int line_no, int grammar_symbol,
                const char *grammar_name, String val);
-AstNode *NSMTD(AstNode, creheap_relop, /, int line_no, const char *grammar_name,
-               RelopKind val);
-AstNode *NSMTD(AstNode, creheap_inner, /, int line_no,
+AstNode *NSMTD(AstNode, creheap_relop, /, int line_no, int grammar_symbol,
+               const char *grammar_name, RelopKind val);
+AstNode *NSMTD(AstNode, creheap_inner, /, int line_no, int grammar_symbol,
                const char *grammar_name);
 
 void MTD(AstNode, add_child, /, AstNode *child);
