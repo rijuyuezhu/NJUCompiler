@@ -69,7 +69,7 @@ typedef struct HString {
 } HString;
 
 /// Every time modifies s, call this to update stored_hash
-static inline void MTD(HString, rehash, /) {
+FUNC_STATIC void MTD(HString, rehash, /) {
     u64 hash = 0;
     for (usize i = 0; i < self->s.size; i++) {
         hash = hash * (u64)277 + (u64)self->s.data[i];
@@ -77,24 +77,24 @@ static inline void MTD(HString, rehash, /) {
     self->stored_hash = hash;
 }
 
-static inline void MTD(HString, init, /) {
+FUNC_STATIC void MTD(HString, init, /) {
     self->s = CREOBJ(String, /);
     self->stored_hash = 0;
 }
 
-static inline void MTD(HString, drop, /) {
+FUNC_STATIC void MTD(HString, drop, /) {
     CALL(String, self->s, drop, /);
     self->stored_hash = 0;
 }
 
-static inline void MTD(HString, clone_from, /, const HString *other) {
+FUNC_STATIC void MTD(HString, clone_from, /, const HString *other) {
     CALL(String, self->s, clone_from, /, &other->s);
     self->stored_hash = other->stored_hash;
 }
 
-static inline DEFAULT_DERIVE_CLONE(HString, /);
+FUNC_STATIC DEFAULT_DERIVE_CLONE(HString, /);
 
-static inline HString NSMTD(HString, from_inner, /, String s) {
+FUNC_STATIC HString NSMTD(HString, from_inner, /, String s) {
     HString hstr = CREOBJ(HString, /);
     hstr.s = s;
     CALL(HString, hstr, rehash, /);
