@@ -565,13 +565,11 @@ VISITOR(FunDec) {
     }
     POP_SYMTAB();
 
-    // TODO: Now the func_type is completed; merge
-
     // Handle fun_name
 
     String *fun_name = &DATA_CHILD(0)->str_val;
 
-    // NOTE: key here is a hack! Do not drop it
+    // key here is a hack! Do not drop it
     HString key = NSCALL(HString, from_inner, /, *fun_name);
 
     GET_SYMTAB();
@@ -1150,7 +1148,7 @@ VISITOR(ExpCall) {
     String *name = &DATA_CHILD(0)->str_val;
     ASSERT(name);
 
-    // NOTE: key here is a hack! Do not drop it
+    // key here is a hack! Do not drop it
     HString key = NSCALL(HString, from_inner, /, *name);
 
     GET_SYMTAB();
@@ -1176,6 +1174,12 @@ VISITOR(ExpCall) {
         CALL(TypeManager, *self->type_manager, get_type, /, call_type_idx);
     ASSERT(type->kind == TypeKindFun);
     usize ret_type_idx = type->as_fun.ret_par_idxes.data[0];
+
+    // to save memory: pop the temporary type
+    bool success_pop =
+        CALL(TypeManager, *self->type_manager, pop_type, /, call_type_idx);
+    ASSERT(success_pop, "pop should be successful");
+
     SAVE_TYPE(ret_type_idx);
 }
 
@@ -1225,7 +1229,7 @@ VISITOR(ExpField) {
     } else {
         String *field_name = &DATA_CHILD(2)->str_val;
         ASSERT(field_name);
-        // NOTE: key here is a hack! Do not drop it
+        // key here is a hack! Do not drop it
         HString key = NSCALL(HString, from_inner, /, *field_name);
         SymbolTable *struct_symtab =
             CALL(SymbolManager, *self->symbol_manager, get_table, /,
@@ -1253,7 +1257,7 @@ VISITOR(ExpID) {
     String *name = &DATA_CHILD(0)->str_val;
     ASSERT(name);
 
-    // NOTE: key here is a hack! Do not drop it
+    // key here is a hack! Do not drop it
     HString key = NSCALL(HString, from_inner, /, *name);
 
     GET_SYMTAB();

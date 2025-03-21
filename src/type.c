@@ -1,4 +1,5 @@
 #include "type.h"
+#include "symbol.h"
 #include "tem_vec.h"
 
 void MTD(Type, drop, /) {
@@ -67,6 +68,15 @@ void MTD(TypeManager, drop, /) { DROPOBJ(VecType, self->types); }
 usize MTD(TypeManager, add_type, /, Type type) {
     CALL(VecType, self->types, push_back, /, type);
     return self->types.size - 1;
+}
+
+bool MTD(TypeManager, pop_type, /, usize last_type_idx) {
+    if (last_type_idx + 1 == self->types.size) {
+        CALL(VecType, self->types, pop_back, /);
+        return true;
+    } else {
+        return false;
+    }
 }
 
 usize MTD(TypeManager, make_array, /, usize size, usize subtype_idx) {

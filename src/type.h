@@ -60,6 +60,7 @@ void MTD(TypeManager, init, /);
 void MTD(TypeManager, drop, /);
 
 usize MTD(TypeManager, add_type, /, Type type);
+bool MTD(TypeManager, pop_type, /, usize last_type_idx);
 usize MTD(TypeManager, make_array, /, usize size, usize subtype_idx);
 usize MTD(TypeManager, make_struct, /, usize symtab_idx);
 usize MTD(TypeManager, make_fun, /);
