@@ -7,41 +7,36 @@
 
 /* SymbolEntry */
 
-typedef enum SymbolKind {
-    SymbolKindInvalid,
-    SymbolKindVar,
-    SymbolKindFun,
-    SymbolKindStruct,
-} SymbolKind;
+typedef enum SymbolEntryKind {
+    SymbolEntryInvalid,
+    SymbolEntryVar,
+    SymbolEntryFun,
+    SymbolEntryStruct,
+} SymbolEntryKind;
 
 typedef struct SymbolEntry {
-    SymbolKind kind;
+    SymbolEntryKind kind;
+    usize type_idx;
+
+    // The following things shall be manually set
     struct SymbolTable *table; // points to the table that contains this entry
     String *name;              // points to the key in the symbol table
     union {
         struct {
-            usize type_idx;
-        } as_var;
-        struct {
-            VecUSize type_idxs;
-            // the 0-th is the return type; 1 + #param == type_ids.size
+            bool is_defined;
         } as_fun;
-        struct {
-            usize type_idx;
-        } as_struct;
     };
 } SymbolEntry;
 
-void MTD(SymbolEntry, drop, /);
-DELETED_CLONER(SymbolEntry, FUNC_STATIC);
+FUNC_STATIC void MTD(SymbolEntry, init, /, SymbolEntryKind kind,
+                     usize type_idx) {
+    self->kind = kind;
+    self->type_idx = type_idx;
+}
 
-SymbolEntry NSMTD(SymbolEntry, make_var, /, struct SymbolTable *table,
-                  String *name, usize type_idx);
-SymbolEntry NSMTD(SymbolEntry, make_fun, /, struct SymbolTable *table,
-                  String *name);
-void MTD(SymbolEntry, fun_add, /, usize type_idx);
-SymbolEntry NSMTD(SymbolEntry, make_struct, /, struct SymbolTable *table,
-                  String *name, usize type_idx);
+FUNC_STATIC DEFAULT_DROPER(SymbolEntry);
+
+DELETED_CLONER(SymbolEntry, FUNC_STATIC);
 
 /* SymbolTable */
 
@@ -50,6 +45,7 @@ DECLARE_MAPPING(MapSymbolTable, HString, SymbolEntry, FUNC_EXTERN,
                 GENERATOR_CLASS_COMPARATOR);
 
 #define SYMBOL_TABLE_NO_PARENT ((usize) - 1)
+
 typedef struct SymbolTable {
     usize parent_idx;
     MapSymbolTable mapping;
@@ -59,10 +55,14 @@ void MTD(SymbolTable, init, /, usize parent_idx);
 void MTD(SymbolTable, drop, /);
 DELETED_CLONER(SymbolTable, FUNC_STATIC);
 
+bool MTD(SymbolTable, is_root, /);
 MapSymbolTableInsertResult MTD(SymbolTable, insert, /, HString name,
-                               SymbolEntry entry);
+                               SymbolEntryKind kind, usize type_idx);
+
 MapSymbolTableIterator MTD(SymbolTable, find, /, HString *name);
+
 struct SymbolManager;
+
 MapSymbolTableIterator MTD(SymbolTable, find_recursive, /, HString *name,
                            struct SymbolManager *manager);
 
@@ -73,8 +73,11 @@ DECLARE_CLASS_VEC(VecSymbolTable, SymbolTable, FUNC_EXTERN);
 typedef struct SymbolManager {
     VecSymbolTable tables;
     usize root_idx;
+    usize temp_cnt;
 } SymbolManager;
 
 void MTD(SymbolManager, init, /);
 void MTD(SymbolManager, drop, /);
 usize MTD(SymbolManager, add_table, /, usize parent_idx);
+SymbolTable *MTD(SymbolManager, get_table, /, usize idx);
+HString MTD(SymbolManager, make_temp, /);

@@ -17,7 +17,7 @@ class CommandSpace:
     def build(self, *_: str, clean_build: bool = False):
         if clean_build:
             self.clean()
-        crun("make")
+        crun("make -j16")
 
     def b(self, *args: str):
         self.build(*args)

@@ -1,48 +1,5 @@
 #include "symbol.h"
 
-/* SymbolEntry */
-
-void MTD(SymbolEntry, drop, /) {
-    if (self->kind == SymbolKindFun) {
-        DROPOBJ(VecUSize, self->as_fun.type_idxs);
-    }
-}
-
-SymbolEntry NSMTD(SymbolEntry, make_var, /, struct SymbolTable *table,
-                  String *name, usize type_idx) {
-    return (SymbolEntry){
-        .kind = SymbolKindVar,
-        .table = table,
-        .name = name,
-        .as_var = {.type_idx = type_idx},
-    };
-}
-
-SymbolEntry NSMTD(SymbolEntry, make_fun, /, struct SymbolTable *table,
-                  String *name) {
-    return (SymbolEntry){
-        .kind = SymbolKindFun,
-        .table = table,
-        .name = name,
-        .as_fun = {.type_idxs = CREOBJ(VecUSize, /)},
-    };
-}
-
-void MTD(SymbolEntry, fun_add, /, usize type_idx) {
-    ASSERT(self->kind == SymbolKindFun);
-    CALL(VecUSize, self->as_fun.type_idxs, push_back, /, type_idx);
-}
-
-SymbolEntry NSMTD(SymbolEntry, make_struct, /, struct SymbolTable *table,
-                  String *name, usize type_idx) {
-    return (SymbolEntry){
-        .kind = SymbolKindStruct,
-        .table = table,
-        .name = name,
-        .as_struct = {.type_idx = type_idx},
-    };
-}
-
 /* SymbolTable */
 
 void MTD(SymbolTable, init, /, usize parent_idx) {
@@ -52,8 +9,13 @@ void MTD(SymbolTable, init, /, usize parent_idx) {
 
 void MTD(SymbolTable, drop, /) { DROPOBJ(MapSymbolTable, self->mapping); }
 
+bool MTD(SymbolTable, is_root, /) {
+    return self->parent_idx == SYMBOL_TABLE_NO_PARENT;
+}
+
 MapSymbolTableInsertResult MTD(SymbolTable, insert, /, HString name,
-                               SymbolEntry entry) {
+                               SymbolEntryKind kind, usize type_idx) {
+    SymbolEntry entry = CREOBJ(SymbolEntry, /, kind, type_idx);
     MapSymbolTableInsertResult result =
         CALL(MapSymbolTable, self->mapping, insert, /, name, entry);
     if (result.inserted) {
@@ -73,7 +35,7 @@ MapSymbolTableIterator MTD(SymbolTable, find_recursive, /, HString *name,
                            SymbolManager *manager) {
     while (true) {
         MapSymbolTableIterator it = CALL(SymbolTable, *self, find, /, name);
-        if (it != NULL || self->parent_idx == SYMBOL_TABLE_NO_PARENT) {
+        if (it != NULL || CALL(SymbolTable, *self, is_root, /)) {
             return it;
         }
         self = &manager->tables.data[self->parent_idx];
@@ -86,14 +48,28 @@ void MTD(SymbolManager, init, /) {
     CALL(VecSymbolTable, self->tables, init, /);
     self->root_idx =
         CALL(SymbolManager, *self, add_table, /, SYMBOL_TABLE_NO_PARENT);
+    self->temp_cnt = 0;
 }
 
 void MTD(SymbolManager, drop, /) { DROPOBJ(VecSymbolTable, self->tables); }
 
 usize MTD(SymbolManager, add_table, /, usize parent_idx) {
+    ASSERT(parent_idx < self->tables.size ||
+           parent_idx == SYMBOL_TABLE_NO_PARENT);
     SymbolTable table = CREOBJ(SymbolTable, /, parent_idx);
     CALL(VecSymbolTable, self->tables, push_back, /, table);
     return self->tables.size - 1;
+}
+
+SymbolTable *MTD(SymbolManager, get_table, /, usize idx) {
+    ASSERT(idx < self->tables.size);
+    return &self->tables.data[idx];
+}
+
+HString MTD(SymbolManager, make_temp, /) {
+    String s = NSCALL(String, from_f, /, "@t%zu", self->temp_cnt);
+    self->temp_cnt++;
+    return NSCALL(HString, from_inner, /, s);
 }
 
 DEFINE_MAPPING(MapSymbolTable, HString, SymbolEntry, FUNC_EXTERN);

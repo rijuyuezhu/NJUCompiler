@@ -41,7 +41,7 @@ $(YFC): $(YFILE)
 	@echo + BISON src/$(notdir $(YFILE)) >&2
 	@$(BISON) -o $(YFC) -d -v $(YFILE)
 
-$(BUILD_DIR)/src/%.c.o: %.c
+$(BUILD_DIR)/src/%.c.o: %.c $(YFC)
 	@echo + CC src/$(notdir $<) >&2
 	@$(CC) $(CFLAGS) -c $< -o $@ -MMD
 

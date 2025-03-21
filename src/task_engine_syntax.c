@@ -1,3 +1,4 @@
+#include "ast.h"
 #include "syntax.tab.h"
 #include "task_engine.h"
 

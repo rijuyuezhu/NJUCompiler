@@ -27,10 +27,14 @@ typedef enum RelopKind {
 typedef struct AstNode {
     AstNodeKind kind;
 
-    /* Basic Information */
+    /* Lex/Syntax Info */
     int line_no;
     GrammarSymbol grammar_symbol;
     const char *grammar_name;
+
+    /* Semantic Info */
+    usize symtab_idx;
+    usize type_idx;
 
     /* Attribute_value */
     union {

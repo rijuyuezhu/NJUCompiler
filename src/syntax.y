@@ -1,16 +1,16 @@
 %code requires {
 #include "task_engine.h"
+#include "ast.h"
 }
 %{
 #include <stdio.h>
 
-#include "ast.h"
 #include "lex.yy.c"
 #include "utils.h"
 
 #define TO_GS(x) CONCATENATE(GS_, x)
 
-#define SYNTAX_BASIC_ACTION(name, line_no)                                     \
+#define SYNTAX_BASIC_ACTION0(name, line_no)                                     \
     ({                                                                         \
         NSCALL(AstNode, creheap_inner, /, line_no, TO_GS(name),                \
                STRINGIFY(name));                                               \
@@ -100,6 +100,11 @@
         NSCALL(AstNode, add_child, /, MPROT(n), arg6);                         \
         NSCALL(AstNode, add_child, /, MPROT(n), arg7);                         \
         MPROT(n);                                                              \
+    })
+
+#define FACING_ERROR0(it)                                                \
+    ({                                                                         \
+        it = NULL;                                                             \
     })
 
 #define FACING_ERROR1(it, arg1)                                                \
@@ -217,18 +222,19 @@ Program
 
 ExtDefList
     : ExtDef ExtDefList { $$ = SYNTAX_BASIC_ACTION2(ExtDefList, @$.first_line, $1, $2); }
-    | /* empty */ { $$ = NULL; }
+    | /* empty */ { $$ = SYNTAX_BASIC_ACTION0(ExtDefList, @$.first_line); }
     ;
 
 ExtDef
     : Specifier ExtDecList TK_SEMI { $$ = SYNTAX_BASIC_ACTION3(ExtDef, @$.first_line, $1, $2, $3); }
     | Specifier TK_SEMI { $$ = SYNTAX_BASIC_ACTION2(ExtDef, @$.first_line, $1, $2); }
     | Specifier FunDec CompSt { $$ = SYNTAX_BASIC_ACTION3(ExtDef, @$.first_line, $1, $2, $3); }
+    | Specifier FunDec TK_SEMI { $$ = SYNTAX_BASIC_ACTION3(ExtDef, @$.first_line, $1, $2, $3); }
 
     | Specifier error CompSt { FACING_ERROR2($$, $1, $3); }
     | Specifier error TK_SEMI { FACING_ERROR2($$, $1, $3); }
-    | error CompSt { FACING_ERROR1($$, $2);  }
-    | error TK_SEMI { FACING_ERROR1($$, $2);  }
+    | error CompSt { FACING_ERROR1($$, $2); }
+    | error TK_SEMI { FACING_ERROR1($$, $2); }
     ;
 
 ExtDecList
@@ -252,7 +258,7 @@ StructSpecifier
 
 OptTag
     : TK_ID { $$ = SYNTAX_BASIC_ACTION1(OptTag, @$.first_line, $1); }
-    | /* empty */ { $$ = NULL; }
+    | /* empty */ { $$ = SYNTAX_BASIC_ACTION0(OptTag, @$.first_line); }
     ;
 
 Tag
@@ -292,7 +298,7 @@ CompSt
 
 StmtList
     : Stmt StmtList { $$ = SYNTAX_BASIC_ACTION2(StmtList, @$.first_line, $1, $2); }
-    | /* empty */ { $$ = NULL; }
+    | /* empty */ { $$ = SYNTAX_BASIC_ACTION0(StmtList, @$.first_line); }
     ;
 
 Stmt
@@ -317,7 +323,7 @@ Stmt
 
 DefList
     : Def DefList { $$ = SYNTAX_BASIC_ACTION2(DefList, @$.first_line, $1, $2); }
-    | /* empty */ { $$ = NULL; }
+    | /* empty */ { $$ = SYNTAX_BASIC_ACTION0(DefList, @$.first_line); }
     ;
 
 Def
@@ -358,7 +364,7 @@ Exp
     | TK_INT { $$ = SYNTAX_BASIC_ACTION1(Exp, @$.first_line, $1); }
     | TK_FLOAT { $$ = SYNTAX_BASIC_ACTION1(Exp, @$.first_line, $1); }
 
-    | error { $$ = NULL; }
+    | error { FACING_ERROR0($$); }
     ;
 
 Args

@@ -105,5 +105,4 @@ void MTD(AstNode, drop, /) {
         }
         DROPOBJ(VecPtr, self->children);
     }
-    self->kind = ASTNodeInvalid;
 }
