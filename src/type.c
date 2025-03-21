@@ -4,6 +4,8 @@
 void MTD(Type, drop, /) {
     if (self->kind == TypeKindStruct) {
         DROPOBJ(VecUSize, self->as_struct.field_idxes);
+    } else if (self->kind == TypeKindFun) {
+        DROPOBJ(VecUSize, self->as_fun.ret_par_idxes);
     }
 }
 
@@ -59,6 +61,7 @@ void MTD(TypeManager, init, /) {
     self->void_type_idx =
         CALL(TypeManager, *self, add_type, /, (Type){.kind = TypeKindVoid});
 }
+
 void MTD(TypeManager, drop, /) { DROPOBJ(VecType, self->types); }
 
 usize MTD(TypeManager, add_type, /, Type type) {
@@ -89,14 +92,14 @@ void MTD(TypeManager, add_fun_ret_par, /, usize type_idx, usize ret_par_idx) {
     CALL(Type, self->types.data[type_idx], add_fun_ret_par, /, ret_par_idx);
 }
 
-FUNC_STATIC bool MTD(TypeManager, check_type_array_consistency, /, Type *t1,
+FUNC_STATIC bool MTD(TypeManager, is_type_array_consistency, /, Type *t1,
                      Type *t2) {
     return t1->as_array.dim == t2->as_array.dim &&
-           CALL(TypeManager, *self, check_type_consistency, /,
+           CALL(TypeManager, *self, is_type_consistency, /,
                 t1->as_array.subtype_idx, t2->as_array.subtype_idx);
 }
 
-FUNC_STATIC bool MTD(TypeManager, check_type_struct_consistency, /, Type *t1,
+FUNC_STATIC bool MTD(TypeManager, is_type_struct_consistency, /, Type *t1,
                      Type *t2) {
     VecUSize *f1 = &t1->as_struct.field_idxes;
     VecUSize *f2 = &t2->as_struct.field_idxes;
@@ -104,14 +107,14 @@ FUNC_STATIC bool MTD(TypeManager, check_type_struct_consistency, /, Type *t1,
         return false;
     }
     for (usize i = 0; i < f1->size; i++) {
-        if (!CALL(TypeManager, *self, check_type_consistency, /, f1->data[i],
+        if (!CALL(TypeManager, *self, is_type_consistency, /, f1->data[i],
                   f2->data[i])) {
             return false;
         }
     }
     return true;
 }
-FUNC_STATIC bool MTD(TypeManager, check_type_fun_consistency, /, Type *t1,
+FUNC_STATIC bool MTD(TypeManager, is_type_fun_consistency, /, Type *t1,
                      Type *t2, bool fix) {
     VecUSize *r1 = &t1->as_fun.ret_par_idxes;
     VecUSize *r2 = &t2->as_fun.ret_par_idxes;
@@ -123,14 +126,14 @@ FUNC_STATIC bool MTD(TypeManager, check_type_fun_consistency, /, Type *t1,
     }
 
     if (!fix) {
-        if (!CALL(TypeManager, *self, check_type_consistency, /, r1->data[0],
+        if (!CALL(TypeManager, *self, is_type_consistency, /, r1->data[0],
                   r2->data[0])) {
             return false;
         }
     }
 
     for (usize i = 1; i < r1->size; i++) {
-        if (!CALL(TypeManager, *self, check_type_consistency, /, r1->data[i],
+        if (!CALL(TypeManager, *self, is_type_consistency, /, r1->data[i],
                   r2->data[i])) {
             return false;
         }
@@ -148,40 +151,45 @@ FUNC_STATIC bool MTD(TypeManager, check_type_fun_consistency, /, Type *t1,
     return true;
 }
 
-static bool MTD(TypeManager, check_type_consistency_inner, /, usize type_idx1,
+static bool MTD(TypeManager, is_type_consistency_inner, /, usize type_idx1,
                 usize type_idx2, bool fun_fix) {
+    if (type_idx1 == self->void_type_idx || type_idx2 == self->void_type_idx) {
+        return true;
+    }
+    // now types cannot be void
+
     Type *t1 = CALL(TypeManager, *self, get_type, /, type_idx1);
     Type *t2 = CALL(TypeManager, *self, get_type, /, type_idx2);
+
     if (t1->kind != t2->kind) {
         return false;
     }
-    if (t1->kind == TypeKindInvalid || t1->kind == TypeKindInt ||
-        t1->kind == TypeKindFloat || t1->kind == TypeKindVoid) {
+
+    if (t1->kind == TypeKindInt || t1->kind == TypeKindFloat) {
         return true;
     }
+
     if (t1->kind == TypeKindArray) {
-        return CALL(TypeManager, *self, check_type_array_consistency, /, t1,
-                    t2);
+        return CALL(TypeManager, *self, is_type_array_consistency, /, t1, t2);
     } else if (t1->kind == TypeKindStruct) {
-        return CALL(TypeManager, *self, check_type_struct_consistency, /, t1,
-                    t2);
+        return CALL(TypeManager, *self, is_type_struct_consistency, /, t1, t2);
     } else if (t1->kind == TypeKindFun) {
-        return CALL(TypeManager, *self, check_type_fun_consistency, /, t1, t2,
+        return CALL(TypeManager, *self, is_type_fun_consistency, /, t1, t2,
                     fun_fix);
     } else {
-        PANIC("Unknown kind.");
+        PANIC("Unknown kind");
     }
 }
 
-bool MTD(TypeManager, check_type_consistency, /, usize type_idx1,
+bool MTD(TypeManager, is_type_consistency, /, usize type_idx1,
          usize type_idx2) {
-    return CALL(TypeManager, *self, check_type_consistency_inner, /, type_idx1,
+    return CALL(TypeManager, *self, is_type_consistency_inner, /, type_idx1,
                 type_idx2, false);
 }
 
 DEFINE_CLASS_VEC(VecType, Type, FUNC_EXTERN);
-bool MTD(TypeManager, check_type_consistency_with_fun_fix, /, usize type_idx1,
+bool MTD(TypeManager, is_type_consistency_with_fun_fix, /, usize type_idx1,
          usize type_idx2) {
-    return CALL(TypeManager, *self, check_type_consistency_inner, /, type_idx1,
+    return CALL(TypeManager, *self, is_type_consistency_inner, /, type_idx1,
                 type_idx2, true);
 }

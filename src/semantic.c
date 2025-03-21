@@ -6,6 +6,32 @@
 #include "type.h"
 #include "utils.h"
 
+typedef struct SemPassInfo {
+    // inherits; requires initialization
+    usize inherit_type_idx;
+    usize enclosing_struct_type_idx;
+    bool is_fun_dec;
+    bool is_in_struct;
+
+    // synthesized
+    struct String *gen_symbol_str;
+    usize gen_symtab_idx;
+} SemPassInfo;
+
+FUNC_STATIC void MTD(SemPassInfo, init, /, usize inherit_type_idx,
+                     usize enclosing_struct_type_idx, bool is_fun_dec,
+                     bool is_in_struct) {
+    self->inherit_type_idx = inherit_type_idx;
+    self->enclosing_struct_type_idx = enclosing_struct_type_idx;
+    self->is_fun_dec = is_fun_dec;
+    self->is_in_struct = is_in_struct;
+
+    self->gen_symbol_str = NULL;
+    self->gen_symtab_idx = -1;
+}
+
+FUNC_STATIC DEFAULT_DROPER(SemPassInfo);
+
 void MTD(SemResolver, init, /, TypeManager *type_manager,
          SymbolManager *symbol_manager) {
     self->type_manager = type_manager;
@@ -14,24 +40,28 @@ void MTD(SemResolver, init, /, TypeManager *type_manager,
     self->sem_error = false;
 }
 
-#define DEF_VISITOR(gs)                                                        \
+// Visitor operations
+
+#define VISITOR(gs)                                                            \
     FUNC_STATIC void MTD(SemResolver, CONCATENATE(visit_, gs), /,              \
                          AstNode * node, ATTR_UNUSED SemPassInfo * info)
 
-#define DISPATCH_TO(gs)                                                        \
+#define DISPATCH(gs)                                                           \
     ({ CALL(SemResolver, *self, CONCATENATE(visit_, gs), /, node, info); })
 
 // Declare Visitor functions;
 // e.g. void MTD(SemResolver, visit_SEMI, /, AstNode * node); etc
-#define DECL_SEMRESOLVER_GRAMMAR_SYMBOL_AID(gs) DEF_VISITOR(gs);
+#define DECL_SEMRESOLVER_GRAMMAR_SYMBOL_AID(gs) VISITOR(gs);
 APPLY_GRAMMAR_SYMBOL_SYNTAX(DECL_SEMRESOLVER_GRAMMAR_SYMBOL_AID);
 
-#define UNDEF ((usize) - 1)
+// Info management
 #define INFO ASSERT(info, "info must not be NULL")
 #define NO_INFO ASSERT(!info, "info must be NULL")
 #define NEWNXTINFO(...)                                                        \
     SemPassInfo nxtinfo = CREOBJ(SemPassInfo, /, ##__VA_ARGS__)
 #define NXTINFO(...) nxtinfo = CREOBJ(SemPassInfo, /, ##__VA_ARGS__)
+
+// Data/flow management
 
 #define NUM_CHILDREN() (node->children.size)
 #define DATA_CHILD(idx)                                                        \
@@ -42,7 +72,8 @@ APPLY_GRAMMAR_SYMBOL_SYNTAX(DECL_SEMRESOLVER_GRAMMAR_SYMBOL_AID);
 #define VISIT_CHILD(gs, idx)                                                   \
     ({                                                                         \
         ASSERT(idx < NUM_CHILDREN(), "index out of range");                    \
-        ASSERT(DATA_CHILD(idx) && DATA_CHILD(idx)->grammar_symbol == GS_##gs,  \
+        ASSERT(DATA_CHILD(idx) &&                                              \
+                   DATA_CHILD(idx)->grammar_symbol == CONCATENATE(GS_, gs),    \
                "unexpected grammar symbol");                                   \
         CALL(SemResolver, *self, CONCATENATE(visit_, gs), /, DATA_CHILD(idx),  \
              NULL);                                                            \
@@ -50,24 +81,35 @@ APPLY_GRAMMAR_SYMBOL_SYNTAX(DECL_SEMRESOLVER_GRAMMAR_SYMBOL_AID);
 #define VISIT_WITH(gs, idx, info)                                              \
     ({                                                                         \
         ASSERT(idx < NUM_CHILDREN(), "index out of range");                    \
-        ASSERT(DATA_CHILD(idx) && DATA_CHILD(idx)->grammar_symbol == GS_##gs,  \
+        ASSERT(DATA_CHILD(idx) &&                                              \
+                   DATA_CHILD(idx)->grammar_symbol == CONCATENATE(GS_, gs),    \
                "unexpected grammar symbol");                                   \
         CALL(SemResolver, *self, CONCATENATE(visit_, gs), /, DATA_CHILD(idx),  \
              info);                                                            \
     })
 
-#define SAVE_SYMTAB() ({ node->symtab_idx = self->current_symtab_idx; })
+// Type management
+
 #define SAVE_TYPE_BASIC(basic_type)                                            \
     ({                                                                         \
         node->type_idx =                                                       \
             self->type_manager->CONCATENATE(basic_type, _type_idx);            \
     })
-#define SAVE_TYPE(type) ({ node->type_idx = type; })
+#define SAVE_TYPE(type) ({ node->type_idx = (type); })
 #define SAVE_TYPE_CHILD(idx) SAVE_TYPE(DATA_CHILD(idx)->type_idx)
+
+// Symtab management
+
+#define SAVE_SYMTAB() ({ node->symtab_idx = self->current_symtab_idx; })
 
 #define GET_SYMTAB()                                                           \
     SymbolTable *now_symtab = CALL(SymbolManager, *self->symbol_manager,       \
                                    get_table, /, self->current_symtab_idx)
+#define GET_TOPSYMTAB()                                                        \
+    SymbolTable *top_symtab =                                                  \
+        CALL(SymbolManager, *self->symbol_manager, get_table, /,               \
+             self->symbol_manager->root_idx)
+
 #define CHNGPUSH_SYMTAB(idx)                                                   \
     usize origin_symtab_idx = self->current_symtab_idx;                        \
     self->current_symtab_idx = idx
@@ -78,35 +120,24 @@ APPLY_GRAMMAR_SYMBOL_SYNTAX(DECL_SEMRESOLVER_GRAMMAR_SYMBOL_AID);
                                     add_table, /, self->current_symtab_idx)
 #define POP_SYMTAB() self->current_symtab_idx = origin_symtab_idx
 
+/* ------ */
+
 void MTD(SemResolver, resolve, /, AstNode *node) {
+    // first, do a visit
     CALL(SemResolver, *self, visit_Program, /, node, NULL);
-}
 
-void MTD(SemResolver, insert_var_dec, /, String *symbol_name, usize type_idx,
-         AstNode *node, SemPassInfo *info) {
-    // NOTE: key here is a hack! Do not drop it
-    HString key = NSCALL(HString, from_inner, /, *symbol_name);
-    GET_SYMTAB();
-
-    // do not recursively find: we only need to check the current scope
-    MapSymbolTableIterator it = CALL(SymbolTable, *now_symtab, find, /, &key);
-    if (it == NULL) {
-        // ok to insert it in.
-        HString key_to_insert = CALL(HString, key, clone, /);
-        MapSymbolTableInsertResult result =
-            CALL(SymbolTable, *now_symtab, insert, /, key_to_insert,
-                 SymbolEntryVar, type_idx);
-        ASSERT(result.inserted, "insertion shall be successful");
-    } else {
-        if (info->is_in_struct) {
-            report_semerr_fmt(node->line_no, SemErrorStructDefWrong,
-                              "redefinition of field \"%s\"",
-                              symbol_name->data);
-        } else {
-            report_semerr_fmt(node->line_no, SemErrorVarRedef,
-                              "redefinition of variable \"%s\"",
-                              symbol_name->data);
+    // then, check if there is any function that is declared but not defined
+    GET_TOPSYMTAB();
+    MapSymtab *top_mapping = &top_symtab->mapping;
+    MapSymtabIterator it = CALL(MapSymtab, *top_mapping, begin, /);
+    while (it) {
+        if (it->value.kind == SymbolEntryFun && !it->value.as_fun.is_defined) {
+            report_semerr_fmt(it->value.as_fun.first_decl_line_no,
+                              SemErrorFunDecButNotDef,
+                              "function \"%s\" declared but not defined",
+                              STRING_C_STR(it->key.s));
         }
+        it = CALL(MapSymtab, *top_mapping, next, /, it);
     }
 }
 
@@ -114,55 +145,92 @@ void MTD(SemResolver, insert_var_dec, /, String *symbol_name, usize type_idx,
 // Program         NOINFO | void
 // ExtDefList      NOINFO | void
 // ExtDef          NOINFO | void
-// ExtDecList      {give: prefix_type_idx}
-//                     - prefix_type_idx: the type of the declaration
+// ExtDecList      {give: inherit_type_idx}
+//                     - inherit_type_idx: the type of the declaration
 // Specifier       NOINFO | [int, float, (Sturct type from StructSpecifier)]
 // StructSpecifier NOINFO | (Struct type)
 // OptTag          {expect: gen_symbol_str @ nullable} | void
 //                     - gen_symbol_str: the name of the struct
 // Tag             {expect: gen_symbol_str} | void
 //                     - gen_symbol_str: the name of the struct
-// VarDec          {give: prefix_type_idx, expect: gen_symbol_str} | syn_type
-//                     - prefix_type_idx: the type from suffix (or the base type)
+// VarDec          {give: inherit_type_idx, expect: gen_symbol_str} | syn_type
+//                     - inherit_type_idx: the subtype of the array
 //                     - gen_symbol_str: the name of the var
 //                     - syn_type: type formed from now and the suffix
 //                     sym_gen is due to the father
-// FunDec          {give: prefix_type_idx, is_fun_dec; expect: gen_symtab_idx} | func_type
-//                     - prefix_type_idx: the return type of the function
+// FunDec          {give: inherit_type_idx, is_fun_dec; expect: gen_symtab_idx} | func_type
+//                     - inherit_type_idx: the return type of the function
 //                     - is_fun_dec: whether it is a function declaration
 //                     - gen_symtab_idx: the new symbol table index for the func
 //                     - func_type: the complete type of the function
-// VarList         {give: prefix_type_idx} | void
-//                     - prefix_type_idx: the belonging function type
-// ParamDec        {give: prefix_type_idx} | void
-//                     - prefix_type_idx: the belonging function type
-// CompSt          {give: prefix_type_idx} | void
-//                     - prefix_type_idx: the return type of the function
-// StmtList        {give: prefix_type_idx} | void
-//                     - prefix_type_idx: the return type of the function
-// Stmt            {give: prefix_type_idx} | void
-//                     - prefix_type_idx: the return type of the function
+// VarList         {give: inherit_type_idx} | void
+//                     - inherit_type_idx: the belonging function type
+// ParamDec        {give: inherit_type_idx} | void
+//                     - inherit_type_idx: the belonging function type
+// CompSt          {give: inherit_type_idx} | void
+//                     - inherit_type_idx: the return type of the function
+// StmtList        {give: inherit_type_idx} | void
+//                     - inherit_type_idx: the return type of the function
+// Stmt            {give: inherit_type_idx} | void
+//                     - inherit_type_idx: the return type of the function
 // DefList         {give: enclosing_struct_type_idx, is_in_struct} | void
 //                     - enclosing_struct_type_idx: the struct type of the enclosing struct (if is_in_struct == true)
 //                     - is_in_struct: whether the DefList is in a struct
 // Def             {give: enclosing_struct_type_idx, is_in_struct} | void
 //                     - enclosing_struct_type_idx: the struct type of the enclosing struct (if is_in_struct == true)
 //                     - is_in_struct: whether the Def is in a struct
-// DecList         {give: prefix_type_idx, enclosing_struct_type_idx, is_in_struct} | void
-//                     - prefix_type_idx: the type of the declaration (local)
+// DecList         {give: inherit_type_idx, enclosing_struct_type_idx, is_in_struct} | void
+//                     - inherit_type_idx: the type of the declaration (local)
 //                     - enclosing_struct_type_idx: the struct type of the enclosing struct (if is_in_struct == true)
 //                     - is_in_struct: whether the DecList is in a struct
-// Dec             {give: prefix_type_idx, enclosing_struct_type_idx, is_in_struct} | void
-//                     - prefix_type_idx: the type of the declaration (local)
+// Dec             {give: inherit_type_idx, enclosing_struct_type_idx, is_in_struct} | void
+//                     - inherit_type_idx: the type of the declaration (local)
 //                     - enclosing_struct_type_idx: the struct type of the enclosing struct (if is_in_struct == true)
 //                     - is_in_struct: whether the Dec is in a struct
 // Exp             NOINFO | (type of the expresion)
-// Args            {give: prefix_type_idx} | void
-//                     - prefix_type_idx: the type that is being determined (func call type)
+// Args            {give: inherit_type_idx} | void
+//                     - inherit_type_idx: the type that is being determined (func call type)
 // clang-format on
 
+void MTD(SemResolver, insert_var_dec, /, String *symbol_name, usize type_idx,
+         AstNode *node, SemPassInfo *info) {
+    ASSERT(symbol_name);
+    // key here is a hack! Do not drop it
+    HString key = NSCALL(HString, from_inner, /, *symbol_name);
+
+    GET_SYMTAB();
+    // recursively find to avoid name conflict with structs
+    MapSymtabIterator it = CALL(SymbolTable, *now_symtab, find_recursive, /,
+                                &key, self->symbol_manager);
+    bool can_insert_in = false;
+    if (it == NULL) {
+        can_insert_in = true;
+    } else if (it->value.kind == SymbolEntryVar &&
+               it->value.table != now_symtab) {
+        can_insert_in = true;
+    } else {
+        if (info->is_in_struct) {
+            report_semerr_fmt(node->line_no, SemErrorStructDefWrong,
+                              "redefinition of field \"%s\"",
+                              STRING_C_STR(*symbol_name));
+        } else {
+            report_semerr_fmt(node->line_no, SemErrorVarRedef,
+                              "redefinition of variable \"%s\"",
+                              STRING_C_STR(*symbol_name));
+        }
+    }
+
+    if (can_insert_in) {
+        HString key_to_insert = CALL(HString, key, clone, /);
+        MapSymtabInsertResult result =
+            CALL(SymbolTable, *now_symtab, insert, /, key_to_insert,
+                 SymbolEntryVar, type_idx);
+        ASSERT(result.inserted, "insertion shall be successful");
+    }
+}
+
 // Program -> ExtDefList
-DEF_VISITOR(Program) {
+VISITOR(Program) {
     NO_INFO;
     SAVE_SYMTAB();
     VISIT_CHILD(ExtDefList, 0);
@@ -171,31 +239,33 @@ DEF_VISITOR(Program) {
 
 // ExtDefList -> ExtDef ExtDefList
 // ExtDefList -> \epsilon
-DEF_VISITOR(ExtDefList) {
+VISITOR(ExtDefList) {
     NO_INFO;
     SAVE_SYMTAB();
     if (NUM_CHILDREN() == 2) {
         // ExtDefList -> ExtDef ExtDefList
         VISIT_CHILD(ExtDef, 0);
         VISIT_CHILD(ExtDefList, 1);
-    } // else ExtDefList -> \epsilon; no more actions
+    } else {
+        // ExtDefList -> \epsilon
+    }
     SAVE_TYPE_BASIC(void);
 }
 
 // ExtDef -> Specifier ExtDecList SEMI
-DEF_VISITOR(ExtDefCase1) {
+VISITOR(ExtDefCase1) {
     NO_INFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Specifier, 0);
 
     usize decl_type_idx = DATA_CHILD(0)->type_idx;
-    NEWNXTINFO(decl_type_idx, UNDEF, false, false);
+    NEWNXTINFO(decl_type_idx, -1, false, false);
     VISIT_WITH(ExtDecList, 1, &nxtinfo);
     SAVE_TYPE_BASIC(void);
 }
 
 // ExtDef -> Specifier SEMI
-DEF_VISITOR(ExtDefCase2) {
+VISITOR(ExtDefCase2) {
     NO_INFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Specifier, 0);
@@ -203,18 +273,18 @@ DEF_VISITOR(ExtDefCase2) {
 }
 
 // ExtDef -> Specifier FunDec CompSt
-DEF_VISITOR(ExtDefCase3) {
+VISITOR(ExtDefCase3) {
     NO_INFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Specifier, 0);
 
     usize ret_type_idx = DATA_CHILD(0)->type_idx;
-    NEWNXTINFO(ret_type_idx, UNDEF, false, false);
+    NEWNXTINFO(ret_type_idx, -1, false, false);
     VISIT_WITH(FunDec, 1, &nxtinfo);
 
     usize func_symtab_idx = nxtinfo.gen_symtab_idx;
 
-    NXTINFO(ret_type_idx, UNDEF, false, false);
+    NXTINFO(ret_type_idx, -1, false, false);
     CHNGPUSH_SYMTAB(func_symtab_idx);
     VISIT_WITH(CompSt, 2, &nxtinfo);
     POP_SYMTAB();
@@ -222,13 +292,13 @@ DEF_VISITOR(ExtDefCase3) {
 }
 
 // ExtDef -> Specifier FunDec SEMI
-DEF_VISITOR(ExtDefCase4) {
+VISITOR(ExtDefCase4) {
     NO_INFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Specifier, 0);
 
     usize ret_type_idx = DATA_CHILD(0)->type_idx;
-    NEWNXTINFO(ret_type_idx, UNDEF, true, false);
+    NEWNXTINFO(ret_type_idx, -1, true, false);
     VISIT_WITH(FunDec, 1, &nxtinfo);
     SAVE_TYPE_BASIC(void);
 }
@@ -238,29 +308,30 @@ DEF_VISITOR(ExtDefCase4) {
 // - ExtDef -> Specifier SEMI
 // - ExtDef -> Specifier FunDec CompSt
 // - ExtDef -> Specifier FunDec SEMI
-DEF_VISITOR(ExtDef) {
+VISITOR(ExtDef) {
     if (NUM_CHILDREN() == 2) {
         // ExtDef -> Specifier SEMI
-        DISPATCH_TO(ExtDefCase2);
+        DISPATCH(ExtDefCase2);
     } else if (DATA_CHILD(1)->grammar_symbol == GS_ExtDecList) {
         // ExtDef -> Specifier ExtDecList SEMI
-        DISPATCH_TO(ExtDefCase1);
+        DISPATCH(ExtDefCase1);
     } else if (DATA_CHILD(2)->grammar_symbol == GS_CompSt) {
         // ExtDef -> Specifier FunDec CompSt
-        DISPATCH_TO(ExtDefCase3);
+        DISPATCH(ExtDefCase3);
     } else {
         // ExtDef -> Specifier FunDec SEMI
-        DISPATCH_TO(ExtDefCase4);
+        DISPATCH(ExtDefCase4);
     }
 }
 
 // ExtDecList -> VarDec COMMA ExtDecList
 // ExtDecList -> VarDec
-DEF_VISITOR(ExtDecList) {
+VISITOR(ExtDecList) {
     INFO;
     SAVE_SYMTAB();
 
     VISIT_WITH(VarDec, 0, info);
+
     String *symbol_name = info->gen_symbol_str;
     ASSERT(symbol_name);
     usize var_type_idx = DATA_CHILD(0)->type_idx;
@@ -270,12 +341,14 @@ DEF_VISITOR(ExtDecList) {
     if (NUM_CHILDREN() == 3) {
         // ExtDecList -> VarDec COMMA ExtDecList
         VISIT_WITH(ExtDecList, 2, info);
-    } // else, ExtDecList -> VarDec; no more actions
+    } else {
+        // ExtDecList -> VarDec
+    }
     SAVE_TYPE_BASIC(void);
 }
 
 // Specifier -> TYPE
-DEF_VISITOR(SpecifierCase1) {
+VISITOR(SpecifierCase1) {
     NO_INFO;
     SAVE_SYMTAB();
     const char *type_str = DATA_CHILD(0)->str_val.data;
@@ -287,7 +360,7 @@ DEF_VISITOR(SpecifierCase1) {
 }
 
 // Specifier -> StructSpecifier
-DEF_VISITOR(SpecifierCase2) {
+VISITOR(SpecifierCase2) {
     NO_INFO;
     SAVE_SYMTAB();
     VISIT_CHILD(StructSpecifier, 0);
@@ -297,21 +370,22 @@ DEF_VISITOR(SpecifierCase2) {
 // Specifier Dispatcher
 // - Specifier -> TYPE
 // - Specifier -> StructSpecifier
-DEF_VISITOR(Specifier) {
+VISITOR(Specifier) {
     if (DATA_CHILD(0)->grammar_symbol == GS_TYPE) {
         // Specifier -> TYPE
-        DISPATCH_TO(SpecifierCase1);
+        DISPATCH(SpecifierCase1);
     } else {
         // Specifier -> StructSpecifier
-        DISPATCH_TO(SpecifierCase2);
+        DISPATCH(SpecifierCase2);
     }
 }
 
 // StructSpecifier -> STRUCT OptTag LC DefList RC
-DEF_VISITOR(StructSpecifierCase1) {
+VISITOR(StructSpecifierCase1) {
     NO_INFO;
     SAVE_SYMTAB();
-    NEWNXTINFO(UNDEF, UNDEF, false, false);
+
+    NEWNXTINFO(-1, -1, false, false);
     VISIT_WITH(OptTag, 1, &nxtinfo);
 
     // construct the struct type
@@ -320,60 +394,66 @@ DEF_VISITOR(StructSpecifierCase1) {
     usize struct_type_idx = CALL(TypeManager, *self->type_manager, make_struct,
                                  /, struct_symtab_idx);
 
-    // try to fill in the symtab
     String *struct_tag = nxtinfo.gen_symbol_str;
+
+    // struct body requires a new symtab
+    NXTINFO(-1, struct_type_idx, false, true);
+    CHNGPUSH_SYMTAB(struct_symtab_idx);
+    VISIT_WITH(DefList, 3, &nxtinfo);
+    POP_SYMTAB();
+
+    // try to fill the tag in the symtab
     if (struct_tag) {
-        // NOTE: key here is a hack! Do not drop it
+        // key here is a hack! Do not drop it
         HString key = NSCALL(HString, from_inner, /, *struct_tag);
 
         // check if the struct is already defined
         GET_SYMTAB();
-        MapSymbolTableIterator it =
-            CALL(SymbolTable, *now_symtab, find_recursive, /, &key,
-                 self->symbol_manager);
+        MapSymtabIterator it = CALL(SymbolTable, *now_symtab, find_recursive, /,
+                                    &key, self->symbol_manager);
         if (it == NULL) {
-            // ok to insert it in.
+            // ok to insert it (in the top symtab)
             HString key_to_insert = CALL(HString, key, clone, /);
-            MapSymbolTableInsertResult result =
-                CALL(SymbolTable, *now_symtab, insert, /, key_to_insert,
+
+            GET_TOPSYMTAB();
+            MapSymtabInsertResult result =
+                CALL(SymbolTable, *top_symtab, insert, /, key_to_insert,
                      SymbolEntryStruct, struct_type_idx);
             ASSERT(result.inserted, "insertion shall be successful");
         } else {
             report_semerr_fmt(node->line_no, SemErrorStructRedef,
                               "redefinition of struct \"%s\"",
-                              struct_tag->data);
+                              STRING_C_STR(*struct_tag));
         }
+    } else {
+        // An anonymous struct; we do not insert anything to the symtab
     }
-
-    NXTINFO(UNDEF, struct_type_idx, false, true);
-
-    // struct body requires a new symtab
-    CHNGPUSH_SYMTAB(struct_symtab_idx);
-    VISIT_WITH(DefList, 3, &nxtinfo);
-    POP_SYMTAB();
 
     SAVE_TYPE(struct_type_idx);
 }
 
 // StructSpecifier -> STRUCT Tag
-DEF_VISITOR(StructSpecifierCase2) {
+VISITOR(StructSpecifierCase2) {
     NO_INFO;
     SAVE_SYMTAB();
-    NEWNXTINFO(UNDEF, UNDEF, false, false);
-    VISIT_WITH(Tag, 1, &nxtinfo);
-    String *struct_tag = nxtinfo.gen_symbol_str;
-    ASSERT(struct_tag, "struct tag must not be NULL");
 
-    // NOTE: key here is a hack! Do not drop it
+    NEWNXTINFO(-1, -1, false, false);
+    VISIT_WITH(Tag, 1, &nxtinfo);
+
+    String *struct_tag = nxtinfo.gen_symbol_str;
+    ASSERT(struct_tag, "struct with `Tag` must not be NULL");
+
+    // key here is a hack! Do not drop it
     HString key = NSCALL(HString, from_inner, /, *struct_tag);
 
     // check if the struct is already defined
     GET_SYMTAB();
-    MapSymbolTableIterator it = CALL(SymbolTable, *now_symtab, find_recursive,
-                                     /, &key, self->symbol_manager);
-    if (it == NULL) {
+    MapSymtabIterator it = CALL(SymbolTable, *now_symtab, find_recursive, /,
+                                &key, self->symbol_manager);
+
+    if (it == NULL || it->value.kind != SymbolEntryStruct) {
         report_semerr_fmt(node->line_no, SemErrorStructUndef,
-                          "undefined struct \"%s\"", struct_tag->data);
+                          "undefined struct \"%s\"", STRING_C_STR(*struct_tag));
         SAVE_TYPE_BASIC(void);
     } else {
         SAVE_TYPE(it->value.type_idx);
@@ -383,22 +463,22 @@ DEF_VISITOR(StructSpecifierCase2) {
 // StructSpecifier Dispatcher
 // - StructSpecifier -> STRUCT OptTag LC DefList RC
 // - StructSpecifier -> STRUCT Tag
-DEF_VISITOR(StructSpecifier) {
+VISITOR(StructSpecifier) {
     if (NUM_CHILDREN() == 5) {
         // StructSpecifier -> STRUCT OptTag LC DefList RC
-        DISPATCH_TO(StructSpecifierCase1);
+        DISPATCH(StructSpecifierCase1);
     } else {
         // StructSpecifier -> STRUCT Tag
-        DISPATCH_TO(StructSpecifierCase2);
+        DISPATCH(StructSpecifierCase2);
     }
 }
 
 // OptTag -> ID
 // OptTag -> \epsilon
-DEF_VISITOR(OptTag) {
+VISITOR(OptTag) {
     INFO;
     SAVE_SYMTAB();
-    if (DATA_CHILD(0)->grammar_symbol == GS_ID) {
+    if (NUM_CHILDREN() == 1) {
         // OptTag -> ID
         info->gen_symbol_str = &DATA_CHILD(0)->str_val;
     } else {
@@ -409,7 +489,7 @@ DEF_VISITOR(OptTag) {
 }
 
 // Tag -> ID
-DEF_VISITOR(Tag) {
+VISITOR(Tag) {
     INFO;
     SAVE_SYMTAB();
     info->gen_symbol_str = &DATA_CHILD(0)->str_val;
@@ -417,25 +497,28 @@ DEF_VISITOR(Tag) {
 }
 
 // VarDec -> ID
-DEF_VISITOR(VarDecCase1) {
+VISITOR(VarDecCase1) {
     INFO;
     SAVE_SYMTAB();
+
     info->gen_symbol_str = &DATA_CHILD(0)->str_val;
-    usize upper_type_idx = info->prefix_type_idx;
-    SAVE_TYPE(upper_type_idx);
+    usize subtype_idx = info->inherit_type_idx;
+    SAVE_TYPE(subtype_idx);
 }
 
 // VarDec -> VarDec LB INT RB
-DEF_VISITOR(VarDecCase2) {
+VISITOR(VarDecCase2) {
     INFO;
     SAVE_SYMTAB();
 
     usize size = DATA_CHILD(2)->int_val;
-    usize upper_type_idx = info->prefix_type_idx;
-    usize now_type_idx = CALL(TypeManager, *self->type_manager, make_array, /,
-                              size, upper_type_idx);
-    NEWNXTINFO(now_type_idx, UNDEF, false, false);
+    usize subtype_idx = info->inherit_type_idx;
+    usize type_idx = CALL(TypeManager, *self->type_manager, make_array, /, size,
+                          subtype_idx);
+
+    NEWNXTINFO(type_idx, -1, false, false);
     VISIT_WITH(VarDec, 0, &nxtinfo);
+
     info->gen_symbol_str = nxtinfo.gen_symbol_str;
     SAVE_TYPE_CHILD(0);
 }
@@ -443,30 +526,48 @@ DEF_VISITOR(VarDecCase2) {
 // VarDec Dispatcher
 // - VarDec -> ID
 // - VarDec -> VarDec LB INT RB
-DEF_VISITOR(VarDec) {
+VISITOR(VarDec) {
     if (NUM_CHILDREN() == 1) {
         // VarDec -> ID
-        DISPATCH_TO(VarDecCase1);
+        DISPATCH(VarDecCase1);
     } else {
         // VarDec -> VarDec LB INT RB
-        DISPATCH_TO(VarDecCase2);
+        DISPATCH(VarDecCase2);
     }
 }
 
 // FunDec -> ID LP VarList RP
 // FunDec -> ID LP RP
-DEF_VISITOR(FunDec) {
+VISITOR(FunDec) {
     INFO;
     SAVE_SYMTAB();
-    usize ret_type_idx = info->prefix_type_idx;
+
+    usize ret_type_idx = info->inherit_type_idx;
     bool is_fun_dec = info->is_fun_dec;
 
-    // create the function type
+    // create the function type, and add the return type as its 0th-elem
     usize func_type_idx = CALL(TypeManager, *self->type_manager, make_fun, /);
     CALL(TypeManager, *self->type_manager, add_fun_ret_par, /, func_type_idx,
          ret_type_idx);
 
-    // 1. Handle ID
+    // Handle VarList
+
+    PUSH_SYMTAB();
+    info->gen_symtab_idx = self->current_symtab_idx;
+
+    if (NUM_CHILDREN() == 4) {
+        // FunDec -> ID LP VarList RP
+        NEWNXTINFO(func_type_idx, -1, false, false);
+        VISIT_WITH(VarList, 2, &nxtinfo);
+    } else {
+        // FunDec -> ID LP RP
+        // do nothing
+    }
+    POP_SYMTAB();
+
+    // TODO: Now the func_type is completed; merge
+
+    // Handle fun_name
 
     String *fun_name = &DATA_CHILD(0)->str_val;
 
@@ -474,12 +575,13 @@ DEF_VISITOR(FunDec) {
     HString key = NSCALL(HString, from_inner, /, *fun_name);
 
     GET_SYMTAB();
-    MapSymbolTableIterator it = CALL(SymbolTable, *now_symtab, find_recursive,
-                                     /, &key, self->symbol_manager);
+    MapSymtabIterator it = CALL(SymbolTable, *now_symtab, find_recursive, /,
+                                &key, self->symbol_manager);
+
     if (it == NULL) {
         // ok to insert it in.
         HString key_to_insert = CALL(HString, key, clone, /);
-        MapSymbolTableInsertResult result =
+        MapSymtabInsertResult result =
             CALL(SymbolTable, *now_symtab, insert, /, key_to_insert,
                  SymbolEntryFun, func_type_idx);
         ASSERT(result.inserted, "insertion shall be successful");
@@ -490,38 +592,33 @@ DEF_VISITOR(FunDec) {
             // First time dec
             entry->as_fun.is_defined = false;
         } else {
-            // First time def
+            // First time dec + def
             entry->as_fun.is_defined = true;
         }
+        entry->as_fun.first_decl_line_no = node->line_no;
+    } else if (it->value.kind != SymbolEntryFun) {
+        report_semerr_fmt(
+            node->line_no, SemErrorFunRedef,
+            "conflict definition with previous identifiers for function \"%s\"",
+            STRING_C_STR(*fun_name));
     } else {
         SymbolEntry *entry = &it->value;
-        if (!info->is_fun_dec && entry->as_fun.is_defined) {
+        if (!is_fun_dec && entry->as_fun.is_defined) {
+            // double definition
             report_semerr_fmt(node->line_no, SemErrorFunRedef,
                               "redefinition of function \"%s\"",
-                              fun_name->data);
-        } else if (!info->is_fun_dec && !entry->as_fun.is_defined) {
-            entry->as_fun.is_defined = true;
-        }
-    }
-
-    PUSH_SYMTAB();
-    info->gen_symtab_idx = self->current_symtab_idx;
-
-    // 2. Handle VarList
-    if (NUM_CHILDREN() == 4) {
-        // FunDec -> ID LP VarList RP
-        NEWNXTINFO(func_type_idx, UNDEF, false, false);
-        VISIT_WITH(VarList, 2, &nxtinfo);
-    }
-    POP_SYMTAB();
-
-    if (it) {
-        // check the consistency of the function declaration
-        if (!CALL(TypeManager, *self->type_manager, check_type_consistency, /,
-                  func_type_idx, it->value.type_idx)) {
-            report_semerr_fmt(node->line_no, SemErrorFunDecConflict,
-                              "conflicting types for function \"%s\"",
-                              fun_name->data);
+                              STRING_C_STR(*fun_name));
+        } else {
+            if (!CALL(TypeManager, *self->type_manager, is_type_consistency, /,
+                      func_type_idx, entry->type_idx)) {
+                // not consistent
+                report_semerr_fmt(node->line_no, SemErrorFunDecConflict,
+                                  "conflicting types for function \"%s\"",
+                                  STRING_C_STR(*fun_name));
+            } else if (!is_fun_dec) {
+                // consistent; now it is defined
+                entry->as_fun.is_defined = true;
+            }
         }
     }
 
@@ -530,63 +627,76 @@ DEF_VISITOR(FunDec) {
 
 // VarList -> ParamDec COMMA VarList
 // VarList -> ParamDec
-DEF_VISITOR(VarList) {
+VISITOR(VarList) {
     INFO;
     SAVE_SYMTAB();
     VISIT_WITH(ParamDec, 0, info);
     if (NUM_CHILDREN() == 3) {
         // VarList -> ParamDec COMMA VarList
         VISIT_WITH(VarList, 2, info);
+    } else {
+        // VarList -> ParamDec
+        // do nothing
     }
     SAVE_TYPE_BASIC(void);
 }
 
 // ParamDec -> Specifier VarDec
-DEF_VISITOR(ParamDec) {
+VISITOR(ParamDec) {
     INFO;
     SAVE_SYMTAB();
 
-    VISIT_CHILD(Specifier, 0);
-    usize fun_type_idx = info->prefix_type_idx;
+    usize fun_type_idx = info->inherit_type_idx;
 
-    usize base_type_idx = DATA_CHILD(0)->type_idx;
-    NEWNXTINFO(base_type_idx, UNDEF, false, false);
+    VISIT_CHILD(Specifier, 0);
+    usize decl_type_idx = DATA_CHILD(0)->type_idx;
+
+    NEWNXTINFO(decl_type_idx, -1, false, false);
     VISIT_WITH(VarDec, 1, &nxtinfo);
+
     String *symbol_name = nxtinfo.gen_symbol_str;
     ASSERT(symbol_name);
+
     usize param_type_idx = DATA_CHILD(1)->type_idx;
     CALL(SemResolver, *self, insert_var_dec, /, symbol_name, param_type_idx,
          node, info);
 
     CALL(TypeManager, *self->type_manager, add_fun_ret_par, /, fun_type_idx,
          param_type_idx);
+
     SAVE_TYPE_BASIC(void);
 }
 
 // CompSt -> LC DefList StmtList RC
-DEF_VISITOR(CompSt) {
+VISITOR(CompSt) {
     INFO;
-    NEWNXTINFO(UNDEF, UNDEF, false, false);
+    SAVE_SYMTAB();
+
+    NEWNXTINFO(-1, -1, false, false);
     VISIT_WITH(DefList, 1, &nxtinfo);
     VISIT_WITH(StmtList, 2, info);
+
     SAVE_TYPE_BASIC(void);
 }
 
 // StmtList -> Stmt StmtList
 // StmtList -> \epsilon
-DEF_VISITOR(StmtList) {
+VISITOR(StmtList) {
     INFO;
     SAVE_SYMTAB();
     if (NUM_CHILDREN() == 2) {
         // StmtList -> Stmt StmtList
         VISIT_WITH(Stmt, 0, info);
         VISIT_WITH(StmtList, 1, info);
-    } // else StmtList -> \epsilon; no more actions
+    } else {
+        // StmtList -> \epsilon
+        // do nothing
+    }
     SAVE_TYPE_BASIC(void);
 }
 
 // Stmt -> Exp SEMI
-DEF_VISITOR(StmtCase1) {
+VISITOR(StmtCase1) {
     INFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Exp, 0);
@@ -594,47 +704,61 @@ DEF_VISITOR(StmtCase1) {
 }
 
 // Stmt -> CompSt
-DEF_VISITOR(StmtCase2) {
+VISITOR(StmtCase2) {
     INFO;
     SAVE_SYMTAB();
+
     PUSH_SYMTAB();
     VISIT_WITH(CompSt, 0, info);
     POP_SYMTAB();
+
     SAVE_TYPE_BASIC(void);
 }
 
 // Stmt -> RETURN Exp SEMI
-DEF_VISITOR(StmtCase3) {
+VISITOR(StmtCase3) {
     INFO;
     SAVE_SYMTAB();
+
     VISIT_CHILD(Exp, 1);
-    usize ret_type_idx = info->prefix_type_idx;
-    if (DATA_CHILD(1)->type_idx != ret_type_idx) {
+
+    usize ret_type_idx = info->inherit_type_idx;
+    usize exp_type_idx = DATA_CHILD(1)->type_idx;
+
+    if (!CALL(TypeManager, *self->type_manager, is_type_consistency, /,
+              ret_type_idx, exp_type_idx)) {
         report_semerr(node->line_no, SemErrorReturnTypeErr,
                       "return type mismatched");
     }
+
     SAVE_TYPE_BASIC(void);
 }
 
 // Stmt -> IF LP Exp RP Stmt
-DEF_VISITOR(StmtCase4) {
+VISITOR(StmtCase4) {
     INFO;
     SAVE_SYMTAB();
+
     VISIT_CHILD(Exp, 2);
-    if (DATA_CHILD(2)->type_idx != self->type_manager->int_type_idx) {
+    usize cond_type_idx = DATA_CHILD(2)->type_idx;
+    if (!CALL(TypeManager, *self->type_manager, is_type_consistency, /,
+              cond_type_idx, self->type_manager->int_type_idx)) {
         report_semerr(node->line_no, SemErrorOPTypeErr,
                       "if condition must be of type int");
     }
     VISIT_WITH(Stmt, 4, info);
+
     SAVE_TYPE_BASIC(void);
 }
 
 // Stmt -> IF LP Exp RP Stmt ELSE Stmt
-DEF_VISITOR(StmtCase5) {
+VISITOR(StmtCase5) {
     INFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Exp, 2);
-    if (DATA_CHILD(2)->type_idx != self->type_manager->int_type_idx) {
+    usize cond_type_idx = DATA_CHILD(2)->type_idx;
+    if (!CALL(TypeManager, *self->type_manager, is_type_consistency, /,
+              cond_type_idx, self->type_manager->int_type_idx)) {
         report_semerr(node->line_no, SemErrorOPTypeErr,
                       "if condition must be of type int");
     }
@@ -644,11 +768,13 @@ DEF_VISITOR(StmtCase5) {
 }
 
 // Stmt -> WHILE LP Exp RP Stmt
-DEF_VISITOR(StmtCase6) {
+VISITOR(StmtCase6) {
     INFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Exp, 2);
-    if (DATA_CHILD(2)->type_idx != self->type_manager->int_type_idx) {
+    usize cond_type_idx = DATA_CHILD(2)->type_idx;
+    if (!CALL(TypeManager, *self->type_manager, is_type_consistency, /,
+              cond_type_idx, self->type_manager->int_type_idx)) {
         report_semerr(node->line_no, SemErrorOPTypeErr,
                       "while condition must be of type int");
     }
@@ -663,74 +789,86 @@ DEF_VISITOR(StmtCase6) {
 // - Stmt -> IF LP Exp RP Stmt
 // - Stmt -> IF LP Exp RP Stmt ELSE Stmt
 // - Stmt -> WHILE LP Exp RP Stmt
-DEF_VISITOR(Stmt) {
+VISITOR(Stmt) {
     if (NUM_CHILDREN() == 2) {
         // Stmt -> Exp SEMI
-        DISPATCH_TO(StmtCase1);
+        DISPATCH(StmtCase1);
     } else if (NUM_CHILDREN() == 1) {
         // Stmt -> CompSt
-        DISPATCH_TO(StmtCase2);
+        DISPATCH(StmtCase2);
     } else if (NUM_CHILDREN() == 3) {
         // Stmt -> RETURN Exp SEMI
-        DISPATCH_TO(StmtCase3);
+        DISPATCH(StmtCase3);
     } else if (NUM_CHILDREN() == 7) {
         // Stmt -> IF LP Exp RP Stmt ELSE Stmt
-        DISPATCH_TO(StmtCase5);
+        DISPATCH(StmtCase5);
     } else if (DATA_CHILD(0)->grammar_symbol == GS_IF) {
         // Stmt -> IF LP Exp RP Stmt
-        DISPATCH_TO(StmtCase4);
+        DISPATCH(StmtCase4);
     } else {
         // Stmt -> WHILE LP Exp RP Stmt
-        DISPATCH_TO(StmtCase6);
+        DISPATCH(StmtCase6);
     }
 }
 
 // DefList -> Def DefList
 // DefList -> \epsilon
-DEF_VISITOR(DefList) {
+VISITOR(DefList) {
     INFO;
     SAVE_SYMTAB();
+
     if (NUM_CHILDREN() == 2) {
         // DefList -> Def DefList
         VISIT_WITH(Def, 0, info);
         VISIT_WITH(DefList, 1, info);
-    } // else DefList -> \epsilon; no more actions
+    } else {
+        // DefList -> \epsilon
+        // do nothing
+    }
     SAVE_TYPE_BASIC(void);
 }
 
 // Def -> Specifier DecList SEMI
-DEF_VISITOR(Def) {
+VISITOR(Def) {
     INFO;
     SAVE_SYMTAB();
+
     VISIT_CHILD(Specifier, 0);
     usize decl_type_idx = DATA_CHILD(0)->type_idx;
+
     NEWNXTINFO(decl_type_idx, info->enclosing_struct_type_idx, false,
                info->is_in_struct);
     VISIT_WITH(DecList, 1, &nxtinfo);
+
     SAVE_TYPE_BASIC(void);
 }
 
 // DecList -> Dec
 // DecList -> Dec COMMA DecList
-DEF_VISITOR(DecList) {
+VISITOR(DecList) {
     INFO;
     SAVE_SYMTAB();
     VISIT_WITH(Dec, 0, info);
     if (NUM_CHILDREN() == 3) {
         // DecList -> Dec COMMA DecList
         VISIT_WITH(DecList, 2, info);
-    } // else DecList -> Dec; no more actions
+    } else {
+        // DecList -> Dec
+        // do nothing
+    }
     SAVE_TYPE_BASIC(void);
 }
 
 // Dec -> VarDec
-DEF_VISITOR(DecCase1) {
+VISITOR(DecCase1) {
     INFO;
     SAVE_SYMTAB();
-    usize decl_type_idx = info->prefix_type_idx;
-    NEWNXTINFO(decl_type_idx, UNDEF, false, false);
 
+    usize decl_type_idx = info->inherit_type_idx;
+
+    NEWNXTINFO(decl_type_idx, -1, false, false);
     VISIT_WITH(VarDec, 0, &nxtinfo);
+
     String *symbol_name = nxtinfo.gen_symbol_str;
     ASSERT(symbol_name);
     usize var_type_idx = DATA_CHILD(0)->type_idx;
@@ -745,46 +883,54 @@ DEF_VISITOR(DecCase1) {
 }
 
 // Dec -> VarDec ASSIGNOP Exp
-DEF_VISITOR(DecCase2) {
+VISITOR(DecCase2) {
     INFO;
     SAVE_SYMTAB();
+
     if (info->is_in_struct) {
         report_semerr(node->line_no, SemErrorStructDefWrong,
                       "initialization in struct definition");
     }
-    usize decl_type_idx = info->prefix_type_idx;
-    NEWNXTINFO(decl_type_idx, UNDEF, false, false);
+
+    usize decl_type_idx = info->inherit_type_idx;
+    NEWNXTINFO(decl_type_idx, -1, false, false);
 
     VISIT_WITH(VarDec, 0, &nxtinfo);
     String *symbol_name = nxtinfo.gen_symbol_str;
     ASSERT(symbol_name);
+
     usize var_type_idx = DATA_CHILD(0)->type_idx;
     CALL(SemResolver, *self, insert_var_dec, /, symbol_name, var_type_idx, node,
          info);
+
     if (info->is_in_struct) {
         CALL(TypeManager, *self->type_manager, add_struct_field, /,
              info->enclosing_struct_type_idx, var_type_idx);
     }
 
     VISIT_CHILD(Exp, 2);
-    usize exp_type_idx = DATA_CHILD(2)->type_idx;
-    if (!CALL(TypeManager, *self->type_manager, check_type_consistency, /,
-              var_type_idx, exp_type_idx)) {
-        report_semerr(node->line_no, SemErrorAssignTypeErr,
-                      "assignment type mismatched");
+
+    if (!info->is_in_struct) {
+        usize exp_type_idx = DATA_CHILD(2)->type_idx;
+
+        if (!CALL(TypeManager, *self->type_manager, is_type_consistency, /,
+                  var_type_idx, exp_type_idx)) {
+            report_semerr(node->line_no, SemErrorAssignTypeErr,
+                          "assignment type mismatched");
+        }
     }
 }
 
 // Dec Dispatcher
 // - Dec -> VarDec
 // - Dec -> VarDec ASSIGNOP Exp
-DEF_VISITOR(Dec) {
+VISITOR(Dec) {
     if (NUM_CHILDREN() == 1) {
         // Dec -> VarDec
-        DISPATCH_TO(DecCase1);
+        DISPATCH(DecCase1);
     } else {
         // Dec -> VarDec ASSIGNOP Exp
-        DISPATCH_TO(DecCase2);
+        DISPATCH(DecCase2);
     }
 }
 
@@ -804,116 +950,145 @@ FUNC_STATIC bool MTD(SemResolver, is_lvalue, /, AstNode *node) {
     return false;
 }
 
-// Exp -> Exp ASSIGNOP Exp
-DEF_VISITOR(ExpASSIGNOP) {
-    NO_INFO;
-    SAVE_SYMTAB();
-    VISIT_CHILD(Exp, 0);
-    VISIT_CHILD(Exp, 2);
-    usize left_type_idx = DATA_CHILD(0)->type_idx;
-    usize right_type_idx = DATA_CHILD(2)->type_idx;
-    if (!CALL(TypeManager, *self->type_manager, check_type_consistency, /,
-              left_type_idx, right_type_idx)) {
-        report_semerr(node->line_no, SemErrorAssignTypeErr,
-                      "assignment type mismatched");
-    }
-    // check if left_type_idx is lvalue
-    bool is_lvalue = CALL(SemResolver, *self, is_lvalue, /, DATA_CHILD(0));
-    if (!is_lvalue) {
-        report_semerr(node->line_no, SemErrorAssignToRValue,
-                      "assignment to non-lvalue");
-    }
-    SAVE_TYPE(left_type_idx);
-}
-
 #define PREPARE_BINARY                                                         \
     NO_INFO;                                                                   \
     SAVE_SYMTAB();                                                             \
     VISIT_CHILD(Exp, 0);                                                       \
     VISIT_CHILD(Exp, 2);                                                       \
     usize left_type_idx = DATA_CHILD(0)->type_idx;                             \
-    usize right_type_idx = DATA_CHILD(2)->type_idx
+    usize right_type_idx = DATA_CHILD(2)->type_idx;                            \
+    usize syn_type_idx = (left_type_idx == self->type_manager->void_type_idx)  \
+                             ? right_type_idx                                  \
+                             : left_type_idx;                                  \
+    bool has_err = false;
 
-#define FINISH_BINARY SAVE_TYPE(left_type_idx)
+#define FINISH_BINARY                                                          \
+    SAVE_TYPE(has_err ? self->type_manager->void_type_idx : syn_type_idx);
 
-#define ARITH_CHECK                                                            \
-    if (left_type_idx != self->type_manager->int_type_idx &&                   \
-        left_type_idx != self->type_manager->float_type_idx) {                 \
-        report_semerr(                                                         \
-            node->line_no, SemErrorOPTypeErr,                                  \
-            "arithmetic operator requires the left operand of type int "       \
-            "or float");                                                       \
-    } else if (right_type_idx != self->type_manager->int_type_idx &&           \
-               right_type_idx != self->type_manager->float_type_idx) {         \
-        report_semerr(                                                         \
-            node->line_no, SemErrorOPTypeErr,                                  \
-            "arithmetic operator requires the right operand of type int "      \
-            "or float");                                                       \
-    } else if (left_type_idx != right_type_idx) {                              \
-        report_semerr(node->line_no, SemErrorOPTypeErr,                        \
-                      "arithmetic operator requires two operands of the same " \
-                      "type");                                                 \
+FUNC_STATIC bool MTD(SemResolver, is_int_type, /, usize type_idx) {
+    return type_idx == self->type_manager->int_type_idx ||
+           type_idx == self->type_manager->void_type_idx;
+}
+
+FUNC_STATIC bool MTD(SemResolver, is_basic_type, /, usize type_idx) {
+    return type_idx == self->type_manager->int_type_idx ||
+           type_idx == self->type_manager->float_type_idx ||
+           type_idx == self->type_manager->void_type_idx;
+}
+
+FUNC_STATIC bool MTD(SemResolver, is_arith_type_with_error, /, AstNode *node,
+                     usize left_type_idx, usize right_type_idx) {
+    if (!CALL(SemResolver, *self, is_basic_type, /, left_type_idx)) {
+        report_semerr(
+            node->line_no, SemErrorOPTypeErr,
+            "arithmetic operator requires the left operand of type int "
+            "or float");
+        return false;
+    } else if (!CALL(SemResolver, *self, is_basic_type, /, right_type_idx)) {
+        report_semerr(
+            node->line_no, SemErrorOPTypeErr,
+            "arithmetic operator requires the right operand of type int "
+            "or float");
+        return false;
+    } else if (!CALL(TypeManager, *self->type_manager, is_type_consistency, /,
+                     left_type_idx, right_type_idx)) {
+        report_semerr(node->line_no, SemErrorOPTypeErr,
+                      "arithmetic operator requires two operands of the same "
+                      "type");
+        return false;
+    }
+    return true;
+}
+
+// Exp -> Exp ASSIGNOP Exp
+VISITOR(ExpASSIGNOP) {
+    PREPARE_BINARY;
+
+    if (!CALL(TypeManager, *self->type_manager, is_type_consistency, /,
+              left_type_idx, right_type_idx)) {
+        report_semerr(node->line_no, SemErrorAssignTypeErr,
+                      "assignment type mismatched");
+        has_err = true;
     }
 
+    // check if left_type_idx is lvalue
+    bool is_lvalue = CALL(SemResolver, *self, is_lvalue, /, DATA_CHILD(0));
+    if (!is_lvalue) {
+        report_semerr(node->line_no, SemErrorAssignToRValue,
+                      "assignment to non-lvalue");
+        has_err = true;
+    }
+    FINISH_BINARY;
+}
+
 // Exp -> Exp AND Exp
-DEF_VISITOR(ExpAND) {
+VISITOR(ExpAND) {
     PREPARE_BINARY;
-    if (left_type_idx != self->type_manager->int_type_idx ||
-        right_type_idx != self->type_manager->int_type_idx) {
+    if (!CALL(SemResolver, *self, is_int_type, /, left_type_idx) ||
+        !CALL(SemResolver, *self, is_int_type, /, right_type_idx)) {
         report_semerr(node->line_no, SemErrorOPTypeErr,
                       "AND operator requires two operands of type int");
+        has_err = true;
     }
     FINISH_BINARY;
 }
 
 // Exp -> Exp OR Exp
-DEF_VISITOR(ExpOR) {
+VISITOR(ExpOR) {
     PREPARE_BINARY;
-    if (left_type_idx != self->type_manager->int_type_idx ||
-        right_type_idx != self->type_manager->int_type_idx) {
+    if (!CALL(SemResolver, *self, is_int_type, /, left_type_idx) ||
+        !CALL(SemResolver, *self, is_int_type, /, right_type_idx)) {
         report_semerr(node->line_no, SemErrorOPTypeErr,
                       "OR operator requires two operands of type int");
+        has_err = true;
     }
     FINISH_BINARY;
 }
 
+#define ARITH_CHECK                                                            \
+    if (!CALL(SemResolver, *self, is_arith_type_with_error, /, node,           \
+              left_type_idx, right_type_idx)) {                                \
+        has_err = true;                                                        \
+    }
+
 // Exp -> Exp RELOP Exp
-DEF_VISITOR(ExpRELOP) {
+VISITOR(ExpRELOP) {
     PREPARE_BINARY;
     ARITH_CHECK;
+    syn_type_idx = self->type_manager->int_type_idx;
     FINISH_BINARY;
 }
 
 // Exp -> Exp PLUS Exp
-DEF_VISITOR(ExpPLUS) {
+VISITOR(ExpPLUS) {
     PREPARE_BINARY;
     ARITH_CHECK;
     FINISH_BINARY;
 }
 
 // Exp -> Exp MINUS Exp
-DEF_VISITOR(ExpMINUS) {
+VISITOR(ExpMINUS) {
     PREPARE_BINARY;
     ARITH_CHECK;
     FINISH_BINARY;
 }
 
 // Exp -> Exp STAR Exp
-DEF_VISITOR(ExpSTAR) {
+VISITOR(ExpSTAR) {
     PREPARE_BINARY;
     ARITH_CHECK;
     FINISH_BINARY;
 }
 
 // Exp -> Exp DIV Exp
-DEF_VISITOR(ExpDIV) {
+VISITOR(ExpDIV) {
     PREPARE_BINARY;
     ARITH_CHECK;
     FINISH_BINARY;
 }
 
 // Exp -> LP Exp RP
-DEF_VISITOR(ExpParen) {
+VISITOR(ExpParen) {
     NO_INFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Exp, 1);
@@ -921,57 +1096,66 @@ DEF_VISITOR(ExpParen) {
 }
 
 // Exp -> MINUS Exp
-DEF_VISITOR(ExpUMINUS) {
+VISITOR(ExpUMINUS) {
     NO_INFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Exp, 1);
     usize type_idx = DATA_CHILD(1)->type_idx;
-    if (type_idx != self->type_manager->int_type_idx &&
-        type_idx != self->type_manager->float_type_idx) {
+    if (!CALL(SemResolver, *self, is_basic_type, /, type_idx)) {
         report_semerr(node->line_no, SemErrorOPTypeErr,
                       "unary minus operator requires operand of type int or "
                       "float");
+        SAVE_TYPE_BASIC(void);
+    } else {
+        SAVE_TYPE(type_idx);
     }
-    SAVE_TYPE(type_idx);
 }
 
 // Exp -> NOT Exp
-DEF_VISITOR(ExpNOT) {
+VISITOR(ExpNOT) {
     NO_INFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Exp, 1);
     usize type_idx = DATA_CHILD(1)->type_idx;
-    if (type_idx != self->type_manager->int_type_idx) {
+    if (!CALL(SemResolver, *self, is_int_type, /, type_idx)) {
         report_semerr(node->line_no, SemErrorOPTypeErr,
                       "NOT operator requires operand of type int");
+        SAVE_TYPE_BASIC(void);
+    } else {
+        SAVE_TYPE(type_idx);
     }
-    SAVE_TYPE(type_idx);
 }
 
 // Exp -> ID LP Args RP
 // Exp -> ID LP RP
-DEF_VISITOR(ExpCall) {
+VISITOR(ExpCall) {
     NO_INFO;
     SAVE_SYMTAB();
 
     usize call_type_idx = CALL(TypeManager, *self->type_manager, make_fun, /);
-    // add a dummy return type
+
+    // add a dummy (void) return type
     CALL(TypeManager, *self->type_manager, add_fun_ret_par, /, call_type_idx,
          self->type_manager->void_type_idx);
 
     if (NUM_CHILDREN() == 4) {
         // Exp -> ID LP Args RP
-        NEWNXTINFO(call_type_idx, UNDEF, false, false);
+        NEWNXTINFO(call_type_idx, -1, false, false);
         VISIT_WITH(Args, 2, &nxtinfo);
-    } // else, Exp -> ID LP RP; no more actions
+    } else {
+        // Exp -> ID LP RP
+        // do nothing
+    }
 
     String *name = &DATA_CHILD(0)->str_val;
     ASSERT(name);
+
     // NOTE: key here is a hack! Do not drop it
     HString key = NSCALL(HString, from_inner, /, *name);
+
     GET_SYMTAB();
-    MapSymbolTableIterator it = CALL(SymbolTable, *now_symtab, find_recursive,
-                                     /, &key, self->symbol_manager);
+    MapSymtabIterator it = CALL(SymbolTable, *now_symtab, find_recursive, /,
+                                &key, self->symbol_manager);
     if (it == NULL) {
         report_semerr_fmt(node->line_no, SemErrorFunUndef,
                           "undefined function \"%s\"", STRING_C_STR(*name));
@@ -979,12 +1163,13 @@ DEF_VISITOR(ExpCall) {
         report_semerr_fmt(node->line_no, SemErrorCallBaseTypeErr,
                           "\"%s\" is not a function", STRING_C_STR(*name));
     } else if (!CALL(TypeManager, *self->type_manager,
-                     check_type_consistency_with_fun_fix, /, call_type_idx,
+                     is_type_consistency_with_fun_fix, /, call_type_idx,
                      it->value.type_idx)) {
         report_semerr_fmt(node->line_no, SemErrorCallArgParaMismatch,
                           "conflicting types for function \"%s\"",
                           STRING_C_STR(*name));
     }
+
     // if correctly match, check_type_consistency_with_fun_fix will fix the
     // return type.
     Type *type =
@@ -995,22 +1180,26 @@ DEF_VISITOR(ExpCall) {
 }
 
 // Exp -> Exp LB Exp RB
-DEF_VISITOR(ExpIndex) {
+VISITOR(ExpIndex) {
     NO_INFO;
     SAVE_SYMTAB();
+
     VISIT_CHILD(Exp, 0);
     VISIT_CHILD(Exp, 2);
+
     usize base_type_idx = DATA_CHILD(0)->type_idx;
     usize idx_type_idx = DATA_CHILD(2)->type_idx;
+
     Type *base_type =
         CALL(TypeManager, *self->type_manager, get_type, /, base_type_idx);
+
     if (base_type->kind != TypeKindArray) {
         report_semerr(
             node->line_no, SemErrorIndexBaseTypeErr,
             "index operator requires the base operand to be an array");
         SAVE_TYPE_BASIC(void);
     } else {
-        if (idx_type_idx != self->type_manager->int_type_idx) {
+        if (!CALL(SemResolver, *self, is_int_type, /, idx_type_idx)) {
             report_semerr(
                 node->line_no, SemErrorIndexNonInt,
                 "index operator requires the index to be of type int");
@@ -1021,7 +1210,7 @@ DEF_VISITOR(ExpIndex) {
 }
 
 // Exp -> Exp DOT ID
-DEF_VISITOR(ExpField) {
+VISITOR(ExpField) {
     NO_INFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Exp, 0);
@@ -1041,29 +1230,35 @@ DEF_VISITOR(ExpField) {
         SymbolTable *struct_symtab =
             CALL(SymbolManager, *self->symbol_manager, get_table, /,
                  base_type->as_struct.symtab_idx);
-        MapSymbolTableIterator it =
-            CALL(SymbolTable, *struct_symtab, find, /, &key);
+
+        // we do not find recursively: the fields are not inherited
+        MapSymtabIterator it = CALL(SymbolTable, *struct_symtab, find, /, &key);
         if (it == NULL) {
             report_semerr_fmt(node->line_no, SemErrorFieldNotExist,
                               "field \"%s\" does not exist in struct",
                               STRING_C_STR(*field_name));
+            SAVE_TYPE_BASIC(void);
+        } else {
+            usize field_type_idx = it->value.type_idx;
+            SAVE_TYPE(field_type_idx);
         }
-        usize field_type_idx = it->value.type_idx;
-        SAVE_TYPE(field_type_idx);
     }
 }
 
 // Exp -> ID
-DEF_VISITOR(ExpID) {
+VISITOR(ExpID) {
     NO_INFO;
     SAVE_SYMTAB();
+
     String *name = &DATA_CHILD(0)->str_val;
     ASSERT(name);
+
     // NOTE: key here is a hack! Do not drop it
     HString key = NSCALL(HString, from_inner, /, *name);
+
     GET_SYMTAB();
-    MapSymbolTableIterator it = CALL(SymbolTable, *now_symtab, find_recursive,
-                                     /, &key, self->symbol_manager);
+    MapSymtabIterator it = CALL(SymbolTable, *now_symtab, find_recursive, /,
+                                &key, self->symbol_manager);
     if (it == NULL) {
         report_semerr_fmt(node->line_no, SemErrorVarUndef,
                           "undefined variable \"%s\"", STRING_C_STR(*name));
@@ -1078,14 +1273,14 @@ DEF_VISITOR(ExpID) {
 }
 
 // Exp -> INT
-DEF_VISITOR(ExpINT) {
+VISITOR(ExpINT) {
     NO_INFO;
     SAVE_SYMTAB();
     SAVE_TYPE_BASIC(int);
 }
 
 // Exp -> FLOAT
-DEF_VISITOR(ExpFLOAT) {
+VISITOR(ExpFLOAT) {
     NO_INFO;
     SAVE_SYMTAB();
     SAVE_TYPE_BASIC(float);
@@ -1110,52 +1305,52 @@ DEF_VISITOR(ExpFLOAT) {
 // 16. Exp -> ID
 // 17. Exp -> INT
 // 18. Exp -> FLOAT
-DEF_VISITOR(Exp) {
+VISITOR(Exp) {
     if (NUM_CHILDREN() == 3) {
         switch (DATA_CHILD(1)->grammar_symbol) {
         case GS_ASSIGNOP:
             // Exp -> Exp ASSIGNOP Exp
-            DISPATCH_TO(ExpASSIGNOP);
+            DISPATCH(ExpASSIGNOP);
             break;
         case GS_AND:
             // Exp -> Exp AND Exp
-            DISPATCH_TO(ExpAND);
+            DISPATCH(ExpAND);
             break;
         case GS_OR:
             // Exp -> Exp OR Exp
-            DISPATCH_TO(ExpOR);
+            DISPATCH(ExpOR);
             break;
         case GS_RELOP:
             // Exp -> Exp RELOP Exp
-            DISPATCH_TO(ExpRELOP);
+            DISPATCH(ExpRELOP);
             break;
         case GS_PLUS:
             // Exp -> Exp PLUS Exp
-            DISPATCH_TO(ExpPLUS);
+            DISPATCH(ExpPLUS);
             break;
         case GS_MINUS:
             // Exp -> Exp MINUS Exp
-            DISPATCH_TO(ExpMINUS);
+            DISPATCH(ExpMINUS);
             break;
         case GS_STAR:
             // Exp -> Exp STAR Exp
-            DISPATCH_TO(ExpSTAR);
+            DISPATCH(ExpSTAR);
             break;
         case GS_DIV:
             // Exp -> Exp DIV Exp
-            DISPATCH_TO(ExpDIV);
+            DISPATCH(ExpDIV);
             break;
         case GS_Exp:
             // Exp -> LP Exp RP
-            DISPATCH_TO(ExpParen);
+            DISPATCH(ExpParen);
             break;
         case GS_LP:
             // Exp -> ID LP RP
-            DISPATCH_TO(ExpCall);
+            DISPATCH(ExpCall);
             break;
         case GS_DOT:
             // Exp -> Exp DOT ID
-            DISPATCH_TO(ExpField);
+            DISPATCH(ExpField);
             break;
         default:
             PANIC("unexpected grammar symbol");
@@ -1163,33 +1358,33 @@ DEF_VISITOR(Exp) {
     } else if (NUM_CHILDREN() == 2) {
         if (DATA_CHILD(0)->grammar_symbol == GS_MINUS) {
             // Exp -> MINUS Exp
-            DISPATCH_TO(ExpUMINUS);
+            DISPATCH(ExpUMINUS);
         } else if (DATA_CHILD(0)->grammar_symbol == GS_NOT) {
             // Exp -> NOT Exp
-            DISPATCH_TO(ExpNOT);
+            DISPATCH(ExpNOT);
         } else {
             PANIC("unexpected grammar symbol");
         }
     } else if (NUM_CHILDREN() == 1) {
         if (DATA_CHILD(0)->grammar_symbol == GS_ID) {
             // Exp -> ID
-            DISPATCH_TO(ExpID);
+            DISPATCH(ExpID);
         } else if (DATA_CHILD(0)->grammar_symbol == GS_INT) {
             // Exp -> INT
-            DISPATCH_TO(ExpINT);
+            DISPATCH(ExpINT);
         } else if (DATA_CHILD(0)->grammar_symbol == GS_FLOAT) {
             // Exp -> FLOAT
-            DISPATCH_TO(ExpFLOAT);
+            DISPATCH(ExpFLOAT);
         } else {
             PANIC("unexpected grammar symbol");
         }
     } else if (NUM_CHILDREN() == 4) {
         if (DATA_CHILD(1)->grammar_symbol == GS_LP) {
             // Exp -> ID LP Args RP
-            DISPATCH_TO(ExpCall);
+            DISPATCH(ExpCall);
         } else if (DATA_CHILD(1)->grammar_symbol == GS_LB) {
             // Exp -> Exp LB Exp RB
-            DISPATCH_TO(ExpIndex);
+            DISPATCH(ExpIndex);
         } else {
             PANIC("unexpected grammar symbol");
         }
@@ -1200,20 +1395,25 @@ DEF_VISITOR(Exp) {
 
 // Args -> Exp COMMA Args
 // Args -> Exp
-DEF_VISITOR(Args) {
+VISITOR(Args) {
     INFO;
     SAVE_SYMTAB();
+
     VISIT_CHILD(Exp, 0);
 
+    usize call_type_idx = info->inherit_type_idx;
     usize param_type_idx = DATA_CHILD(0)->type_idx;
-    usize call_type_idx = info->prefix_type_idx;
+
     CALL(TypeManager, *self->type_manager, add_fun_ret_par, /, call_type_idx,
          param_type_idx);
 
     if (NUM_CHILDREN() == 3) {
         // Args -> Exp COMMA Args
         VISIT_WITH(Args, 2, info);
-    } // else Args -> Exp; no more actions
+    } else {
+        // Args -> Exp
+        // do nothing
+    }
 
     SAVE_TYPE_BASIC(void);
 }

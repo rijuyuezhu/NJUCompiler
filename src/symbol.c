@@ -4,20 +4,20 @@
 
 void MTD(SymbolTable, init, /, usize parent_idx) {
     self->parent_idx = parent_idx;
-    CALL(MapSymbolTable, self->mapping, init, /);
+    CALL(MapSymtab, self->mapping, init, /);
 }
 
-void MTD(SymbolTable, drop, /) { DROPOBJ(MapSymbolTable, self->mapping); }
+void MTD(SymbolTable, drop, /) { DROPOBJ(MapSymtab, self->mapping); }
 
 bool MTD(SymbolTable, is_root, /) {
     return self->parent_idx == SYMBOL_TABLE_NO_PARENT;
 }
 
-MapSymbolTableInsertResult MTD(SymbolTable, insert, /, HString name,
-                               SymbolEntryKind kind, usize type_idx) {
+MapSymtabInsertResult MTD(SymbolTable, insert, /, HString name,
+                          SymbolEntryKind kind, usize type_idx) {
     SymbolEntry entry = CREOBJ(SymbolEntry, /, kind, type_idx);
-    MapSymbolTableInsertResult result =
-        CALL(MapSymbolTable, self->mapping, insert, /, name, entry);
+    MapSymtabInsertResult result =
+        CALL(MapSymtab, self->mapping, insert, /, name, entry);
     if (result.inserted) {
         HString *key = &result.node->key;
         SymbolEntry *value = &result.node->value;
@@ -27,14 +27,14 @@ MapSymbolTableInsertResult MTD(SymbolTable, insert, /, HString name,
     return result;
 }
 
-MapSymbolTableIterator MTD(SymbolTable, find, /, HString *name) {
-    return CALL(MapSymbolTable, self->mapping, find, /, name);
+MapSymtabIterator MTD(SymbolTable, find, /, HString *name) {
+    return CALL(MapSymtab, self->mapping, find, /, name);
 }
 
-MapSymbolTableIterator MTD(SymbolTable, find_recursive, /, HString *name,
-                           SymbolManager *manager) {
+MapSymtabIterator MTD(SymbolTable, find_recursive, /, HString *name,
+                      SymbolManager *manager) {
     while (true) {
-        MapSymbolTableIterator it = CALL(SymbolTable, *self, find, /, name);
+        MapSymtabIterator it = CALL(SymbolTable, *self, find, /, name);
         if (it != NULL || CALL(SymbolTable, *self, is_root, /)) {
             return it;
         }
@@ -67,10 +67,10 @@ SymbolTable *MTD(SymbolManager, get_table, /, usize idx) {
 }
 
 HString MTD(SymbolManager, make_temp, /) {
-    String s = NSCALL(String, from_f, /, "@t%zu", self->temp_cnt);
+    String s = NSCALL(String, from_f, /, "@temp_%zu", self->temp_cnt);
     self->temp_cnt++;
     return NSCALL(HString, from_inner, /, s);
 }
 
-DEFINE_MAPPING(MapSymbolTable, HString, SymbolEntry, FUNC_EXTERN);
+DEFINE_MAPPING(MapSymtab, HString, SymbolEntry, FUNC_EXTERN);
 DEFINE_CLASS_VEC(VecSymbolTable, SymbolTable, FUNC_EXTERN);

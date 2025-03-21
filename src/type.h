@@ -65,9 +65,8 @@ usize MTD(TypeManager, make_struct, /, usize symtab_idx);
 usize MTD(TypeManager, make_fun, /);
 void MTD(TypeManager, add_struct_field, /, usize type_idx, usize field_idx);
 void MTD(TypeManager, add_fun_ret_par, /, usize type_idx, usize ret_par_idx);
-bool MTD(TypeManager, check_type_consistency, /, usize type_idx1,
-         usize type_idx2);
-bool MTD(TypeManager, check_type_consistency_with_fun_fix, /, usize type_idx1,
+bool MTD(TypeManager, is_type_consistency, /, usize type_idx1, usize type_idx2);
+bool MTD(TypeManager, is_type_consistency_with_fun_fix, /, usize type_idx1,
          usize type_idx2);
 
 FUNC_STATIC Type *MTD(TypeManager, get_type, /, usize type_idx) {
