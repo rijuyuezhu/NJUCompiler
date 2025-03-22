@@ -12,7 +12,7 @@ STUNAME = "221180115-黄文睿"
 class CommandSpace:
     def bear(self, *_: str):
         self.clean()
-        crun("bear -- make -B")
+        crun("bear -- make -B -j16")
 
     def build(self, *_: str, clean_build: bool = False):
         if clean_build:

@@ -402,6 +402,9 @@ VISITOR(StructSpecifierCase1) {
     VISIT_WITH(DefList, 3, &nxtinfo);
     POP_SYMTAB();
 
+    // The struct type is now ready; get its representative
+    CALL(TypeManager, *self->type_manager, fill_in_repr, /, struct_type_idx);
+
     // try to fill the tag in the symtab
     if (struct_tag) {
         // key here is a hack! Do not drop it
@@ -515,6 +518,8 @@ VISITOR(VarDecCase2) {
     usize subtype_idx = info->inherit_type_idx;
     usize type_idx = CALL(TypeManager, *self->type_manager, make_array, /, size,
                           subtype_idx);
+    // The array type is now ready; get its representative
+    CALL(TypeManager, *self->type_manager, fill_in_repr, /, type_idx);
 
     NEWNXTINFO(type_idx, -1, false, false);
     VISIT_WITH(VarDec, 0, &nxtinfo);
@@ -564,6 +569,9 @@ VISITOR(FunDec) {
         // do nothing
     }
     POP_SYMTAB();
+
+    // The fun_type is now ready; get its representative
+    CALL(TypeManager, *self->type_manager, fill_in_repr, /, func_type_idx);
 
     // Handle fun_name
 
