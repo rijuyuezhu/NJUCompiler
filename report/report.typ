@@ -1,6 +1,4 @@
 #import "@preview/numbly:0.1.0": numbly
-#import "@preview/cuti:0.2.1": show-cn-fakebold
-#show: show-cn-fakebold
 
 #set text(font: ("Libertinus Serif", "Noto Serif CJK SC"))
 
@@ -33,7 +31,7 @@
 #set underline(offset: .1em, stroke: .05em, evade: false)
 
 
-= #text(font: ("Libertinus Serif", "STZhongsong"))[编译原理 Project 1 实验报告]
+= #text(font: ("Libertinus Serif", "STZhongsong"))[编译原理 Project 2 实验报告]
 
 #align(center)[
   #v(1em)
@@ -50,17 +48,79 @@
 
 == 程序实现功能 <impl>
 
-我在项目中实现了编译原理 Project 1 的全部内容，包括：
-- 词法分析器；完成了 Flex 代码的编写；
-- 语法分析器；完成了 Bison 代码的编写，其中包含了一些常见语法错误的错误处理；
-- AST 的建立与输出：在 Bison 源代码中，插入了建立 AST 的代码；在 parse 后即输出。
+我在项目中实现了编译原理 Project 2 的全部内容，包括：
+- 符号表与类型系统的建立（@symtab[Sec]）；
+- 语义分析的实现（@semantic[Sec]）。
+
+=== 符号表与类型系统 <symtab>
+
+符号表的实现使用了在 Project 1 中就预先实现的平衡二叉搜索树（用 Treap 实现），实现了从 `HString` 到 `SymbolEntry` 的映射：
+
+```c
+typedef struct HString {
+    String s;
+    u64 stored_hash;
+} HString;
+
+typedef struct SymbolEntry {
+    SymbolEntryKind kind;
+    usize type_idx;
+
+    struct SymbolTable *table;
+    String *name;
+    union {
+        struct {
+            bool is_defined;
+            int first_decl_line_no;
+        } as_fun;
+    };
+} SymbolEntry;
+```
+其中 `HString` 是缓存了哈希值的 `String`（`String` 是可变长的、类似于 C++ 中 `std::string` 的字符串，是以在 Project 1 中实现的、以宏作为模板的 `Vector` 为基础实现的），缓存哈希主要是为了能够则平衡二叉搜索树中快速比较；`SymbolEntry` 主要包括了一个表示该符号对应类型的 `type_idx`，以及其他所需信息。
+
+而*每个*符号表则是以从 `HString` 到 `SymbolEntry` 的 Mapping 为基础实现的，不同的符号表构成父子关系，用以支持变量作用域的嵌套：
+```c
+typedef struct SymbolTable {
+    usize parent_idx; // father symtab
+    MapSymtab mapping;
+} SymbolTable;
+```
+
+而类型系统则是以 `Type` 结构体为基础实现的：
+```c
+typedef struct Type {
+    TypeKind kind;
+    usize repr_val; // representive index; for fast equal test. See Sec 4.2
+    union {
+        struct {
+            usize size, dim, subtype_idx;
+        } as_array;
+        struct {
+            VecUSize field_idxes;
+            usize symtab_idx;
+        } as_struct;
+        struct {
+            VecUSize ret_par_idxes; // the 0th element is the return type
+        } as_fun;
+    };
+} Type;
+```
+
+值得注意的是，在符号表和类型系统中，指代其他的符号表/类型的索引均使用 `usize`；这是因为我使用了可变长的 `Vector` 来进行符号表/类型管理。该 `Vector` 可能由于扩容而导致指针失效，故使用整数索引较为稳妥。
+
+=== 语义分析 <semantic>
+
+基于这一套符号表和类型系统，我实现了语义分析，主要包括了：
+
+- 遍历 AST，在该过程中按照语义，传递各种 attributes，从而适当地进行符号表嵌套、类型生成（`Struct` 和 `Fun` 类型）和符号表填充；
+- 当遇到语法错误时，按照规定进行报错。
+
 
 == 程序编译指令 <compile>
 
 对于根目录如图的项目:
 
-#figure(
-```plain
+#figure(```plain
 .
 ├── Code
 │   ├── ast.c
@@ -73,131 +133,48 @@
 └── Test
     ├── test1.cmm
     └── test2.cmm
-```
-)
+```)
 
 运行 `make -C ./Code` 即可编译项目，得到的可执行文件位于 `./Code/parser`。其中 Makefile 和下发的 Makefile 一致。
 
 == 其它亮点 <other>
 
-为了方便这个 C 项目的管理，我在项目中实现了方法调用与 RAII（@oop[Sec]），并在此基础上实现了常用容器 `Vec` 和 `Mapping` (@container[Sec])；
-另外，我也实现了项目的单元测试和综合测试（@test[Sec]）
+=== 应用“空类型”减少非本质报错
 
-=== 方法调用和 RAII 在 C 中的手动实现<oop>
+在计算过程中，若发现了错误，我希望能够在报错时尽可能减少因该错误而连带引起的错误。解决方法是引入空类型 `void`（其实相当于 bottom 类型 $bot$)：在语义分析出现错误时，程序会报错，并将可能产生的“结果”（如 Exp 的求值，StructSpecifier 的解析等）的类型设为 `void`。在类型相容性检查时给予 `void` 较高的兼容性以减少连锁报错。
 
-为了方便在 C 语言中进行一些面向对象编程（不包括多态，主要目的是将数据和函数联系起来形成命名空间），我用宏实现了基本的方法定义和方法调用，并借此实现了手动的 RAII。
+=== 高效进行类型相容性检查
 
-```c
-typedef struct TaskEngine {
-    const char *input_file;
-
-    AstNode *ast_root;
-    bool ast_error;
-} TaskEngine;
-
-void MTD(TaskEngine, init, /, const char *file);
-void MTD(TaskEngine, drop, /);
-void MTD(TaskEngine, parse_ast, /);
-void MTD(TaskEngine, print_ast, /);
-```
-
-调用时使用类似于如下的语法：
-```c
-TaskEngine engine = CREOBJ(TaskEngine, /, argv[1]);
-CALL(TaskEngine, engine, parse_ast, /);
-if (engine.ast_root && !engine.ast_error) { // No error in parsing
-    CALL(TaskEngine, engine, print_ast, /);
-}
-DROPOBJ(TaskEngine, engine);
-```
-
-'`/`' 用于分割方法名和参数，`CREOBJ` 用于创建对象，`CALL` 用于调用方法，`DROPOBJ` 用于销毁对象。
-语法比较丑，但读多了还是比较直观的。在 C 中进行内存管理比较麻烦。为了方便内存管理，我借用了 Rust 的赋值的语义：
-- 每一个变量都表示栈上某个值；变量间的赋值永远是浅拷贝（按字节的直接复制），不会涉及到堆上的数据，语义为变量移动；
-- 提供了 `MTD(T, init, /, ...)`, `MTD(T, drop, /)`, `MTD(T, clone, /)`, `MTD(T, clone_from, /, const T *other)` 四个接口方法，
-  用于初始化、销毁、深拷贝、从另一个对象深拷贝；
-- 所有的值的可用性，以及移动语义、内存释放的正确性靠手动维护。
-
-=== 常用容器实现 <container>
-
-借助 OOP 和 RAII 的相关框架，以及 C 语言的宏，我实现了可变长数组 `Vec`（类似 C++ 的 `std::vector`）和映射 `Mapping`（类似 C++ 的 `std::map`）：
+由于按照讲义的编译器实现中，对类型相容性检查需要递归进行（例如对两个 `Struct` 的相容性判断需要递归地对每个 Field 依次判断，对两个 `Fun` 的相容性判断需要递归地对参数和返回值进行判断），在一些极端情况下会导致低效。例如，在以下构造的样例中会导致指数型的判断递归：
 
 ```c
-// in .h
-DECLARE_PLAIN_VEC(VecI32, i32, FUNC_EXTERN);
-// in .c
-DEFINE_PLAIN_VEC(VecI32, i32, FUNC_EXTERN);
-...
-// in .c
-static VecI32 gen_range(usize n) {
-    VecI32 v = CREOBJ(VecI32, /);
-    for (usize i = 0; i < n; i++) {
-        CALL(VecI32, v, push_back, /, (i32)i);
-    }
-    return v;
+struct A0{
+  int val;
+};
+struct A1{
+	struct A0 v0, v1;
+};
+struct A2{
+	struct A1 v0, v1;
+};
+// ...
+struct A2999{
+	struct A2998 v0, v1;
+};
+int main(){
+  struct A2999 a, b; struct A2997 c; struct A2997 d; struct A2998 e;
+  a = b; a = c; b = c; a = d; b = d; c = d; a = e; b = e; c = e; d = e;
 }
 ```
-使用了宏作为泛型的实现机制，并实现了大部分常用的方法；`Vec` 的实现使用了常用的动态扩容（在满时扩容到原来空间的两倍，从而均摊单次插入 $O(1)$）。在此基础上，我实现了 `String`（类似 C++ 中的 `std::string`）。
 
-```c
-// in .h
-DECLARE_MAPPING(MapSS, String, String, FUNC_EXTERN, GENERATOR_CLASS_KEY,
-                GENERATOR_CLASS_VALUE, GENERATOR_CLASS_COMPARATOR);
-// in .c
-DEFINE_MAPPING(MapSS, String, String, FUNC_EXTERN);
-...
-// in .c
-MapSS m = CREOBJ(MapSS, /);
-String k = NSCALL(String, from_raw, /, "hello");
-String v = NSCALL(String, from_raw, /, "yes");
-MapSSInsertResult res = CALL(MapSS, m, insert, /, k, v);
-ASSERT(res.inserted);
-DROPOBJ(MapSS, m);
-```
+为了解决这个问题，我为每个类型引入了一个 `repr_val`，用以快速判断两个类型是否相容。所有相容的类型都有相同的 `repr_val`。这使得能够在常数时间内判断两个类型是否相同。
 
-使用了 Treap 作为了 `Mapping` 的内层平衡二叉树实现。
-
-这些容器为实现 AST，以及之后符号表等的实现奠定了基础。
-
-=== 单元测试和综合测试 <test>
-
-我在项目中实现了单元测试，和综合测试。
-
-- 单元测试中，将所有源代码（除 `main.c`）编译成静态库，然后由另一个 `tests/` 下的项目使用。每次开始测试前会进行 fork，以保证测试的独立性。
-- 综合测试则使用了 Python 驱动，运行测试用例并和期望输出对比。
-
-```console
-[rijuyuezhu@rjyz-linux:~/Code/Compiler on A1] 
-% ./init test
-===== Unit        Tests =====
-tests to run    : plain_vec class_vec map hstr 
-tests filtered  : 
-
-:: Start running test: plain_vec
-:: End   running test: plain_vec
-:: Start running test: class_vec
-:: End   running test: class_vec
-:: Start running test: map
-:: End   running test: map
-:: Start running test: hstr
-:: End   running test: hstr
-
-===== Integration Tests =====
-tests to run    : cmm1 cmm2
-tests filtered  : 
-tests not found : 
-
-:: Start running test: cmm1
-:: End   running test: cmm1
-:: Start running test: cmm2
-:: End   running test: cmm2
-
-All tests finished
-```
-
-这些测试能够提高程序的可靠性。
+具体做法是，维护一个 `Type` 到 `usize` 的 Map（使用平衡二叉搜索树实现；实际键值为 `HType`，即缓存了哈希的 `Type`，用以提高搜索效率），用以维护不同类型的等价类（以相容性为等价关系）。在一个类型构造完成时（如 `Struct` 添加了所有的 Field 后，或是 `Fun` 添加了所有返回值和参数后），会试图在该 Map 中寻找是否有与之相容的类型；若找到了，则将 `repr_val` 设为 Map 中对应的值；否则新建一个独特的值并插入 Map 中。而“在该 Map 中寻找是否有与之相容的类型”的操作则也较为简单：对于普通类型，直接在 Map 中进行比对即可；对于包含其他类型的复合类型，如 `Array`, `Struct` 和 `Fun`，则将其所包含的所有子类型先改写成其对应的 `repr_val`，再将改写后的类型插入 Map。该算法其实是龙书第六章对应算法的一个实现。
 
 == 实验感想 <thought>
 
-1. 使用 C 进行内存管理、写代码确实是一件非常麻烦的事情，写编译器的过程中会受到很多与编译器主要逻辑无关的杂音的干扰。写 C 时，内存安全的正确性主要依靠 asan、valgrind 等进行检查。如果可以，还是希望编译原理实验尽早换成一个更高级的语言（如 #box[C++], Rust）。
-2. Bison 中的错误处理感觉常常没有一个比较好的标准，希望讲义在这方面能够更加详细一些；目前完善错误处理的方式是不断地进行 benchmark 以提高错误处理能力。
+这次实验相比上一次实验，正确性的不确定性小了很多（语义分析有着更为明确的规范），但是实现的复杂度也有所增加。我在 Project 1 中实现的 `Vector`, `Mapping`, `String` 等基础设施，以及一套在 C 语言中实现的面向对象原语派上了用场，能够实现在任何输入下的*无内存泄漏*、*高正确性*、*高效率*的编译器。两次实验我的工作量增量大概如下(含 `.c`, `.h`, `.l`, `.y` 的、非自动生成的文件)：
+- Project 1: 2328 行；
+- Project 2: 2252 行。
+
+使用 C 进行编译器实现，经常会出现 Segmentation Fault；使用 gdb 能较为高效地进行查错。

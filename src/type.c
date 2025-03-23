@@ -164,6 +164,7 @@ void MTD(TypeManager, init, /) {
                                });
     CALL(TypeManager, *self, fill_in_repr, /, self->int_type_idx);
     CALL(TypeManager, *self, fill_in_repr, /, self->float_type_idx);
+    CALL(TypeManager, *self, fill_in_repr, /, self->void_type_idx);
 }
 
 void MTD(TypeManager, drop, /) {
@@ -323,33 +324,20 @@ void MTD(TypeManager, fill_in_repr, /, usize type_idx) {
     if (t->kind == TypeKindArray) {
         Type *subtype =
             CALL(TypeManager, *self, get_type, /, t->as_array.subtype_idx);
-        if (subtype->repr_val == (usize)-1) {
-            // The subtype is not well-formed yet; skip the current type
-            DROPOBJ(Type, repr_t);
-            return;
-        }
+        ASSERT(subtype->repr_val != (usize)-1);
         repr_t.as_array.subtype_idx = subtype->repr_val;
     } else if (t->kind == TypeKindStruct) {
         for (usize i = 0; i < t->as_struct.field_idxes.size; i++) {
             Type *field = CALL(TypeManager, *self, get_type, /,
                                t->as_struct.field_idxes.data[i]);
-            if (field->repr_val == (usize)-1) {
-                // The field is not well-formed yet; skip the current type
-                DROPOBJ(Type, repr_t);
-                return;
-            }
+            ASSERT(field->repr_val != (usize)-1);
             repr_t.as_struct.field_idxes.data[i] = field->repr_val;
         }
     } else if (t->kind == TypeKindFun) {
         for (usize i = 0; i < t->as_fun.ret_par_idxes.size; i++) {
             Type *ret_par = CALL(TypeManager, *self, get_type, /,
                                  t->as_fun.ret_par_idxes.data[i]);
-            if (ret_par->repr_val == (usize)-1) {
-                // The return/parameter type is not well-formed yet; skip the
-                // current type
-                DROPOBJ(Type, repr_t);
-                return;
-            }
+            ASSERT(ret_par->repr_val != (usize)-1);
             repr_t.as_fun.ret_par_idxes.data[i] = ret_par->repr_val;
         }
     } // else, basic type; no change
