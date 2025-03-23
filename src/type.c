@@ -208,15 +208,14 @@ void MTD(TypeManager, add_fun_ret_par, /, usize type_idx, usize ret_par_idx) {
     CALL(Type, self->types.data[type_idx], add_fun_ret_par, /, ret_par_idx);
 }
 
-FUNC_STATIC bool MTD(TypeManager, is_type_array_consistency, /, Type *t1,
-                     Type *t2) {
+static bool MTD(TypeManager, is_type_array_consistency, /, Type *t1, Type *t2) {
     return t1->as_array.dim == t2->as_array.dim &&
            CALL(TypeManager, *self, is_type_consistency, /,
                 t1->as_array.subtype_idx, t2->as_array.subtype_idx);
 }
 
-FUNC_STATIC bool MTD(TypeManager, is_type_struct_consistency, /, Type *t1,
-                     Type *t2) {
+static bool MTD(TypeManager, is_type_struct_consistency, /, Type *t1,
+                Type *t2) {
     VecUSize *f1 = &t1->as_struct.field_idxes;
     VecUSize *f2 = &t2->as_struct.field_idxes;
     if (f1->size != f2->size) {
@@ -230,8 +229,8 @@ FUNC_STATIC bool MTD(TypeManager, is_type_struct_consistency, /, Type *t1,
     }
     return true;
 }
-FUNC_STATIC bool MTD(TypeManager, is_type_fun_consistency, /, Type *t1,
-                     Type *t2, bool fix) {
+static bool MTD(TypeManager, is_type_fun_consistency, /, Type *t1, Type *t2,
+                bool fix) {
     VecUSize *r1 = &t1->as_fun.ret_par_idxes;
     VecUSize *r2 = &t2->as_fun.ret_par_idxes;
     if (r1->size != r2->size) {

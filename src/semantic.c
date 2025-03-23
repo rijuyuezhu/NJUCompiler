@@ -18,9 +18,9 @@ typedef struct SemPassInfo {
     usize gen_symtab_idx;
 } SemPassInfo;
 
-FUNC_STATIC void MTD(SemPassInfo, init, /, usize inherit_type_idx,
-                     usize enclosing_struct_type_idx, bool is_fun_dec,
-                     bool is_in_struct) {
+static void MTD(SemPassInfo, init, /, usize inherit_type_idx,
+                usize enclosing_struct_type_idx, bool is_fun_dec,
+                bool is_in_struct) {
     self->inherit_type_idx = inherit_type_idx;
     self->enclosing_struct_type_idx = enclosing_struct_type_idx;
     self->is_fun_dec = is_fun_dec;
@@ -30,36 +30,33 @@ FUNC_STATIC void MTD(SemPassInfo, init, /, usize inherit_type_idx,
     self->gen_symtab_idx = -1;
 }
 
-FUNC_STATIC DEFAULT_DROPER(SemPassInfo);
-
 void MTD(SemResolver, init, /, TypeManager *type_manager,
          SymbolManager *symbol_manager) {
     self->type_manager = type_manager;
     self->symbol_manager = symbol_manager;
-    self->current_symtab_idx = self->symbol_manager->root_idx;
+    self->cur_symtab_idx = self->symbol_manager->root_idx;
     self->sem_error = false;
 }
 
 // Visitor operations
 
 #define VISITOR(gs)                                                            \
-    FUNC_STATIC void MTD(SemResolver, CONCATENATE(visit_, gs), /,              \
-                         AstNode * node, ATTR_UNUSED SemPassInfo * info)
+    static void MTD(SemResolver, CONCATENATE(visit_, gs), /, AstNode * node,   \
+                    ATTR_UNUSED SemPassInfo * info)
 
 #define DISPATCH(gs)                                                           \
     ({ CALL(SemResolver, *self, CONCATENATE(visit_, gs), /, node, info); })
 
 // Declare Visitor functions;
 // e.g. void MTD(SemResolver, visit_SEMI, /, AstNode * node); etc
-#define DECL_SEMRESOLVER_GRAMMAR_SYMBOL_AID(gs) VISITOR(gs);
-APPLY_GRAMMAR_SYMBOL_SYNTAX(DECL_SEMRESOLVER_GRAMMAR_SYMBOL_AID);
+#define DECLVISITOR_SEMRESOLVER_GRAMMAR_SYMBOL_AID(gs) VISITOR(gs);
+APPLY_GRAMMAR_SYMBOL_SYNTAX(DECLVISITOR_SEMRESOLVER_GRAMMAR_SYMBOL_AID);
 
 // Info management
 #define INFO ASSERT(info, "info must not be NULL")
-#define NO_INFO ASSERT(!info, "info must be NULL")
-#define NEWNXTINFO(...)                                                        \
-    SemPassInfo nxtinfo = CREOBJ(SemPassInfo, /, ##__VA_ARGS__)
-#define NXTINFO(...) nxtinfo = CREOBJ(SemPassInfo, /, ##__VA_ARGS__)
+#define NOINFO ASSERT(!info, "info must be NULL")
+#define NEW_SINFO(...) SemPassInfo sinfo = CREOBJ(SemPassInfo, /, ##__VA_ARGS__)
+#define SINFO(...) sinfo = CREOBJ(SemPassInfo, /, ##__VA_ARGS__)
 
 // Data/flow management
 
@@ -69,24 +66,15 @@ APPLY_GRAMMAR_SYMBOL_SYNTAX(DECL_SEMRESOLVER_GRAMMAR_SYMBOL_AID);
         ASSERT(idx < NUM_CHILDREN(), "index out of range");                    \
         (AstNode *)node->children.data[idx];                                   \
     })
-#define VISIT_CHILD(gs, idx)                                                   \
-    ({                                                                         \
-        ASSERT(idx < NUM_CHILDREN(), "index out of range");                    \
-        ASSERT(DATA_CHILD(idx) &&                                              \
-                   DATA_CHILD(idx)->grammar_symbol == CONCATENATE(GS_, gs),    \
-               "unexpected grammar symbol");                                   \
-        CALL(SemResolver, *self, CONCATENATE(visit_, gs), /, DATA_CHILD(idx),  \
-             NULL);                                                            \
-    })
 #define VISIT_WITH(gs, idx, info)                                              \
     ({                                                                         \
         ASSERT(idx < NUM_CHILDREN(), "index out of range");                    \
-        ASSERT(DATA_CHILD(idx) &&                                              \
-                   DATA_CHILD(idx)->grammar_symbol == CONCATENATE(GS_, gs),    \
+        ASSERT(DATA_CHILD(idx)->grammar_symbol == CONCATENATE(GS_, gs),        \
                "unexpected grammar symbol");                                   \
         CALL(SemResolver, *self, CONCATENATE(visit_, gs), /, DATA_CHILD(idx),  \
              info);                                                            \
     })
+#define VISIT_CHILD(gs, idx) VISIT_WITH(gs, idx, NULL);
 
 // Type management
 
@@ -96,29 +84,33 @@ APPLY_GRAMMAR_SYMBOL_SYNTAX(DECL_SEMRESOLVER_GRAMMAR_SYMBOL_AID);
             self->type_manager->CONCATENATE(basic_type, _type_idx);            \
     })
 #define SAVE_TYPE(type) ({ node->type_idx = (type); })
-#define SAVE_TYPE_CHILD(idx) SAVE_TYPE(DATA_CHILD(idx)->type_idx)
+#define SAVE_TYPE_CHILD(idx)                                                   \
+    ({                                                                         \
+        ASSERT(idx < NUM_CHILDREN(), "index out of range");                    \
+        SAVE_TYPE(DATA_CHILD(idx)->type_idx);                                  \
+    })
 
 // Symtab management
 
-#define SAVE_SYMTAB() ({ node->symtab_idx = self->current_symtab_idx; })
+#define SAVE_SYMTAB() ({ node->symtab_idx = self->cur_symtab_idx; })
 
 #define GET_SYMTAB()                                                           \
     SymbolTable *now_symtab = CALL(SymbolManager, *self->symbol_manager,       \
-                                   get_table, /, self->current_symtab_idx)
+                                   get_table, /, self->cur_symtab_idx)
 #define GET_TOPSYMTAB()                                                        \
     SymbolTable *top_symtab =                                                  \
         CALL(SymbolManager, *self->symbol_manager, get_table, /,               \
              self->symbol_manager->root_idx)
 
 #define CHNGPUSH_SYMTAB(idx)                                                   \
-    usize origin_symtab_idx = self->current_symtab_idx;                        \
-    self->current_symtab_idx = idx
+    usize orig_symtab_idx = self->cur_symtab_idx;                              \
+    self->cur_symtab_idx = idx
 
 #define PUSH_SYMTAB()                                                          \
-    usize origin_symtab_idx = self->current_symtab_idx;                        \
-    self->current_symtab_idx = CALL(SymbolManager, *self->symbol_manager,      \
-                                    add_table, /, self->current_symtab_idx)
-#define POP_SYMTAB() self->current_symtab_idx = origin_symtab_idx
+    usize orig_symtab_idx = self->cur_symtab_idx;                              \
+    self->cur_symtab_idx = CALL(SymbolManager, *self->symbol_manager,          \
+                                add_table, /, self->cur_symtab_idx)
+#define POP_SYMTAB() self->cur_symtab_idx = orig_symtab_idx
 
 /* ------ */
 
@@ -231,7 +223,7 @@ void MTD(SemResolver, insert_var_dec, /, String *symbol_name, usize type_idx,
 
 // Program -> ExtDefList
 VISITOR(Program) {
-    NO_INFO;
+    NOINFO;
     SAVE_SYMTAB();
     VISIT_CHILD(ExtDefList, 0);
     SAVE_TYPE_BASIC(void);
@@ -240,7 +232,7 @@ VISITOR(Program) {
 // ExtDefList -> ExtDef ExtDefList
 // ExtDefList -> \epsilon
 VISITOR(ExtDefList) {
-    NO_INFO;
+    NOINFO;
     SAVE_SYMTAB();
     if (NUM_CHILDREN() == 2) {
         // ExtDefList -> ExtDef ExtDefList
@@ -254,19 +246,19 @@ VISITOR(ExtDefList) {
 
 // ExtDef -> Specifier ExtDecList SEMI
 VISITOR(ExtDefCase1) {
-    NO_INFO;
+    NOINFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Specifier, 0);
 
     usize decl_type_idx = DATA_CHILD(0)->type_idx;
-    NEWNXTINFO(decl_type_idx, -1, false, false);
-    VISIT_WITH(ExtDecList, 1, &nxtinfo);
+    NEW_SINFO(decl_type_idx, -1, false, false);
+    VISIT_WITH(ExtDecList, 1, &sinfo);
     SAVE_TYPE_BASIC(void);
 }
 
 // ExtDef -> Specifier SEMI
 VISITOR(ExtDefCase2) {
-    NO_INFO;
+    NOINFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Specifier, 0);
     SAVE_TYPE_BASIC(void);
@@ -274,32 +266,32 @@ VISITOR(ExtDefCase2) {
 
 // ExtDef -> Specifier FunDec CompSt
 VISITOR(ExtDefCase3) {
-    NO_INFO;
+    NOINFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Specifier, 0);
 
     usize ret_type_idx = DATA_CHILD(0)->type_idx;
-    NEWNXTINFO(ret_type_idx, -1, false, false);
-    VISIT_WITH(FunDec, 1, &nxtinfo);
+    NEW_SINFO(ret_type_idx, -1, false, false);
+    VISIT_WITH(FunDec, 1, &sinfo);
 
-    usize func_symtab_idx = nxtinfo.gen_symtab_idx;
+    usize func_symtab_idx = sinfo.gen_symtab_idx;
 
-    NXTINFO(ret_type_idx, -1, false, false);
+    SINFO(ret_type_idx, -1, false, false);
     CHNGPUSH_SYMTAB(func_symtab_idx);
-    VISIT_WITH(CompSt, 2, &nxtinfo);
+    VISIT_WITH(CompSt, 2, &sinfo);
     POP_SYMTAB();
     SAVE_TYPE_BASIC(void);
 }
 
 // ExtDef -> Specifier FunDec SEMI
 VISITOR(ExtDefCase4) {
-    NO_INFO;
+    NOINFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Specifier, 0);
 
     usize ret_type_idx = DATA_CHILD(0)->type_idx;
-    NEWNXTINFO(ret_type_idx, -1, true, false);
-    VISIT_WITH(FunDec, 1, &nxtinfo);
+    NEW_SINFO(ret_type_idx, -1, true, false);
+    VISIT_WITH(FunDec, 1, &sinfo);
     SAVE_TYPE_BASIC(void);
 }
 
@@ -349,7 +341,7 @@ VISITOR(ExtDecList) {
 
 // Specifier -> TYPE
 VISITOR(SpecifierCase1) {
-    NO_INFO;
+    NOINFO;
     SAVE_SYMTAB();
     const char *type_str = DATA_CHILD(0)->str_val.data;
     if (type_str[0] == 'i') {
@@ -361,7 +353,7 @@ VISITOR(SpecifierCase1) {
 
 // Specifier -> StructSpecifier
 VISITOR(SpecifierCase2) {
-    NO_INFO;
+    NOINFO;
     SAVE_SYMTAB();
     VISIT_CHILD(StructSpecifier, 0);
     SAVE_TYPE_CHILD(0);
@@ -382,24 +374,24 @@ VISITOR(Specifier) {
 
 // StructSpecifier -> STRUCT OptTag LC DefList RC
 VISITOR(StructSpecifierCase1) {
-    NO_INFO;
+    NOINFO;
     SAVE_SYMTAB();
 
-    NEWNXTINFO(-1, -1, false, false);
-    VISIT_WITH(OptTag, 1, &nxtinfo);
+    NEW_SINFO(-1, -1, false, false);
+    VISIT_WITH(OptTag, 1, &sinfo);
 
     // construct the struct type
     usize struct_symtab_idx = CALL(SymbolManager, *self->symbol_manager,
-                                   add_table, /, self->current_symtab_idx);
+                                   add_table, /, self->cur_symtab_idx);
     usize struct_type_idx = CALL(TypeManager, *self->type_manager, make_struct,
                                  /, struct_symtab_idx);
 
-    String *struct_tag = nxtinfo.gen_symbol_str;
+    String *struct_tag = sinfo.gen_symbol_str;
 
     // struct body requires a new symtab
-    NXTINFO(-1, struct_type_idx, false, true);
+    SINFO(-1, struct_type_idx, false, true);
     CHNGPUSH_SYMTAB(struct_symtab_idx);
-    VISIT_WITH(DefList, 3, &nxtinfo);
+    VISIT_WITH(DefList, 3, &sinfo);
     POP_SYMTAB();
 
     // The struct type is now ready; get its representative
@@ -437,13 +429,13 @@ VISITOR(StructSpecifierCase1) {
 
 // StructSpecifier -> STRUCT Tag
 VISITOR(StructSpecifierCase2) {
-    NO_INFO;
+    NOINFO;
     SAVE_SYMTAB();
 
-    NEWNXTINFO(-1, -1, false, false);
-    VISIT_WITH(Tag, 1, &nxtinfo);
+    NEW_SINFO(-1, -1, false, false);
+    VISIT_WITH(Tag, 1, &sinfo);
 
-    String *struct_tag = nxtinfo.gen_symbol_str;
+    String *struct_tag = sinfo.gen_symbol_str;
     ASSERT(struct_tag, "struct with `Tag` must not be NULL");
 
     // key here is a hack! Do not drop it
@@ -521,10 +513,10 @@ VISITOR(VarDecCase2) {
     // The array type is now ready; get its representative
     CALL(TypeManager, *self->type_manager, fill_in_repr, /, type_idx);
 
-    NEWNXTINFO(type_idx, -1, false, false);
-    VISIT_WITH(VarDec, 0, &nxtinfo);
+    NEW_SINFO(type_idx, -1, false, false);
+    VISIT_WITH(VarDec, 0, &sinfo);
 
-    info->gen_symbol_str = nxtinfo.gen_symbol_str;
+    info->gen_symbol_str = sinfo.gen_symbol_str;
     SAVE_TYPE_CHILD(0);
 }
 
@@ -558,12 +550,12 @@ VISITOR(FunDec) {
     // Handle VarList
 
     PUSH_SYMTAB();
-    info->gen_symtab_idx = self->current_symtab_idx;
+    info->gen_symtab_idx = self->cur_symtab_idx;
 
     if (NUM_CHILDREN() == 4) {
         // FunDec -> ID LP VarList RP
-        NEWNXTINFO(func_type_idx, -1, false, false);
-        VISIT_WITH(VarList, 2, &nxtinfo);
+        NEW_SINFO(func_type_idx, -1, false, false);
+        VISIT_WITH(VarList, 2, &sinfo);
     } else {
         // FunDec -> ID LP RP
         // do nothing
@@ -657,10 +649,10 @@ VISITOR(ParamDec) {
     VISIT_CHILD(Specifier, 0);
     usize decl_type_idx = DATA_CHILD(0)->type_idx;
 
-    NEWNXTINFO(decl_type_idx, -1, false, false);
-    VISIT_WITH(VarDec, 1, &nxtinfo);
+    NEW_SINFO(decl_type_idx, -1, false, false);
+    VISIT_WITH(VarDec, 1, &sinfo);
 
-    String *symbol_name = nxtinfo.gen_symbol_str;
+    String *symbol_name = sinfo.gen_symbol_str;
     ASSERT(symbol_name);
 
     usize param_type_idx = DATA_CHILD(1)->type_idx;
@@ -678,8 +670,8 @@ VISITOR(CompSt) {
     INFO;
     SAVE_SYMTAB();
 
-    NEWNXTINFO(-1, -1, false, false);
-    VISIT_WITH(DefList, 1, &nxtinfo);
+    NEW_SINFO(-1, -1, false, false);
+    VISIT_WITH(DefList, 1, &sinfo);
     VISIT_WITH(StmtList, 2, info);
 
     SAVE_TYPE_BASIC(void);
@@ -842,9 +834,9 @@ VISITOR(Def) {
     VISIT_CHILD(Specifier, 0);
     usize decl_type_idx = DATA_CHILD(0)->type_idx;
 
-    NEWNXTINFO(decl_type_idx, info->enclosing_struct_type_idx, false,
-               info->is_in_struct);
-    VISIT_WITH(DecList, 1, &nxtinfo);
+    NEW_SINFO(decl_type_idx, info->enclosing_struct_type_idx, false,
+              info->is_in_struct);
+    VISIT_WITH(DecList, 1, &sinfo);
 
     SAVE_TYPE_BASIC(void);
 }
@@ -872,10 +864,10 @@ VISITOR(DecCase1) {
 
     usize decl_type_idx = info->inherit_type_idx;
 
-    NEWNXTINFO(decl_type_idx, -1, false, false);
-    VISIT_WITH(VarDec, 0, &nxtinfo);
+    NEW_SINFO(decl_type_idx, -1, false, false);
+    VISIT_WITH(VarDec, 0, &sinfo);
 
-    String *symbol_name = nxtinfo.gen_symbol_str;
+    String *symbol_name = sinfo.gen_symbol_str;
     ASSERT(symbol_name);
     usize var_type_idx = DATA_CHILD(0)->type_idx;
     CALL(SemResolver, *self, insert_var_dec, /, symbol_name, var_type_idx, node,
@@ -899,10 +891,10 @@ VISITOR(DecCase2) {
     }
 
     usize decl_type_idx = info->inherit_type_idx;
-    NEWNXTINFO(decl_type_idx, -1, false, false);
+    NEW_SINFO(decl_type_idx, -1, false, false);
 
-    VISIT_WITH(VarDec, 0, &nxtinfo);
-    String *symbol_name = nxtinfo.gen_symbol_str;
+    VISIT_WITH(VarDec, 0, &sinfo);
+    String *symbol_name = sinfo.gen_symbol_str;
     ASSERT(symbol_name);
 
     usize var_type_idx = DATA_CHILD(0)->type_idx;
@@ -925,6 +917,7 @@ VISITOR(DecCase2) {
                           "assignment type mismatched");
         }
     }
+    SAVE_TYPE_BASIC(void);
 }
 
 // Dec Dispatcher
@@ -940,7 +933,7 @@ VISITOR(Dec) {
     }
 }
 
-FUNC_STATIC bool MTD(SemResolver, is_lvalue, /, AstNode *node) {
+static bool MTD(SemResolver, is_lvalue, /, AstNode *node) {
     if (node->grammar_symbol != GS_Exp) {
         return false;
     }
@@ -957,7 +950,7 @@ FUNC_STATIC bool MTD(SemResolver, is_lvalue, /, AstNode *node) {
 }
 
 #define PREPARE_BINARY                                                         \
-    NO_INFO;                                                                   \
+    NOINFO;                                                                    \
     SAVE_SYMTAB();                                                             \
     VISIT_CHILD(Exp, 0);                                                       \
     VISIT_CHILD(Exp, 2);                                                       \
@@ -971,19 +964,19 @@ FUNC_STATIC bool MTD(SemResolver, is_lvalue, /, AstNode *node) {
 #define FINISH_BINARY                                                          \
     SAVE_TYPE(has_err ? self->type_manager->void_type_idx : syn_type_idx);
 
-FUNC_STATIC bool MTD(SemResolver, is_int_type, /, usize type_idx) {
+static bool MTD(SemResolver, is_int_type, /, usize type_idx) {
     return type_idx == self->type_manager->int_type_idx ||
            type_idx == self->type_manager->void_type_idx;
 }
 
-FUNC_STATIC bool MTD(SemResolver, is_basic_type, /, usize type_idx) {
+static bool MTD(SemResolver, is_basic_type, /, usize type_idx) {
     return type_idx == self->type_manager->int_type_idx ||
            type_idx == self->type_manager->float_type_idx ||
            type_idx == self->type_manager->void_type_idx;
 }
 
-FUNC_STATIC bool MTD(SemResolver, is_arith_type_with_error, /, AstNode *node,
-                     usize left_type_idx, usize right_type_idx) {
+static bool MTD(SemResolver, is_arith_type_with_error, /, AstNode *node,
+                usize left_type_idx, usize right_type_idx) {
     if (!CALL(SemResolver, *self, is_basic_type, /, left_type_idx)) {
         report_semerr(
             node->line_no, SemErrorOPTypeErr,
@@ -1095,7 +1088,7 @@ VISITOR(ExpDIV) {
 
 // Exp -> LP Exp RP
 VISITOR(ExpParen) {
-    NO_INFO;
+    NOINFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Exp, 1);
     SAVE_TYPE_CHILD(1);
@@ -1103,7 +1096,7 @@ VISITOR(ExpParen) {
 
 // Exp -> MINUS Exp
 VISITOR(ExpUMINUS) {
-    NO_INFO;
+    NOINFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Exp, 1);
     usize type_idx = DATA_CHILD(1)->type_idx;
@@ -1119,7 +1112,7 @@ VISITOR(ExpUMINUS) {
 
 // Exp -> NOT Exp
 VISITOR(ExpNOT) {
-    NO_INFO;
+    NOINFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Exp, 1);
     usize type_idx = DATA_CHILD(1)->type_idx;
@@ -1135,7 +1128,7 @@ VISITOR(ExpNOT) {
 // Exp -> ID LP Args RP
 // Exp -> ID LP RP
 VISITOR(ExpCall) {
-    NO_INFO;
+    NOINFO;
     SAVE_SYMTAB();
 
     usize call_type_idx = CALL(TypeManager, *self->type_manager, make_fun, /);
@@ -1146,8 +1139,8 @@ VISITOR(ExpCall) {
 
     if (NUM_CHILDREN() == 4) {
         // Exp -> ID LP Args RP
-        NEWNXTINFO(call_type_idx, -1, false, false);
-        VISIT_WITH(Args, 2, &nxtinfo);
+        NEW_SINFO(call_type_idx, -1, false, false);
+        VISIT_WITH(Args, 2, &sinfo);
     } else {
         // Exp -> ID LP RP
         // do nothing
@@ -1193,7 +1186,7 @@ VISITOR(ExpCall) {
 
 // Exp -> Exp LB Exp RB
 VISITOR(ExpIndex) {
-    NO_INFO;
+    NOINFO;
     SAVE_SYMTAB();
 
     VISIT_CHILD(Exp, 0);
@@ -1223,7 +1216,7 @@ VISITOR(ExpIndex) {
 
 // Exp -> Exp DOT ID
 VISITOR(ExpField) {
-    NO_INFO;
+    NOINFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Exp, 0);
     usize base_type_idx = DATA_CHILD(0)->type_idx;
@@ -1259,7 +1252,7 @@ VISITOR(ExpField) {
 
 // Exp -> ID
 VISITOR(ExpID) {
-    NO_INFO;
+    NOINFO;
     SAVE_SYMTAB();
 
     String *name = &DATA_CHILD(0)->str_val;
@@ -1286,14 +1279,14 @@ VISITOR(ExpID) {
 
 // Exp -> INT
 VISITOR(ExpINT) {
-    NO_INFO;
+    NOINFO;
     SAVE_SYMTAB();
     SAVE_TYPE_BASIC(int);
 }
 
 // Exp -> FLOAT
 VISITOR(ExpFLOAT) {
-    NO_INFO;
+    NOINFO;
     SAVE_SYMTAB();
     SAVE_TYPE_BASIC(float);
 }

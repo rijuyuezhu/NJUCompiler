@@ -26,11 +26,11 @@ typedef enum RelopKind {
 
 typedef struct AstNode {
     AstNodeKind kind;
+    int line_no;
 
     /* Lex/Syntax Info */
-    int line_no;
     GrammarSymbol grammar_symbol;
-    const char *grammar_name;
+    const char *grammar_symbol_str;
 
     /* Semantic Info */
     usize symtab_idx;
@@ -46,19 +46,22 @@ typedef struct AstNode {
     };
 } AstNode;
 
-AstNode *NSMTD(AstNode, creheap_basic, /, int line_no, int grammar_symbol,
-               const char *grammar_name);
-AstNode *NSMTD(AstNode, creheap_int, /, int line_no, int grammar_symbol,
-               const char *grammar_name, int val);
-AstNode *NSMTD(AstNode, creheap_float, /, int line_no, int grammar_symbol,
-               const char *grammar_name, float val);
-AstNode *NSMTD(AstNode, creheap_string, /, int line_no, int grammar_symbol,
-               const char *grammar_name, String val);
-AstNode *NSMTD(AstNode, creheap_relop, /, int line_no, int grammar_symbol,
-               const char *grammar_name, RelopKind val);
-AstNode *NSMTD(AstNode, creheap_inner, /, int line_no, int grammar_symbol,
-               const char *grammar_name);
-
+AstNode *NSMTD(AstNode, creheap_basic, /, int line_no,
+               GrammarSymbol grammar_symbol, const char *grammar_symbol_str);
+AstNode *NSMTD(AstNode, creheap_int, /, int line_no,
+               GrammarSymbol grammar_symbol, const char *grammar_symbol_str,
+               int val);
+AstNode *NSMTD(AstNode, creheap_float, /, int line_no,
+               GrammarSymbol grammar_symbol, const char *grammar_symbol_str,
+               float val);
+AstNode *NSMTD(AstNode, creheap_string, /, int line_no,
+               GrammarSymbol grammar_symbol, const char *grammar_symbol_str,
+               String val);
+AstNode *NSMTD(AstNode, creheap_relop, /, int line_no,
+               GrammarSymbol grammar_symbol, const char *grammar_symbol_str,
+               RelopKind val);
+AstNode *NSMTD(AstNode, creheap_inner, /, int line_no,
+               GrammarSymbol grammar_symbol, const char *grammar_symbol_str);
 void MTD(AstNode, add_child, /, AstNode *child);
 void MTD(AstNode, print_subtree, /, usize depth);
 void MTD(AstNode, drop, /);

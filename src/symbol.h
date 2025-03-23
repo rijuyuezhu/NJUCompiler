@@ -45,7 +45,7 @@ DECLARE_MAPPING(MapSymtab, HString, SymbolEntry, FUNC_EXTERN,
                 GENERATOR_CLASS_KEY, GENERATOR_CLASS_VALUE,
                 GENERATOR_CLASS_COMPARATOR);
 
-#define SYMBOL_TABLE_NO_PARENT ((usize)(-1))
+#define SYMTAB_NO_PARENT ((usize)(-1))
 
 typedef struct SymbolTable {
     usize parent_idx;

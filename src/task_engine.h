@@ -24,4 +24,5 @@ void MTD(TaskEngine, drop, /);
 void MTD(TaskEngine, parse_ast, /);
 void MTD(TaskEngine, print_ast, /);
 
+/* Semantic */
 void MTD(TaskEngine, analyze_semantic, /);

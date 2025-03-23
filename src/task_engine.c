@@ -5,6 +5,7 @@ void MTD(TaskEngine, init, /, const char *file) {
     self->input_file = file;
     self->ast_root = NULL;
     self->ast_error = false;
+
     CALL(TypeManager, self->type_manager, init, /);
     CALL(SymbolManager, self->symbol_manager, init, /);
     self->semantic_error = false;

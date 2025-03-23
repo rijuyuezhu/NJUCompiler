@@ -10,7 +10,7 @@ void MTD(SymbolTable, init, /, usize parent_idx) {
 void MTD(SymbolTable, drop, /) { DROPOBJ(MapSymtab, self->mapping); }
 
 bool MTD(SymbolTable, is_root, /) {
-    return self->parent_idx == SYMBOL_TABLE_NO_PARENT;
+    return self->parent_idx == SYMTAB_NO_PARENT;
 }
 
 MapSymtabInsertResult MTD(SymbolTable, insert, /, HString name,
@@ -46,16 +46,14 @@ MapSymtabIterator MTD(SymbolTable, find_recursive, /, HString *name,
 
 void MTD(SymbolManager, init, /) {
     CALL(VecSymbolTable, self->tables, init, /);
-    self->root_idx =
-        CALL(SymbolManager, *self, add_table, /, SYMBOL_TABLE_NO_PARENT);
+    self->root_idx = CALL(SymbolManager, *self, add_table, /, SYMTAB_NO_PARENT);
     self->temp_cnt = 0;
 }
 
 void MTD(SymbolManager, drop, /) { DROPOBJ(VecSymbolTable, self->tables); }
 
 usize MTD(SymbolManager, add_table, /, usize parent_idx) {
-    ASSERT(parent_idx < self->tables.size ||
-           parent_idx == SYMBOL_TABLE_NO_PARENT);
+    ASSERT(parent_idx < self->tables.size || parent_idx == SYMTAB_NO_PARENT);
     SymbolTable table = CREOBJ(SymbolTable, /, parent_idx);
     CALL(VecSymbolTable, self->tables, push_back, /, table);
     return self->tables.size - 1;

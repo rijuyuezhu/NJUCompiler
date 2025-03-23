@@ -31,7 +31,7 @@ typedef enum SemError {
 typedef struct SemResolver {
     struct TypeManager *type_manager;
     struct SymbolManager *symbol_manager;
-    usize current_symtab_idx;
+    usize cur_symtab_idx;
     bool sem_error;
 } SemResolver;
 
