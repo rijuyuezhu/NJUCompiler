@@ -1199,9 +1199,11 @@ VISITOR(ExpIndex) {
         CALL(TypeManager, *self->type_manager, get_type, /, base_type_idx);
 
     if (base_type->kind != TypeKindArray) {
-        report_semerr(
-            node->line_no, SemErrorIndexBaseTypeErr,
-            "index operator requires the base operand to be an array");
+        if (base_type->kind != TypeKindVoid) {
+            report_semerr(
+                node->line_no, SemErrorIndexBaseTypeErr,
+                "index operator requires the base operand to be an array");
+        }
         SAVE_TYPE_BASIC(void);
     } else {
         if (!CALL(SemResolver, *self, is_int_type, /, idx_type_idx)) {
@@ -1223,9 +1225,11 @@ VISITOR(ExpField) {
     Type *base_type =
         CALL(TypeManager, *self->type_manager, get_type, /, base_type_idx);
     if (base_type->kind != TypeKindStruct) {
-        report_semerr(
-            node->line_no, SemErrorFieldBaseTypeErr,
-            "field operator requires the base operand to be a struct");
+        if (base_type->kind != TypeKindVoid) {
+            report_semerr(
+                node->line_no, SemErrorFieldBaseTypeErr,
+                "field operator requires the base operand to be a struct");
+        }
         SAVE_TYPE_BASIC(void);
     } else {
         String *field_name = &DATA_CHILD(2)->str_val;
