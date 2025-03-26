@@ -10,7 +10,7 @@
 #undef ASSERT
 #define ASSERT(x, ...)                                                         \
     ({                                                                         \
-        if (!(x)) {                                                            \
+        if (unlikely(!(x))) {                                                  \
             fprintf(stderr,                                                    \
                     "Assertion failed: `" #x                                   \
                     "`, at %s:%s:%d." VA_OPT_ONE(" %s", ##__VA_ARGS__) "\n",   \
@@ -31,7 +31,7 @@
     ({                                                                         \
         typeof(x) MPROT(ASSERT_EQ_X) = (x);                                    \
         typeof(y) MPROT(ASSERT_EQ_Y) = (y);                                    \
-        if (MPROT(ASSERT_EQ_X) != MPROT(ASSERT_EQ_Y)) {                        \
+        if (unlikely(MPROT(ASSERT_EQ_X) != MPROT(ASSERT_EQ_Y))) {              \
             printf("Assertion failed: `" #x "`=`" fmtid                        \
                    "` is not equal to `" #y "`=`" fmtid                        \
                    "`, at %s:%s:%d." VA_OPT_ONE(" %s", ##__VA_ARGS__) "\n",    \
@@ -46,7 +46,7 @@
     ({                                                                         \
         const char *MPROT(ASSERT_EQ_X) = (x);                                  \
         const char *MPROT(ASSERT_EQ_Y) = (y);                                  \
-        if (strcmp(MPROT(ASSERT_EQ_X), MPROT(ASSERT_EQ_Y)) != 0) {             \
+        if (unlikely(strcmp(MPROT(ASSERT_EQ_X), MPROT(ASSERT_EQ_Y)) != 0)) {   \
             printf("Assertion failed: `" #x "`=`%s` is not equal to `" #y      \
                    "`=`%s`, "                                                  \
                    "at %s:%s:%d." VA_OPT_ONE(" %s", ##__VA_ARGS__) "\n",       \

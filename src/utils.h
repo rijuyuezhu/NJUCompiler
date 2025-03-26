@@ -40,6 +40,10 @@
 #define ATTR_UNUSED __attribute__((unused))
 #undef UNREACHABLE
 #define UNREACHABLE __builtin_unreachable()
+#undef likely
+#define likely(x) __builtin_expect(!!(x), 1)
+#undef unlikely
+#define unlikely(x) __builtin_expect(!!(x), 0)
 #undef FUNC_STATIC
 #define FUNC_STATIC ATTR_UNUSED static inline
 #undef FUNC_EXTERN
