@@ -10,35 +10,35 @@
 
 #define TO_GS(x) CONCATENATE(GS_, x)
 
-#define SYNTAX_BASIC_ACTION0(name, line_no)                                     \
+#define SYNTAX_BASIC_ACTION0(name, production_id, line_no)                     \
     ({                                                                         \
         NSCALL(AstNode, creheap_inner, /, line_no, TO_GS(name),                \
-               STRINGIFY(name));                                               \
+               production_id);                                                 \
     })
 
-#define SYNTAX_BASIC_ACTION1(name, line_no, arg1)                              \
+#define SYNTAX_BASIC_ACTION1(name, production_id, line_no, arg1)               \
     ({                                                                         \
         AstNode *MPROT(n) = NSCALL(AstNode, creheap_inner, /, line_no,         \
-                                   TO_GS(name), STRINGIFY(name));              \
+                                   TO_GS(name), production_id);                \
         CALL(VecPtr, MPROT(n)->children, reserve, /, 1);                       \
         NSCALL(AstNode, add_child, /, MPROT(n), arg1);                         \
         MPROT(n);                                                              \
     })
 
-#define SYNTAX_BASIC_ACTION2(name, line_no, arg1, arg2)                        \
+#define SYNTAX_BASIC_ACTION2(name, production_id, line_no, arg1, arg2)         \
     ({                                                                         \
         AstNode *MPROT(n) = NSCALL(AstNode, creheap_inner, /, line_no,         \
-                                   TO_GS(name), STRINGIFY(name));              \
+                                   TO_GS(name), production_id);                \
         CALL(VecPtr, MPROT(n)->children, reserve, /, 2);                       \
         NSCALL(AstNode, add_child, /, MPROT(n), arg1);                         \
         NSCALL(AstNode, add_child, /, MPROT(n), arg2);                         \
         MPROT(n);                                                              \
     })
 
-#define SYNTAX_BASIC_ACTION3(name, line_no, arg1, arg2, arg3)                  \
+#define SYNTAX_BASIC_ACTION3(name, production_id, line_no, arg1, arg2, arg3)   \
     ({                                                                         \
         AstNode *MPROT(n) = NSCALL(AstNode, creheap_inner, /, line_no,         \
-                                   TO_GS(name), STRINGIFY(name));              \
+                                   TO_GS(name), production_id);                \
         CALL(VecPtr, MPROT(n)->children, reserve, /, 3);                       \
         NSCALL(AstNode, add_child, /, MPROT(n), arg1);                         \
         NSCALL(AstNode, add_child, /, MPROT(n), arg2);                         \
@@ -46,10 +46,11 @@
         MPROT(n);                                                              \
     })
 
-#define SYNTAX_BASIC_ACTION4(name, line_no, arg1, arg2, arg3, arg4)            \
+#define SYNTAX_BASIC_ACTION4(name, production_id, line_no, arg1, arg2, arg3,   \
+                             arg4)                                             \
     ({                                                                         \
         AstNode *MPROT(n) = NSCALL(AstNode, creheap_inner, /, line_no,         \
-                                   TO_GS(name), STRINGIFY(name));              \
+                                   TO_GS(name), production_id);                \
         CALL(VecPtr, MPROT(n)->children, reserve, /, 4);                       \
         NSCALL(AstNode, add_child, /, MPROT(n), arg1);                         \
         NSCALL(AstNode, add_child, /, MPROT(n), arg2);                         \
@@ -58,10 +59,11 @@
         MPROT(n);                                                              \
     })
 
-#define SYNTAX_BASIC_ACTION5(name, line_no, arg1, arg2, arg3, arg4, arg5)      \
+#define SYNTAX_BASIC_ACTION5(name, production_id, line_no, arg1, arg2, arg3,   \
+                             arg4, arg5)                                       \
     ({                                                                         \
         AstNode *MPROT(n) = NSCALL(AstNode, creheap_inner, /, line_no,         \
-                                   TO_GS(name), STRINGIFY(name));              \
+                                   TO_GS(name), production_id);                \
         CALL(VecPtr, MPROT(n)->children, reserve, /, 5);                       \
         NSCALL(AstNode, add_child, /, MPROT(n), arg1);                         \
         NSCALL(AstNode, add_child, /, MPROT(n), arg2);                         \
@@ -71,11 +73,11 @@
         MPROT(n);                                                              \
     })
 
-#define SYNTAX_BASIC_ACTION6(name, line_no, arg1, arg2, arg3, arg4, arg5,      \
-                             arg6)                                             \
+#define SYNTAX_BASIC_ACTION6(name, production_id, line_no, arg1, arg2, arg3,   \
+                             arg4, arg5, arg6)                                 \
     ({                                                                         \
         AstNode *MPROT(n) = NSCALL(AstNode, creheap_inner, /, line_no,         \
-                                   TO_GS(name), STRINGIFY(name));              \
+                                   TO_GS(name), production_id);                \
         CALL(VecPtr, MPROT(n)->children, reserve, /, 6);                       \
         NSCALL(AstNode, add_child, /, MPROT(n), arg1);                         \
         NSCALL(AstNode, add_child, /, MPROT(n), arg2);                         \
@@ -86,11 +88,11 @@
         MPROT(n);                                                              \
     })
 
-#define SYNTAX_BASIC_ACTION7(name, line_no, arg1, arg2, arg3, arg4, arg5,      \
-                             arg6, arg7)                                       \
+#define SYNTAX_BASIC_ACTION7(name, production_id, line_no, arg1, arg2, arg3,   \
+                             arg4, arg5, arg6, arg7)                           \
     ({                                                                         \
         AstNode *MPROT(n) = NSCALL(AstNode, creheap_inner, /, line_no,         \
-                                   TO_GS(name), STRINGIFY(name));              \
+                                   TO_GS(name), production_id);                \
         CALL(VecPtr, MPROT(n)->children, reserve, /, 7);                       \
         NSCALL(AstNode, add_child, /, MPROT(n), arg1);                         \
         NSCALL(AstNode, add_child, /, MPROT(n), arg2);                         \
@@ -102,10 +104,7 @@
         MPROT(n);                                                              \
     })
 
-#define FACING_ERROR0(it)                                                \
-    ({                                                                         \
-        it = NULL;                                                             \
-    })
+#define FACING_ERROR0(it) ({ it = NULL; })
 
 #define FACING_ERROR1(it, arg1)                                                \
     ({                                                                         \
@@ -189,7 +188,7 @@ static void yyerror(TaskEngine *engine, const char *msg) {
 %token TK_SEMI TK_COMMA
 %token TK_ASSIGNOP TK_RELOP
 %token TK_PLUS TK_MINUS TK_STAR TK_DIV
-%token TK_AND TK_OR TK_DOT TK_NOT 
+%token TK_AND TK_OR TK_DOT TK_NOT
 %token TK_LP TK_RP TK_LB TK_RB TK_LC TK_RC
 %token TK_TYPE
 %token TK_STRUCT TK_RETURN TK_IF TK_ELSE TK_WHILE
@@ -217,19 +216,19 @@ static void yyerror(TaskEngine *engine, const char *msg) {
 /* High-level Definitions */
 
 Program
-    : ExtDefList { engine->ast_root = SYNTAX_BASIC_ACTION1(Program, @$.first_line, $1); $$ = NULL; }
+    : ExtDefList { engine->ast_root = SYNTAX_BASIC_ACTION1(Program, 0, @$.first_line, $1); $$ = NULL; }
     ;
 
 ExtDefList
-    : ExtDef ExtDefList { $$ = SYNTAX_BASIC_ACTION2(ExtDefList, @$.first_line, $1, $2); }
-    | /* empty */ { $$ = SYNTAX_BASIC_ACTION0(ExtDefList, @$.first_line); }
+    : ExtDef ExtDefList { $$ = SYNTAX_BASIC_ACTION2(ExtDefList, 0, @$.first_line, $1, $2); }
+    | /* empty */ { $$ = SYNTAX_BASIC_ACTION0(ExtDefList, 1, @$.first_line); }
     ;
 
 ExtDef
-    : Specifier ExtDecList TK_SEMI { $$ = SYNTAX_BASIC_ACTION3(ExtDef, @$.first_line, $1, $2, $3); }
-    | Specifier TK_SEMI { $$ = SYNTAX_BASIC_ACTION2(ExtDef, @$.first_line, $1, $2); }
-    | Specifier FunDec CompSt { $$ = SYNTAX_BASIC_ACTION3(ExtDef, @$.first_line, $1, $2, $3); }
-    | Specifier FunDec TK_SEMI { $$ = SYNTAX_BASIC_ACTION3(ExtDef, @$.first_line, $1, $2, $3); }
+    : Specifier ExtDecList TK_SEMI { $$ = SYNTAX_BASIC_ACTION3(ExtDef, 0, @$.first_line, $1, $2, $3); }
+    | Specifier TK_SEMI { $$ = SYNTAX_BASIC_ACTION2(ExtDef, 1, @$.first_line, $1, $2); }
+    | Specifier FunDec CompSt { $$ = SYNTAX_BASIC_ACTION3(ExtDef, 2, @$.first_line, $1, $2, $3); }
+    | Specifier FunDec TK_SEMI { $$ = SYNTAX_BASIC_ACTION3(ExtDef, 3, @$.first_line, $1, $2, $3); }
 
     | Specifier error CompSt { FACING_ERROR2($$, $1, $3); }
     | Specifier error TK_SEMI { FACING_ERROR2($$, $1, $3); }
@@ -238,76 +237,76 @@ ExtDef
     ;
 
 ExtDecList
-    : VarDec { $$ = SYNTAX_BASIC_ACTION1(ExtDecList, @$.first_line, $1); }
-    | VarDec TK_COMMA ExtDecList { $$ = SYNTAX_BASIC_ACTION3(ExtDecList, @$.first_line, $1, $2, $3); }
+    : VarDec { $$ = SYNTAX_BASIC_ACTION1(ExtDecList, 0, @$.first_line, $1); }
+    | VarDec TK_COMMA ExtDecList { $$ = SYNTAX_BASIC_ACTION3(ExtDecList, 1, @$.first_line, $1, $2, $3); }
     ;
 
 /* Specifiers */
 
 Specifier
-    : TK_TYPE { $$ = SYNTAX_BASIC_ACTION1(Specifier, @$.first_line, $1); }
-    | StructSpecifier { $$ = SYNTAX_BASIC_ACTION1(Specifier, @$.first_line, $1); }
+    : TK_TYPE { $$ = SYNTAX_BASIC_ACTION1(Specifier, 0, @$.first_line, $1); }
+    | StructSpecifier { $$ = SYNTAX_BASIC_ACTION1(Specifier, 1, @$.first_line, $1); }
     ;
 
 StructSpecifier
-    : TK_STRUCT OptTag TK_LC DefList TK_RC { $$ = SYNTAX_BASIC_ACTION5(StructSpecifier, @$.first_line, $1, $2, $3, $4, $5); }
-    | TK_STRUCT Tag { $$ = SYNTAX_BASIC_ACTION2(StructSpecifier, @$.first_line, $1, $2); }
+    : TK_STRUCT OptTag TK_LC DefList TK_RC { $$ = SYNTAX_BASIC_ACTION5(StructSpecifier, 0, @$.first_line, $1, $2, $3, $4, $5); }
+    | TK_STRUCT Tag { $$ = SYNTAX_BASIC_ACTION2(StructSpecifier, 1, @$.first_line, $1, $2); }
 
     | TK_STRUCT error TK_LC error TK_RC { FACING_ERROR3($$, $1, $3, $5); }
     ;
 
 OptTag
-    : TK_ID { $$ = SYNTAX_BASIC_ACTION1(OptTag, @$.first_line, $1); }
-    | /* empty */ { $$ = SYNTAX_BASIC_ACTION0(OptTag, @$.first_line); }
+    : TK_ID { $$ = SYNTAX_BASIC_ACTION1(OptTag, 0, @$.first_line, $1); }
+    | /* empty */ { $$ = SYNTAX_BASIC_ACTION0(OptTag, 1, @$.first_line); }
     ;
 
 Tag
-    : TK_ID { $$ = SYNTAX_BASIC_ACTION1(Tag, @$.first_line, $1); }
+    : TK_ID { $$ = SYNTAX_BASIC_ACTION1(Tag, 0, @$.first_line, $1); }
     ;
 
 /* Declarators */
 
 VarDec
-    : TK_ID { $$ = SYNTAX_BASIC_ACTION1(VarDec, @$.first_line, $1); }
-    | VarDec TK_LB TK_INT TK_RB { $$ = SYNTAX_BASIC_ACTION4(VarDec, @$.first_line, $1, $2, $3, $4); }
+    : TK_ID { $$ = SYNTAX_BASIC_ACTION1(VarDec, 0, @$.first_line, $1); }
+    | VarDec TK_LB TK_INT TK_RB { $$ = SYNTAX_BASIC_ACTION4(VarDec, 1, @$.first_line, $1, $2, $3, $4); }
 
     | VarDec TK_LB error TK_RB { FACING_ERROR3($$, $1, $2, $4); }
     ;
 
 FunDec
-    : TK_ID TK_LP VarList TK_RP { $$ = SYNTAX_BASIC_ACTION4(FunDec, @$.first_line, $1, $2, $3, $4); }
-    | TK_ID TK_LP TK_RP { $$ = SYNTAX_BASIC_ACTION3(FunDec, @$.first_line, $1, $2, $3); }
+    : TK_ID TK_LP VarList TK_RP { $$ = SYNTAX_BASIC_ACTION4(FunDec, 0, @$.first_line, $1, $2, $3, $4); }
+    | TK_ID TK_LP TK_RP { $$ = SYNTAX_BASIC_ACTION3(FunDec, 1, @$.first_line, $1, $2, $3); }
 
     | error TK_LP error TK_RP { FACING_ERROR2($$, $2, $4);  }
     ;
 
 VarList
-    : ParamDec TK_COMMA VarList { $$ = SYNTAX_BASIC_ACTION3(VarList, @$.first_line, $1, $2, $3); }
-    | ParamDec { $$ = SYNTAX_BASIC_ACTION1(VarList, @$.first_line, $1); }
+    : ParamDec TK_COMMA VarList { $$ = SYNTAX_BASIC_ACTION3(VarList, 0, @$.first_line, $1, $2, $3); }
+    | ParamDec { $$ = SYNTAX_BASIC_ACTION1(VarList, 1, @$.first_line, $1); }
     ;
 
 ParamDec
-    : Specifier VarDec { $$ = SYNTAX_BASIC_ACTION2(ParamDec, @$.first_line, $1, $2); }
+    : Specifier VarDec { $$ = SYNTAX_BASIC_ACTION2(ParamDec, 0, @$.first_line, $1, $2); }
     ;
 
 /* Statements */
 
 CompSt
-    : TK_LC DefList StmtList TK_RC { $$ = SYNTAX_BASIC_ACTION4(CompSt, @$.first_line, $1, $2, $3, $4); }
+    : TK_LC DefList StmtList TK_RC { $$ = SYNTAX_BASIC_ACTION4(CompSt, 0, @$.first_line, $1, $2, $3, $4); }
     ;
 
 StmtList
-    : Stmt StmtList { $$ = SYNTAX_BASIC_ACTION2(StmtList, @$.first_line, $1, $2); }
-    | /* empty */ { $$ = SYNTAX_BASIC_ACTION0(StmtList, @$.first_line); }
+    : Stmt StmtList { $$ = SYNTAX_BASIC_ACTION2(StmtList, 0, @$.first_line, $1, $2); }
+    | /* empty */ { $$ = SYNTAX_BASIC_ACTION0(StmtList, 1, @$.first_line); }
     ;
 
 Stmt
-    : Exp TK_SEMI  { $$ = SYNTAX_BASIC_ACTION2(Stmt, @$.first_line, $1, $2); }
-    | CompSt { $$ = SYNTAX_BASIC_ACTION1(Stmt, @$.first_line, $1); }
-    | TK_RETURN Exp TK_SEMI { $$ = SYNTAX_BASIC_ACTION3(Stmt, @$.first_line, $1, $2, $3); }
-    | TK_IF TK_LP Exp TK_RP Stmt %prec LOWER_THAN_ELSE { $$ = SYNTAX_BASIC_ACTION5(Stmt, @$.first_line, $1, $2, $3, $4, $5); }
-    | TK_IF TK_LP Exp TK_RP Stmt TK_ELSE Stmt { $$ = SYNTAX_BASIC_ACTION7(Stmt, @$.first_line, $1, $2, $3, $4, $5, $6, $7); }
-    | TK_WHILE TK_LP Exp TK_RP Stmt { $$ = SYNTAX_BASIC_ACTION5(Stmt, @$.first_line, $1, $2, $3, $4, $5); }
+    : Exp TK_SEMI  { $$ = SYNTAX_BASIC_ACTION2(Stmt, 0, @$.first_line, $1, $2); }
+    | CompSt { $$ = SYNTAX_BASIC_ACTION1(Stmt, 1, @$.first_line, $1); }
+    | TK_RETURN Exp TK_SEMI { $$ = SYNTAX_BASIC_ACTION3(Stmt, 2, @$.first_line, $1, $2, $3); }
+    | TK_IF TK_LP Exp TK_RP Stmt %prec LOWER_THAN_ELSE { $$ = SYNTAX_BASIC_ACTION5(Stmt, 3, @$.first_line, $1, $2, $3, $4, $5); }
+    | TK_IF TK_LP Exp TK_RP Stmt TK_ELSE Stmt { $$ = SYNTAX_BASIC_ACTION7(Stmt, 4, @$.first_line, $1, $2, $3, $4, $5, $6, $7); }
+    | TK_WHILE TK_LP Exp TK_RP Stmt { $$ = SYNTAX_BASIC_ACTION5(Stmt, 5, @$.first_line, $1, $2, $3, $4, $5); }
 
     | TK_SEMI  { yyerror(engine, "syntax error, only one semicolon"); FACING_ERROR1($$, $1); }
     | Exp error  { FACING_ERROR1($$, $1); }
@@ -322,54 +321,54 @@ Stmt
 /* Local Definitions */
 
 DefList
-    : Def DefList { $$ = SYNTAX_BASIC_ACTION2(DefList, @$.first_line, $1, $2); }
-    | /* empty */ { $$ = SYNTAX_BASIC_ACTION0(DefList, @$.first_line); }
+    : Def DefList { $$ = SYNTAX_BASIC_ACTION2(DefList, 0, @$.first_line, $1, $2); }
+    | /* empty */ { $$ = SYNTAX_BASIC_ACTION0(DefList, 1, @$.first_line); }
     ;
 
 Def
-    : Specifier DecList TK_SEMI { $$ = SYNTAX_BASIC_ACTION3(Def, @$.first_line, $1, $2, $3); }
+    : Specifier DecList TK_SEMI { $$ = SYNTAX_BASIC_ACTION3(Def, 0, @$.first_line, $1, $2, $3); }
 
     | Specifier error TK_SEMI { FACING_ERROR2($$, $1, $3); }
     ;
 
 DecList
-    : Dec { $$ = SYNTAX_BASIC_ACTION1(DecList, @$.first_line, $1); }
-    | Dec TK_COMMA DecList { $$ = SYNTAX_BASIC_ACTION3(DecList, @$.first_line, $1, $2, $3); }
+    : Dec { $$ = SYNTAX_BASIC_ACTION1(DecList, 0, @$.first_line, $1); }
+    | Dec TK_COMMA DecList { $$ = SYNTAX_BASIC_ACTION3(DecList, 1, @$.first_line, $1, $2, $3); }
     ;
 
 Dec
-    : VarDec { $$ = SYNTAX_BASIC_ACTION1(Dec, @$.first_line, $1); }
-    | VarDec TK_ASSIGNOP Exp { $$ = SYNTAX_BASIC_ACTION3(Dec, @$.first_line, $1, $2, $3); }
+    : VarDec { $$ = SYNTAX_BASIC_ACTION1(Dec, 0, @$.first_line, $1); }
+    | VarDec TK_ASSIGNOP Exp { $$ = SYNTAX_BASIC_ACTION3(Dec, 1, @$.first_line, $1, $2, $3); }
     ;
 
 /* Expressions */
 
 Exp
-    : Exp TK_ASSIGNOP Exp { $$ = SYNTAX_BASIC_ACTION3(Exp, @$.first_line, $1, $2, $3); }
-    | Exp TK_AND Exp { $$ = SYNTAX_BASIC_ACTION3(Exp, @$.first_line, $1, $2, $3); }
-    | Exp TK_OR Exp { $$ = SYNTAX_BASIC_ACTION3(Exp, @$.first_line, $1, $2, $3); } 
-    | Exp TK_RELOP Exp { $$ = SYNTAX_BASIC_ACTION3(Exp, @$.first_line, $1, $2, $3); } 
-    | Exp TK_PLUS Exp { $$ = SYNTAX_BASIC_ACTION3(Exp, @$.first_line, $1, $2, $3); } 
-    | Exp TK_MINUS Exp { $$ = SYNTAX_BASIC_ACTION3(Exp, @$.first_line, $1, $2, $3); } 
-    | Exp TK_STAR Exp { $$ = SYNTAX_BASIC_ACTION3(Exp, @$.first_line, $1, $2, $3); } 
-    | Exp TK_DIV Exp { $$ = SYNTAX_BASIC_ACTION3(Exp, @$.first_line, $1, $2, $3); } 
-    | TK_LP Exp TK_RP { $$ = SYNTAX_BASIC_ACTION3(Exp, @$.first_line, $1, $2, $3); } 
-    | TK_MINUS Exp %prec UNARY_MINUS { $$ = SYNTAX_BASIC_ACTION2(Exp, @$.first_line, $1, $2); }
-    | TK_NOT Exp { $$ = SYNTAX_BASIC_ACTION2(Exp, @$.first_line, $1, $2); }
-    | TK_ID TK_LP Args TK_RP { $$ = SYNTAX_BASIC_ACTION4(Exp, @$.first_line, $1, $2, $3, $4); }
-    | TK_ID TK_LP TK_RP { $$ = SYNTAX_BASIC_ACTION3(Exp, @$.first_line, $1, $2, $3); }
-    | Exp TK_LB Exp TK_RB { $$ = SYNTAX_BASIC_ACTION4(Exp, @$.first_line, $1, $2, $3, $4); }
-    | Exp TK_DOT TK_ID { $$ = SYNTAX_BASIC_ACTION3(Exp, @$.first_line, $1, $2, $3); }
-    | TK_ID { $$ = SYNTAX_BASIC_ACTION1(Exp, @$.first_line, $1); }
-    | TK_INT { $$ = SYNTAX_BASIC_ACTION1(Exp, @$.first_line, $1); }
-    | TK_FLOAT { $$ = SYNTAX_BASIC_ACTION1(Exp, @$.first_line, $1); }
+    : Exp TK_ASSIGNOP Exp { $$ = SYNTAX_BASIC_ACTION3(Exp, 0, @$.first_line, $1, $2, $3); }
+    | Exp TK_AND Exp { $$ = SYNTAX_BASIC_ACTION3(Exp, 1, @$.first_line, $1, $2, $3); }
+    | Exp TK_OR Exp { $$ = SYNTAX_BASIC_ACTION3(Exp, 2, @$.first_line, $1, $2, $3); }
+    | Exp TK_RELOP Exp { $$ = SYNTAX_BASIC_ACTION3(Exp, 3, @$.first_line, $1, $2, $3); }
+    | Exp TK_PLUS Exp { $$ = SYNTAX_BASIC_ACTION3(Exp, 4, @$.first_line, $1, $2, $3); }
+    | Exp TK_MINUS Exp { $$ = SYNTAX_BASIC_ACTION3(Exp, 5, @$.first_line, $1, $2, $3); }
+    | Exp TK_STAR Exp { $$ = SYNTAX_BASIC_ACTION3(Exp, 6, @$.first_line, $1, $2, $3); }
+    | Exp TK_DIV Exp { $$ = SYNTAX_BASIC_ACTION3(Exp, 7, @$.first_line, $1, $2, $3); }
+    | TK_LP Exp TK_RP { $$ = SYNTAX_BASIC_ACTION3(Exp, 8, @$.first_line, $1, $2, $3); }
+    | TK_MINUS Exp %prec UNARY_MINUS { $$ = SYNTAX_BASIC_ACTION2(Exp, 9, @$.first_line, $1, $2); }
+    | TK_NOT Exp { $$ = SYNTAX_BASIC_ACTION2(Exp, 10, @$.first_line, $1, $2); }
+    | TK_ID TK_LP Args TK_RP { $$ = SYNTAX_BASIC_ACTION4(Exp, 11, @$.first_line, $1, $2, $3, $4); }
+    | TK_ID TK_LP TK_RP { $$ = SYNTAX_BASIC_ACTION3(Exp, 12, @$.first_line, $1, $2, $3); }
+    | Exp TK_LB Exp TK_RB { $$ = SYNTAX_BASIC_ACTION4(Exp, 13, @$.first_line, $1, $2, $3, $4); }
+    | Exp TK_DOT TK_ID { $$ = SYNTAX_BASIC_ACTION3(Exp, 14, @$.first_line, $1, $2, $3); }
+    | TK_ID { $$ = SYNTAX_BASIC_ACTION1(Exp, 15, @$.first_line, $1); }
+    | TK_INT { $$ = SYNTAX_BASIC_ACTION1(Exp, 16, @$.first_line, $1); }
+    | TK_FLOAT { $$ = SYNTAX_BASIC_ACTION1(Exp, 17, @$.first_line, $1); }
 
     | error { FACING_ERROR0($$); }
     ;
 
 Args
-    : Exp TK_COMMA Args { $$ = SYNTAX_BASIC_ACTION3(Args, @$.first_line, $1, $2, $3); }
-    | Exp { $$ = SYNTAX_BASIC_ACTION1(Args, @$.first_line, $1); }
+    : Exp TK_COMMA Args { $$ = SYNTAX_BASIC_ACTION3(Args, 0, @$.first_line, $1, $2, $3); }
+    | Exp { $$ = SYNTAX_BASIC_ACTION1(Args, 1, @$.first_line, $1); }
     ;
 
 %%

@@ -12,7 +12,7 @@
 #define LEX_CREATE_ASTNODE(kind, name, ...)                                    \
     ({                                                                         \
         NSCALL(AstNode, CONCATENATE(creheap_, kind), /, yylineno, TO_GS(name), \
-               STRINGIFY(name), ##__VA_ARGS__);                                \
+               0, ##__VA_ARGS__);                                              \
     })
 #define LEX_CREATE_ASTNODE_STR(name, attr)                                     \
     ({                                                                         \
@@ -39,7 +39,7 @@ static int parse_to_int(const char *str) {
     long ret = strtol(str, &endptr, 0);
     if (*endptr != '\0') {
         printf("Error type A at Line %d: \"%s\" is not a valid integer.\n",
-            yylineno, str);
+               yylineno, str);
         has_lexical_err = true;
         return 0;
     }
@@ -50,7 +50,7 @@ static float parse_to_float(const char *str) {
     float ret = strtof(str, &endptr);
     if (*endptr != '\0') {
         printf("Error type A at Line %d: \"%s\" is not a valid float.\n",
-            yylineno, str);
+               yylineno, str);
         has_lexical_err = true;
         return 0;
     }
@@ -96,7 +96,7 @@ octal 0[0-7]*
 hexadecimal 0[xX][0-9a-fA-F]+
 
 float_normal [0-9]+\.[0-9]+
-float_exp_m [0-9]*\.[0-9]+|[0-9]+\. 
+float_exp_m [0-9]*\.[0-9]+|[0-9]+\.
 float_exp {float_exp_m}[eE]([+-]?)[0-9]+
 
 ident {letter_}({letter_}|{digit})*
@@ -137,7 +137,7 @@ ident {letter_}({letter_}|{digit})*
 ";" { LEX_BASIC_ACTION(SEMI); }
 "," { LEX_BASIC_ACTION(COMMA); }
 "=" { LEX_BASIC_ACTION(ASSIGNOP); }
->|<|>=|<=|==|!= { yylval = LEX_CREATE_ASTNODE(relop, RELOP, parse_to_relop(yytext)); return TK_RELOP; } 
+>|<|>=|<=|==|!= { yylval = LEX_CREATE_ASTNODE(relop, RELOP, parse_to_relop(yytext)); return TK_RELOP; }
 "+" { LEX_BASIC_ACTION(PLUS); }
 "-" { LEX_BASIC_ACTION(MINUS); }
 "*" { LEX_BASIC_ACTION(STAR); }

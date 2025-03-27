@@ -60,6 +60,7 @@ APPLY_GRAMMAR_SYMBOL_SYNTAX(DECLVISITOR_SEMRESOLVER_GRAMMAR_SYMBOL_AID);
 
 // Data/flow management
 
+#define PROD_ID() (node->production_id)
 #define NUM_CHILDREN() (node->children.size)
 #define DATA_CHILD(idx)                                                        \
     ({                                                                         \
@@ -111,6 +112,11 @@ APPLY_GRAMMAR_SYMBOL_SYNTAX(DECLVISITOR_SEMRESOLVER_GRAMMAR_SYMBOL_AID);
     self->cur_symtab_idx = CALL(SymbolManager, *self->symbol_manager,          \
                                 add_table, /, self->cur_symtab_idx)
 #define POP_SYMTAB() self->cur_symtab_idx = orig_symtab_idx
+
+#define DISPATCH_ENTRY(gs, id)                                                 \
+    case id:                                                                   \
+        DISPATCH(CONCATENATE3(gs, Case, id));                                  \
+        break;
 
 /* ------ */
 
@@ -218,6 +224,7 @@ void MTD(SemResolver, insert_var_dec, /, String *symbol_name, usize type_idx,
             CALL(SymbolTable, *now_symtab, insert, /, key_to_insert,
                  SymbolEntryVar, type_idx);
         ASSERT(result.inserted, "insertion shall be successful");
+        node->symentry_ptr = &result.node->value;
     }
 }
 
@@ -229,12 +236,12 @@ VISITOR(Program) {
     SAVE_TYPE_BASIC(void);
 }
 
-// ExtDefList -> ExtDef ExtDefList
-// ExtDefList -> \epsilon
+// 0. ExtDefList -> ExtDef ExtDefList
+// 1. ExtDefList -> \epsilon
 VISITOR(ExtDefList) {
     NOINFO;
     SAVE_SYMTAB();
-    if (NUM_CHILDREN() == 2) {
+    if (PROD_ID() == 0) {
         // ExtDefList -> ExtDef ExtDefList
         VISIT_CHILD(ExtDef, 0);
         VISIT_CHILD(ExtDefList, 1);
@@ -245,7 +252,7 @@ VISITOR(ExtDefList) {
 }
 
 // ExtDef -> Specifier ExtDecList SEMI
-VISITOR(ExtDefCase1) {
+VISITOR(ExtDefCase0) {
     NOINFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Specifier, 0);
@@ -257,7 +264,7 @@ VISITOR(ExtDefCase1) {
 }
 
 // ExtDef -> Specifier SEMI
-VISITOR(ExtDefCase2) {
+VISITOR(ExtDefCase1) {
     NOINFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Specifier, 0);
@@ -265,7 +272,7 @@ VISITOR(ExtDefCase2) {
 }
 
 // ExtDef -> Specifier FunDec CompSt
-VISITOR(ExtDefCase3) {
+VISITOR(ExtDefCase2) {
     NOINFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Specifier, 0);
@@ -284,7 +291,7 @@ VISITOR(ExtDefCase3) {
 }
 
 // ExtDef -> Specifier FunDec SEMI
-VISITOR(ExtDefCase4) {
+VISITOR(ExtDefCase3) {
     NOINFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Specifier, 0);
@@ -296,28 +303,23 @@ VISITOR(ExtDefCase4) {
 }
 
 // ExtDef Dispatcher
-// - ExtDef -> Specifier ExtDecList SEMI
-// - ExtDef -> Specifier SEMI
-// - ExtDef -> Specifier FunDec CompSt
-// - ExtDef -> Specifier FunDec SEMI
+// 0. ExtDef -> Specifier ExtDecList SEMI
+// 1. ExtDef -> Specifier SEMI
+// 2. ExtDef -> Specifier FunDec CompSt
+// 3. ExtDef -> Specifier FunDec SEMI
 VISITOR(ExtDef) {
-    if (NUM_CHILDREN() == 2) {
-        // ExtDef -> Specifier SEMI
-        DISPATCH(ExtDefCase2);
-    } else if (DATA_CHILD(1)->grammar_symbol == GS_ExtDecList) {
-        // ExtDef -> Specifier ExtDecList SEMI
-        DISPATCH(ExtDefCase1);
-    } else if (DATA_CHILD(2)->grammar_symbol == GS_CompSt) {
-        // ExtDef -> Specifier FunDec CompSt
-        DISPATCH(ExtDefCase3);
-    } else {
-        // ExtDef -> Specifier FunDec SEMI
-        DISPATCH(ExtDefCase4);
+    switch (PROD_ID()) {
+        DISPATCH_ENTRY(ExtDef, 0);
+        DISPATCH_ENTRY(ExtDef, 1);
+        DISPATCH_ENTRY(ExtDef, 2);
+        DISPATCH_ENTRY(ExtDef, 3);
+    default:
+        PANIC("unexpected production id");
     }
 }
 
-// ExtDecList -> VarDec COMMA ExtDecList
-// ExtDecList -> VarDec
+// 0. ExtDecList -> VarDec
+// 1. ExtDecList -> VarDec COMMA ExtDecList
 VISITOR(ExtDecList) {
     INFO;
     SAVE_SYMTAB();
@@ -330,7 +332,7 @@ VISITOR(ExtDecList) {
     CALL(SemResolver, *self, insert_var_dec, /, symbol_name, var_type_idx, node,
          info);
 
-    if (NUM_CHILDREN() == 3) {
+    if (PROD_ID() == 1) {
         // ExtDecList -> VarDec COMMA ExtDecList
         VISIT_WITH(ExtDecList, 2, info);
     } else {
@@ -340,7 +342,7 @@ VISITOR(ExtDecList) {
 }
 
 // Specifier -> TYPE
-VISITOR(SpecifierCase1) {
+VISITOR(SpecifierCase0) {
     NOINFO;
     SAVE_SYMTAB();
     const char *type_str = DATA_CHILD(0)->str_val.data;
@@ -352,28 +354,28 @@ VISITOR(SpecifierCase1) {
 }
 
 // Specifier -> StructSpecifier
-VISITOR(SpecifierCase2) {
+VISITOR(SpecifierCase1) {
     NOINFO;
     SAVE_SYMTAB();
     VISIT_CHILD(StructSpecifier, 0);
+    node->symentry_ptr = DATA_CHILD(0)->symentry_ptr;
     SAVE_TYPE_CHILD(0);
 }
 
 // Specifier Dispatcher
-// - Specifier -> TYPE
-// - Specifier -> StructSpecifier
+// 0. Specifier -> TYPE
+// 1. Specifier -> StructSpecifier
 VISITOR(Specifier) {
-    if (DATA_CHILD(0)->grammar_symbol == GS_TYPE) {
-        // Specifier -> TYPE
-        DISPATCH(SpecifierCase1);
-    } else {
-        // Specifier -> StructSpecifier
-        DISPATCH(SpecifierCase2);
+    switch (PROD_ID()) {
+        DISPATCH_ENTRY(Specifier, 0);
+        DISPATCH_ENTRY(Specifier, 1);
+    default:
+        PANIC("unexpected production id");
     }
 }
 
 // StructSpecifier -> STRUCT OptTag LC DefList RC
-VISITOR(StructSpecifierCase1) {
+VISITOR(StructSpecifierCase0) {
     NOINFO;
     SAVE_SYMTAB();
 
@@ -415,6 +417,7 @@ VISITOR(StructSpecifierCase1) {
                 CALL(SymbolTable, *top_symtab, insert, /, key_to_insert,
                      SymbolEntryStruct, struct_type_idx);
             ASSERT(result.inserted, "insertion shall be successful");
+            node->symentry_ptr = &result.node->value;
         } else {
             report_semerr_fmt(node->line_no, SemErrorStructRedef,
                               "redefinition of struct \"%s\"",
@@ -428,7 +431,7 @@ VISITOR(StructSpecifierCase1) {
 }
 
 // StructSpecifier -> STRUCT Tag
-VISITOR(StructSpecifierCase2) {
+VISITOR(StructSpecifierCase1) {
     NOINFO;
     SAVE_SYMTAB();
 
@@ -456,24 +459,23 @@ VISITOR(StructSpecifierCase2) {
 }
 
 // StructSpecifier Dispatcher
-// - StructSpecifier -> STRUCT OptTag LC DefList RC
-// - StructSpecifier -> STRUCT Tag
+// 0. StructSpecifier -> STRUCT OptTag LC DefList RC
+// 1. StructSpecifier -> STRUCT Tag
 VISITOR(StructSpecifier) {
-    if (NUM_CHILDREN() == 5) {
-        // StructSpecifier -> STRUCT OptTag LC DefList RC
-        DISPATCH(StructSpecifierCase1);
-    } else {
-        // StructSpecifier -> STRUCT Tag
-        DISPATCH(StructSpecifierCase2);
+    switch (PROD_ID()) {
+        DISPATCH_ENTRY(StructSpecifier, 0);
+        DISPATCH_ENTRY(StructSpecifier, 1);
+    default:
+        PANIC("unexpected production id");
     }
 }
 
-// OptTag -> ID
-// OptTag -> \epsilon
+// 0. OptTag -> ID
+// 1. OptTag -> \epsilon
 VISITOR(OptTag) {
     INFO;
     SAVE_SYMTAB();
-    if (NUM_CHILDREN() == 1) {
+    if (PROD_ID() == 0) {
         // OptTag -> ID
         info->gen_symbol_str = &DATA_CHILD(0)->str_val;
     } else {
@@ -492,7 +494,7 @@ VISITOR(Tag) {
 }
 
 // VarDec -> ID
-VISITOR(VarDecCase1) {
+VISITOR(VarDecCase0) {
     INFO;
     SAVE_SYMTAB();
 
@@ -502,7 +504,7 @@ VISITOR(VarDecCase1) {
 }
 
 // VarDec -> VarDec LB INT RB
-VISITOR(VarDecCase2) {
+VISITOR(VarDecCase1) {
     INFO;
     SAVE_SYMTAB();
 
@@ -521,20 +523,19 @@ VISITOR(VarDecCase2) {
 }
 
 // VarDec Dispatcher
-// - VarDec -> ID
-// - VarDec -> VarDec LB INT RB
+// 0. VarDec -> ID
+// 1. VarDec -> VarDec LB INT RB
 VISITOR(VarDec) {
-    if (NUM_CHILDREN() == 1) {
-        // VarDec -> ID
-        DISPATCH(VarDecCase1);
-    } else {
-        // VarDec -> VarDec LB INT RB
-        DISPATCH(VarDecCase2);
+    switch (PROD_ID()) {
+        DISPATCH_ENTRY(VarDec, 0);
+        DISPATCH_ENTRY(VarDec, 1);
+    default:
+        PANIC("unexpected production id");
     }
 }
 
-// FunDec -> ID LP VarList RP
-// FunDec -> ID LP RP
+// 0. FunDec -> ID LP VarList RP
+// 1. FunDec -> ID LP RP
 VISITOR(FunDec) {
     INFO;
     SAVE_SYMTAB();
@@ -552,7 +553,7 @@ VISITOR(FunDec) {
     PUSH_SYMTAB();
     info->gen_symtab_idx = self->cur_symtab_idx;
 
-    if (NUM_CHILDREN() == 4) {
+    if (PROD_ID() == 0) {
         // FunDec -> ID LP VarList RP
         NEW_SINFO(func_type_idx, -1, false, false);
         VISIT_WITH(VarList, 2, &sinfo);
@@ -583,6 +584,7 @@ VISITOR(FunDec) {
             CALL(SymbolTable, *now_symtab, insert, /, key_to_insert,
                  SymbolEntryFun, func_type_idx);
         ASSERT(result.inserted, "insertion shall be successful");
+        node->symentry_ptr = &result.node->value;
 
         SymbolEntry *entry = &result.node->value;
 
@@ -623,13 +625,13 @@ VISITOR(FunDec) {
     SAVE_TYPE(func_type_idx);
 }
 
-// VarList -> ParamDec COMMA VarList
-// VarList -> ParamDec
+// 0. VarList -> ParamDec COMMA VarList
+// 1. VarList -> ParamDec
 VISITOR(VarList) {
     INFO;
     SAVE_SYMTAB();
     VISIT_WITH(ParamDec, 0, info);
-    if (NUM_CHILDREN() == 3) {
+    if (PROD_ID() == 0) {
         // VarList -> ParamDec COMMA VarList
         VISIT_WITH(VarList, 2, info);
     } else {
@@ -677,12 +679,12 @@ VISITOR(CompSt) {
     SAVE_TYPE_BASIC(void);
 }
 
-// StmtList -> Stmt StmtList
-// StmtList -> \epsilon
+// 0. StmtList -> Stmt StmtList
+// 1. StmtList -> \epsilon
 VISITOR(StmtList) {
     INFO;
     SAVE_SYMTAB();
-    if (NUM_CHILDREN() == 2) {
+    if (PROD_ID() == 0) {
         // StmtList -> Stmt StmtList
         VISIT_WITH(Stmt, 0, info);
         VISIT_WITH(StmtList, 1, info);
@@ -694,7 +696,7 @@ VISITOR(StmtList) {
 }
 
 // Stmt -> Exp SEMI
-VISITOR(StmtCase1) {
+VISITOR(StmtCase0) {
     INFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Exp, 0);
@@ -702,7 +704,7 @@ VISITOR(StmtCase1) {
 }
 
 // Stmt -> CompSt
-VISITOR(StmtCase2) {
+VISITOR(StmtCase1) {
     INFO;
     SAVE_SYMTAB();
 
@@ -714,7 +716,7 @@ VISITOR(StmtCase2) {
 }
 
 // Stmt -> RETURN Exp SEMI
-VISITOR(StmtCase3) {
+VISITOR(StmtCase2) {
     INFO;
     SAVE_SYMTAB();
 
@@ -733,7 +735,7 @@ VISITOR(StmtCase3) {
 }
 
 // Stmt -> IF LP Exp RP Stmt
-VISITOR(StmtCase4) {
+VISITOR(StmtCase3) {
     INFO;
     SAVE_SYMTAB();
 
@@ -750,7 +752,7 @@ VISITOR(StmtCase4) {
 }
 
 // Stmt -> IF LP Exp RP Stmt ELSE Stmt
-VISITOR(StmtCase5) {
+VISITOR(StmtCase4) {
     INFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Exp, 2);
@@ -766,7 +768,7 @@ VISITOR(StmtCase5) {
 }
 
 // Stmt -> WHILE LP Exp RP Stmt
-VISITOR(StmtCase6) {
+VISITOR(StmtCase5) {
     INFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Exp, 2);
@@ -781,41 +783,32 @@ VISITOR(StmtCase6) {
 }
 
 // Stmt Dispatcher
-// - Stmt -> Exp SEMI
-// - Stmt -> CompSt
-// - Stmt -> RETURN Exp SEMI
-// - Stmt -> IF LP Exp RP Stmt
-// - Stmt -> IF LP Exp RP Stmt ELSE Stmt
-// - Stmt -> WHILE LP Exp RP Stmt
+// 0. Stmt -> Exp SEMI
+// 1. Stmt -> CompSt
+// 2. Stmt -> RETURN Exp SEMI
+// 3. Stmt -> IF LP Exp RP Stmt
+// 4. Stmt -> IF LP Exp RP Stmt ELSE Stmt
+// 5. Stmt -> WHILE LP Exp RP Stmt
 VISITOR(Stmt) {
-    if (NUM_CHILDREN() == 2) {
-        // Stmt -> Exp SEMI
-        DISPATCH(StmtCase1);
-    } else if (NUM_CHILDREN() == 1) {
-        // Stmt -> CompSt
-        DISPATCH(StmtCase2);
-    } else if (NUM_CHILDREN() == 3) {
-        // Stmt -> RETURN Exp SEMI
-        DISPATCH(StmtCase3);
-    } else if (NUM_CHILDREN() == 7) {
-        // Stmt -> IF LP Exp RP Stmt ELSE Stmt
-        DISPATCH(StmtCase5);
-    } else if (DATA_CHILD(0)->grammar_symbol == GS_IF) {
-        // Stmt -> IF LP Exp RP Stmt
-        DISPATCH(StmtCase4);
-    } else {
-        // Stmt -> WHILE LP Exp RP Stmt
-        DISPATCH(StmtCase6);
+    switch (PROD_ID()) {
+        DISPATCH_ENTRY(Stmt, 0);
+        DISPATCH_ENTRY(Stmt, 1);
+        DISPATCH_ENTRY(Stmt, 2);
+        DISPATCH_ENTRY(Stmt, 3);
+        DISPATCH_ENTRY(Stmt, 4);
+        DISPATCH_ENTRY(Stmt, 5);
+    default:
+        PANIC("unexpected production id");
     }
 }
 
-// DefList -> Def DefList
-// DefList -> \epsilon
+// 0. DefList -> Def DefList
+// 1. DefList -> \epsilon
 VISITOR(DefList) {
     INFO;
     SAVE_SYMTAB();
 
-    if (NUM_CHILDREN() == 2) {
+    if (PROD_ID() == 0) {
         // DefList -> Def DefList
         VISIT_WITH(Def, 0, info);
         VISIT_WITH(DefList, 1, info);
@@ -841,13 +834,13 @@ VISITOR(Def) {
     SAVE_TYPE_BASIC(void);
 }
 
-// DecList -> Dec
-// DecList -> Dec COMMA DecList
+// 0. DecList -> Dec
+// 1. DecList -> Dec COMMA DecList
 VISITOR(DecList) {
     INFO;
     SAVE_SYMTAB();
     VISIT_WITH(Dec, 0, info);
-    if (NUM_CHILDREN() == 3) {
+    if (PROD_ID() == 1) {
         // DecList -> Dec COMMA DecList
         VISIT_WITH(DecList, 2, info);
     } else {
@@ -858,7 +851,7 @@ VISITOR(DecList) {
 }
 
 // Dec -> VarDec
-VISITOR(DecCase1) {
+VISITOR(DecCase0) {
     INFO;
     SAVE_SYMTAB();
 
@@ -881,7 +874,7 @@ VISITOR(DecCase1) {
 }
 
 // Dec -> VarDec ASSIGNOP Exp
-VISITOR(DecCase2) {
+VISITOR(DecCase1) {
     INFO;
     SAVE_SYMTAB();
 
@@ -921,32 +914,20 @@ VISITOR(DecCase2) {
 }
 
 // Dec Dispatcher
-// - Dec -> VarDec
-// - Dec -> VarDec ASSIGNOP Exp
+// 0 Dec -> VarDec
+// 1 Dec -> VarDec ASSIGNOP Exp
 VISITOR(Dec) {
-    if (NUM_CHILDREN() == 1) {
-        // Dec -> VarDec
-        DISPATCH(DecCase1);
-    } else {
-        // Dec -> VarDec ASSIGNOP Exp
-        DISPATCH(DecCase2);
+    switch (PROD_ID()) {
+        DISPATCH_ENTRY(Dec, 0);
+        DISPATCH_ENTRY(Dec, 1);
+    default:
+        PANIC("unexpected production id");
     }
 }
 
 static bool MTD(SemResolver, is_lvalue, /, AstNode *node) {
-    if (node->grammar_symbol != GS_Exp) {
-        return false;
-    }
-    if (NUM_CHILDREN() == 1 && DATA_CHILD(0)->grammar_symbol == GS_ID) {
-        return true;
-    }
-    if (NUM_CHILDREN() == 4 && DATA_CHILD(1)->grammar_symbol == GS_LB) {
-        return true;
-    }
-    if (NUM_CHILDREN() == 3 && DATA_CHILD(1)->grammar_symbol == GS_DOT) {
-        return true;
-    }
-    return false;
+    return node->grammar_symbol == GS_Exp &&
+           (PROD_ID() == 13 || PROD_ID() == 14 || PROD_ID() == 15);
 }
 
 #define PREPARE_BINARY                                                         \
@@ -1000,7 +981,7 @@ static bool MTD(SemResolver, is_arith_type_with_error, /, AstNode *node,
 }
 
 // Exp -> Exp ASSIGNOP Exp
-VISITOR(ExpASSIGNOP) {
+VISITOR(ExpCase0) {
     PREPARE_BINARY;
 
     if (!CALL(TypeManager, *self->type_manager, is_type_consistency, /,
@@ -1021,7 +1002,7 @@ VISITOR(ExpASSIGNOP) {
 }
 
 // Exp -> Exp AND Exp
-VISITOR(ExpAND) {
+VISITOR(ExpCase1) {
     PREPARE_BINARY;
     if (!CALL(SemResolver, *self, is_int_type, /, left_type_idx) ||
         !CALL(SemResolver, *self, is_int_type, /, right_type_idx)) {
@@ -1033,7 +1014,7 @@ VISITOR(ExpAND) {
 }
 
 // Exp -> Exp OR Exp
-VISITOR(ExpOR) {
+VISITOR(ExpCase2) {
     PREPARE_BINARY;
     if (!CALL(SemResolver, *self, is_int_type, /, left_type_idx) ||
         !CALL(SemResolver, *self, is_int_type, /, right_type_idx)) {
@@ -1051,7 +1032,7 @@ VISITOR(ExpOR) {
     }
 
 // Exp -> Exp RELOP Exp
-VISITOR(ExpRELOP) {
+VISITOR(ExpCase3) {
     PREPARE_BINARY;
     ARITH_CHECK;
     syn_type_idx = self->type_manager->int_type_idx;
@@ -1059,35 +1040,35 @@ VISITOR(ExpRELOP) {
 }
 
 // Exp -> Exp PLUS Exp
-VISITOR(ExpPLUS) {
+VISITOR(ExpCase4) {
     PREPARE_BINARY;
     ARITH_CHECK;
     FINISH_BINARY;
 }
 
 // Exp -> Exp MINUS Exp
-VISITOR(ExpMINUS) {
+VISITOR(ExpCase5) {
     PREPARE_BINARY;
     ARITH_CHECK;
     FINISH_BINARY;
 }
 
 // Exp -> Exp STAR Exp
-VISITOR(ExpSTAR) {
+VISITOR(ExpCase6) {
     PREPARE_BINARY;
     ARITH_CHECK;
     FINISH_BINARY;
 }
 
 // Exp -> Exp DIV Exp
-VISITOR(ExpDIV) {
+VISITOR(ExpCase7) {
     PREPARE_BINARY;
     ARITH_CHECK;
     FINISH_BINARY;
 }
 
 // Exp -> LP Exp RP
-VISITOR(ExpParen) {
+VISITOR(ExpCase8) {
     NOINFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Exp, 1);
@@ -1095,7 +1076,7 @@ VISITOR(ExpParen) {
 }
 
 // Exp -> MINUS Exp
-VISITOR(ExpUMINUS) {
+VISITOR(ExpCase9) {
     NOINFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Exp, 1);
@@ -1111,7 +1092,7 @@ VISITOR(ExpUMINUS) {
 }
 
 // Exp -> NOT Exp
-VISITOR(ExpNOT) {
+VISITOR(ExpCase10) {
     NOINFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Exp, 1);
@@ -1125,9 +1106,9 @@ VISITOR(ExpNOT) {
     }
 }
 
-// Exp -> ID LP Args RP
-// Exp -> ID LP RP
-VISITOR(ExpCall) {
+// 11. Exp -> ID LP Args RP
+// 12. Exp -> ID LP RP
+VISITOR(ExpCase11_12) {
     NOINFO;
     SAVE_SYMTAB();
 
@@ -1137,7 +1118,7 @@ VISITOR(ExpCall) {
     CALL(TypeManager, *self->type_manager, add_fun_ret_par, /, call_type_idx,
          self->type_manager->void_type_idx);
 
-    if (NUM_CHILDREN() == 4) {
+    if (PROD_ID() == 11) {
         // Exp -> ID LP Args RP
         NEW_SINFO(call_type_idx, -1, false, false);
         VISIT_WITH(Args, 2, &sinfo);
@@ -1167,6 +1148,8 @@ VISITOR(ExpCall) {
         report_semerr_fmt(node->line_no, SemErrorCallArgParaMismatch,
                           "conflicting types for function \"%s\"",
                           STRING_C_STR(*name));
+    } else {
+        node->symentry_ptr = &it->value;
     }
 
     // if correctly match, check_type_consistency_with_fun_fix will fix the
@@ -1185,7 +1168,7 @@ VISITOR(ExpCall) {
 }
 
 // Exp -> Exp LB Exp RB
-VISITOR(ExpIndex) {
+VISITOR(ExpCase13) {
     NOINFO;
     SAVE_SYMTAB();
 
@@ -1217,7 +1200,7 @@ VISITOR(ExpIndex) {
 }
 
 // Exp -> Exp DOT ID
-VISITOR(ExpField) {
+VISITOR(ExpCase14) {
     NOINFO;
     SAVE_SYMTAB();
     VISIT_CHILD(Exp, 0);
@@ -1249,13 +1232,14 @@ VISITOR(ExpField) {
             SAVE_TYPE_BASIC(void);
         } else {
             usize field_type_idx = it->value.type_idx;
+            node->symentry_ptr = &it->value;
             SAVE_TYPE(field_type_idx);
         }
     }
 }
 
 // Exp -> ID
-VISITOR(ExpID) {
+VISITOR(ExpCase15) {
     NOINFO;
     SAVE_SYMTAB();
 
@@ -1277,133 +1261,75 @@ VISITOR(ExpID) {
                           "\"%s\" is not a variable", STRING_C_STR(*name));
         SAVE_TYPE_BASIC(void);
     } else {
+        node->symentry_ptr = &it->value;
         SAVE_TYPE(it->value.type_idx);
     }
 }
 
 // Exp -> INT
-VISITOR(ExpINT) {
+VISITOR(ExpCase16) {
     NOINFO;
     SAVE_SYMTAB();
     SAVE_TYPE_BASIC(int);
 }
 
 // Exp -> FLOAT
-VISITOR(ExpFLOAT) {
+VISITOR(ExpCase17) {
     NOINFO;
     SAVE_SYMTAB();
     SAVE_TYPE_BASIC(float);
 }
 
 // Exp Dispatcher
-// 1. Exp -> Exp ASSIGNOP Exp
-// 2. Exp -> Exp AND Exp
-// 3. Exp -> Exp OR Exp
-// 4. Exp -> Exp RELOP Exp
-// 5. Exp -> Exp PLUS Exp
-// 6. Exp -> Exp MINUS Exp
-// 7. Exp -> Exp STAR Exp
-// 8. Exp -> Exp DIV Exp
-// 9. Exp -> LP Exp RP
-// 10. Exp -> MINUS Exp
-// 11. Exp -> NOT Exp
-// 12. Exp -> ID LP Args RP
-// 13. Exp -> ID LP RP
-// 14. Exp -> Exp LB Exp RB
-// 15. Exp -> Exp DOT ID
-// 16. Exp -> ID
-// 17. Exp -> INT
-// 18. Exp -> FLOAT
+// 0. Exp -> Exp ASSIGNOP Exp
+// 1. Exp -> Exp AND Exp
+// 2. Exp -> Exp OR Exp
+// 3. Exp -> Exp RELOP Exp
+// 4. Exp -> Exp PLUS Exp
+// 5. Exp -> Exp MINUS Exp
+// 6. Exp -> Exp STAR Exp
+// 7. Exp -> Exp DIV Exp
+// 8. Exp -> LP Exp RP
+// 9. Exp -> MINUS Exp
+// 10. Exp -> NOT Exp
+// 11. Exp -> ID LP Args RP
+// 12. Exp -> ID LP RP
+// 13. Exp -> Exp LB Exp RB
+// 14. Exp -> Exp DOT ID
+// 15. Exp -> ID
+// 16. Exp -> INT
+// 17. Exp -> FLOAT
 VISITOR(Exp) {
-    if (NUM_CHILDREN() == 3) {
-        switch (DATA_CHILD(1)->grammar_symbol) {
-        case GS_ASSIGNOP:
-            // Exp -> Exp ASSIGNOP Exp
-            DISPATCH(ExpASSIGNOP);
-            break;
-        case GS_AND:
-            // Exp -> Exp AND Exp
-            DISPATCH(ExpAND);
-            break;
-        case GS_OR:
-            // Exp -> Exp OR Exp
-            DISPATCH(ExpOR);
-            break;
-        case GS_RELOP:
-            // Exp -> Exp RELOP Exp
-            DISPATCH(ExpRELOP);
-            break;
-        case GS_PLUS:
-            // Exp -> Exp PLUS Exp
-            DISPATCH(ExpPLUS);
-            break;
-        case GS_MINUS:
-            // Exp -> Exp MINUS Exp
-            DISPATCH(ExpMINUS);
-            break;
-        case GS_STAR:
-            // Exp -> Exp STAR Exp
-            DISPATCH(ExpSTAR);
-            break;
-        case GS_DIV:
-            // Exp -> Exp DIV Exp
-            DISPATCH(ExpDIV);
-            break;
-        case GS_Exp:
-            // Exp -> LP Exp RP
-            DISPATCH(ExpParen);
-            break;
-        case GS_LP:
-            // Exp -> ID LP RP
-            DISPATCH(ExpCall);
-            break;
-        case GS_DOT:
-            // Exp -> Exp DOT ID
-            DISPATCH(ExpField);
-            break;
-        default:
-            PANIC("unexpected grammar symbol");
-        }
-    } else if (NUM_CHILDREN() == 2) {
-        if (DATA_CHILD(0)->grammar_symbol == GS_MINUS) {
-            // Exp -> MINUS Exp
-            DISPATCH(ExpUMINUS);
-        } else if (DATA_CHILD(0)->grammar_symbol == GS_NOT) {
-            // Exp -> NOT Exp
-            DISPATCH(ExpNOT);
-        } else {
-            PANIC("unexpected grammar symbol");
-        }
-    } else if (NUM_CHILDREN() == 1) {
-        if (DATA_CHILD(0)->grammar_symbol == GS_ID) {
-            // Exp -> ID
-            DISPATCH(ExpID);
-        } else if (DATA_CHILD(0)->grammar_symbol == GS_INT) {
-            // Exp -> INT
-            DISPATCH(ExpINT);
-        } else if (DATA_CHILD(0)->grammar_symbol == GS_FLOAT) {
-            // Exp -> FLOAT
-            DISPATCH(ExpFLOAT);
-        } else {
-            PANIC("unexpected grammar symbol");
-        }
-    } else if (NUM_CHILDREN() == 4) {
-        if (DATA_CHILD(1)->grammar_symbol == GS_LP) {
-            // Exp -> ID LP Args RP
-            DISPATCH(ExpCall);
-        } else if (DATA_CHILD(1)->grammar_symbol == GS_LB) {
-            // Exp -> Exp LB Exp RB
-            DISPATCH(ExpIndex);
-        } else {
-            PANIC("unexpected grammar symbol");
-        }
-    } else {
-        PANIC("unexpected number of children");
+    switch (PROD_ID()) {
+        DISPATCH_ENTRY(Exp, 0);
+        DISPATCH_ENTRY(Exp, 1);
+        DISPATCH_ENTRY(Exp, 2);
+        DISPATCH_ENTRY(Exp, 3);
+        DISPATCH_ENTRY(Exp, 4);
+        DISPATCH_ENTRY(Exp, 5);
+        DISPATCH_ENTRY(Exp, 6);
+        DISPATCH_ENTRY(Exp, 7);
+        DISPATCH_ENTRY(Exp, 8);
+        DISPATCH_ENTRY(Exp, 9);
+        DISPATCH_ENTRY(Exp, 10);
+
+    case 11:
+    case 12:
+        DISPATCH(ExpCase11_12);
+        break;
+
+        DISPATCH_ENTRY(Exp, 13);
+        DISPATCH_ENTRY(Exp, 14);
+        DISPATCH_ENTRY(Exp, 15);
+        DISPATCH_ENTRY(Exp, 16);
+        DISPATCH_ENTRY(Exp, 17);
+    default:
+        PANIC("unexpected production id");
     }
 }
 
-// Args -> Exp COMMA Args
-// Args -> Exp
+// 0. Args -> Exp COMMA Args
+// 1. Args -> Exp
 VISITOR(Args) {
     INFO;
     SAVE_SYMTAB();
@@ -1416,7 +1342,7 @@ VISITOR(Args) {
     CALL(TypeManager, *self->type_manager, add_fun_ret_par, /, call_type_idx,
          param_type_idx);
 
-    if (NUM_CHILDREN() == 3) {
+    if (PROD_ID() == 0) {
         // Args -> Exp COMMA Args
         VISIT_WITH(Args, 2, info);
     } else {

@@ -30,11 +30,24 @@ typedef struct AstNode {
 
     /* Lex/Syntax Info */
     GrammarSymbol grammar_symbol;
-    const char *grammar_symbol_str;
+    usize production_id;
 
     /* Semantic Info */
     usize symtab_idx;
     usize type_idx;
+
+    // only maybe non-null for grammar_symbols below:
+    // 1. StructSpecifier and its father (Specifier with prod_id 1); the struct
+    // name
+    // 2. ExpDecList, ParamDec, Dec; the declared var name
+    // ---
+    // 3. FunDec; the declared func
+    // 4. Exp (prod_id 11, 12 -- call exprs); the called func name
+    // 5. Exp (prod_id 14 -- field access); the field name
+    // 6. Exp (prod_id 15 -- Exp -> ID); the id name
+    //
+    // The last four are used in IR generation
+    struct SymbolEntry *symentry_ptr;
 
     /* Attribute_value */
     union {
@@ -47,21 +60,17 @@ typedef struct AstNode {
 } AstNode;
 
 AstNode *NSMTD(AstNode, creheap_basic, /, int line_no,
-               GrammarSymbol grammar_symbol, const char *grammar_symbol_str);
+               GrammarSymbol grammar_symbol, int production_id);
 AstNode *NSMTD(AstNode, creheap_int, /, int line_no,
-               GrammarSymbol grammar_symbol, const char *grammar_symbol_str,
-               int val);
+               GrammarSymbol grammar_symbol, int production_id, int val);
 AstNode *NSMTD(AstNode, creheap_float, /, int line_no,
-               GrammarSymbol grammar_symbol, const char *grammar_symbol_str,
-               float val);
+               GrammarSymbol grammar_symbol, int production_id, float val);
 AstNode *NSMTD(AstNode, creheap_string, /, int line_no,
-               GrammarSymbol grammar_symbol, const char *grammar_symbol_str,
-               String val);
+               GrammarSymbol grammar_symbol, int production_id, String val);
 AstNode *NSMTD(AstNode, creheap_relop, /, int line_no,
-               GrammarSymbol grammar_symbol, const char *grammar_symbol_str,
-               RelopKind val);
+               GrammarSymbol grammar_symbol, int production_id, RelopKind val);
 AstNode *NSMTD(AstNode, creheap_inner, /, int line_no,
-               GrammarSymbol grammar_symbol, const char *grammar_symbol_str);
+               GrammarSymbol grammar_symbol, int production_id);
 void MTD(AstNode, add_child, /, AstNode *child);
 void MTD(AstNode, print_subtree, /, usize depth);
 void MTD(AstNode, drop, /);
