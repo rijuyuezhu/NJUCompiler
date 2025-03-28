@@ -2,10 +2,12 @@
 
 #include "symbol.h"
 #include "type.h"
+#include "ir.h"
 #include "utils.h"
 
 typedef struct TaskEngine {
     const char *input_file;
+    const char *ir_file;
 
     // Lexical & Syntax analysis
     struct AstNode *ast_root;
@@ -15,9 +17,13 @@ typedef struct TaskEngine {
     TypeManager type_manager;
     SymbolManager symbol_manager;
     bool semantic_error;
+
+    // gen ir
+    IRManager ir_manager;
+    bool genir_error;
 } TaskEngine;
 
-void MTD(TaskEngine, init, /, const char *file);
+void MTD(TaskEngine, init, /, const char *src_file, const char *ir_file);
 void MTD(TaskEngine, drop, /);
 
 /* Lexical & Syntax */
@@ -25,4 +31,4 @@ void MTD(TaskEngine, parse_ast, /);
 void MTD(TaskEngine, print_ast, /);
 
 /* Semantic */
-void MTD(TaskEngine, analyze_semantic, /);
+void MTD(TaskEngine, analyze_semantic, /, bool add_builtin);

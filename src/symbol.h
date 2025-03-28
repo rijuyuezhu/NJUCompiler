@@ -75,6 +75,9 @@ typedef struct SymbolManager {
     VecSymbolTable tables;
     usize root_idx;
     usize temp_cnt;
+
+    SymbolEntry *read_fun;
+    SymbolEntry *write_fun;
 } SymbolManager;
 
 void MTD(SymbolManager, init, /);

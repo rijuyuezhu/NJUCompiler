@@ -40,7 +40,7 @@ void MTD(SemResolver, init, /, struct TypeManager *type_manager,
 FUNC_STATIC DEFAULT_DROPER(SemResolver);
 
 struct AstNode;
-void MTD(SemResolver, resolve, /, struct AstNode *node);
+void MTD(SemResolver, resolve, /, struct AstNode *node, bool add_builtin);
 
 /* semerr reporter */
 

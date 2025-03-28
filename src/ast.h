@@ -2,6 +2,7 @@
 
 #include "general_vec.h"
 #include "grammar_symbol.h"
+#include "op.h"
 #include "str.h"
 #include "utils.h"
 
@@ -14,15 +15,6 @@ typedef enum AstNodeKind {
     ASTNodeRelop,
     ASTNodeInner,
 } AstNodeKind;
-
-typedef enum RelopKind {
-    RelopGT,
-    RelopLT,
-    RelopGE,
-    RelopLE,
-    RelopEQ,
-    RelopNE,
-} RelopKind;
 
 typedef struct AstNode {
     AstNodeKind kind;

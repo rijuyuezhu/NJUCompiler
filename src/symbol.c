@@ -48,6 +48,9 @@ void MTD(SymbolManager, init, /) {
     CALL(VecSymbolTable, self->tables, init, /);
     self->root_idx = CALL(SymbolManager, *self, add_table, /, SYMTAB_NO_PARENT);
     self->temp_cnt = 0;
+
+    self->read_fun = NULL;
+    self->write_fun = NULL;
 }
 
 void MTD(SymbolManager, drop, /) { DROPOBJ(VecSymbolTable, self->tables); }

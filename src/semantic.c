@@ -120,7 +120,50 @@ APPLY_GRAMMAR_SYMBOL_SYNTAX(DECLVISITOR_SEMRESOLVER_GRAMMAR_SYMBOL_AID);
 
 /* ------ */
 
-void MTD(SemResolver, resolve, /, AstNode *node) {
+void MTD(SemResolver, add_builtin_func, /) {
+    GET_TOPSYMTAB();
+    {
+        // `int read()`
+        usize fun_type_idx =
+            CALL(TypeManager, *self->type_manager, make_fun, /);
+        CALL(TypeManager, *self->type_manager, add_fun_ret_par, /, fun_type_idx,
+             self->type_manager->int_type_idx);
+        CALL(TypeManager, *self->type_manager, fill_in_repr, /, fun_type_idx);
+
+        String s = NSCALL(String, from_raw, /, "read");
+        HString hs = NSCALL(HString, from_inner, /, s);
+        MapSymtabInsertResult result = CALL(SymbolTable, *top_symtab, insert, /,
+                                            hs, SymbolEntryFun, fun_type_idx);
+        ASSERT(result.inserted);
+        result.node->value.as_fun.first_decl_line_no = 0;
+        result.node->value.as_fun.is_defined = true;
+        self->symbol_manager->read_fun = &result.node->value;
+    }
+    // `int write(int)`
+    {
+        usize fun_type_idx =
+            CALL(TypeManager, *self->type_manager, make_fun, /);
+        CALL(TypeManager, *self->type_manager, add_fun_ret_par, /, fun_type_idx,
+             self->type_manager->int_type_idx);
+        CALL(TypeManager, *self->type_manager, add_fun_ret_par, /, fun_type_idx,
+             self->type_manager->int_type_idx);
+        CALL(TypeManager, *self->type_manager, fill_in_repr, /, fun_type_idx);
+
+        String s = NSCALL(String, from_raw, /, "write");
+        HString hs = NSCALL(HString, from_inner, /, s);
+        MapSymtabInsertResult result = CALL(SymbolTable, *top_symtab, insert, /,
+                                            hs, SymbolEntryFun, fun_type_idx);
+        ASSERT(result.inserted);
+        result.node->value.as_fun.first_decl_line_no = 0;
+        result.node->value.as_fun.is_defined = true;
+        self->symbol_manager->write_fun = &result.node->value;
+    }
+}
+
+void MTD(SemResolver, resolve, /, AstNode *node, bool add_builtin) {
+    if (add_builtin) {
+        CALL(SemResolver, *self, add_builtin_func, /);
+    }
     // first, do a visit
     CALL(SemResolver, *self, visit_Program, /, node, NULL);
 
