@@ -357,5 +357,10 @@ void MTD(TypeManager, fill_in_repr, /, usize type_idx) {
     }
 }
 
+Type *MTD(TypeManager, get_type, /, usize type_idx) {
+    ASSERT(type_idx < self->types.size, "type_idx out of range");
+    return &self->types.data[type_idx];
+}
+
 DEFINE_CLASS_VEC(VecType, Type, FUNC_EXTERN);
 DEFINE_MAPPING(MapHTypeUSize, HType, usize, FUNC_EXTERN);

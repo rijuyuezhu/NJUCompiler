@@ -13,7 +13,7 @@ void MTD(TaskEngine, init, /, const char *src_file, const char *ir_file) {
     self->semantic_error = false;
 
     CALL(IRManager, self->ir_manager, init, /);
-    self->genir_error = false;
+    self->gen_ir_error = false;
 }
 
 void MTD(TaskEngine, drop, /) {

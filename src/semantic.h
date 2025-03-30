@@ -3,6 +3,10 @@
 
 #include "utils.h"
 
+struct TypeManager;
+struct SymbolManager;
+struct AstNode;
+
 typedef enum SemError {
     SemErrorInvalid = 0,
     SemErrorVarUndef = 1,
@@ -39,7 +43,6 @@ void MTD(SemResolver, init, /, struct TypeManager *type_manager,
          struct SymbolManager *symbol_manager);
 FUNC_STATIC DEFAULT_DROPER(SemResolver);
 
-struct AstNode;
 void MTD(SemResolver, resolve, /, struct AstNode *node, bool add_builtin);
 
 /* semerr reporter */

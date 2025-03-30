@@ -1,9 +1,10 @@
 #pragma once
-#include "general_vec.h"
 #include "str.h"
 #include "tem_map.h"
 #include "tem_vec.h"
 #include "utils.h"
+
+struct SymbolManager;
 
 /* SymbolEntry */
 
@@ -61,8 +62,6 @@ MapSymtabInsertResult MTD(SymbolTable, insert, /, HString name,
                           SymbolEntryKind kind, usize type_idx);
 
 MapSymtabIterator MTD(SymbolTable, find, /, HString *name);
-
-struct SymbolManager;
 
 MapSymtabIterator MTD(SymbolTable, find_recursive, /, HString *name,
                       struct SymbolManager *manager);

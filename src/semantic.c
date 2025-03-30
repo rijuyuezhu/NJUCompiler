@@ -47,6 +47,11 @@ void MTD(SemResolver, init, /, TypeManager *type_manager,
 #define DISPATCH(gs)                                                           \
     ({ CALL(SemResolver, *self, CONCATENATE(visit_, gs), /, node, info); })
 
+#define DISPATCH_ENTRY(gs, id)                                                 \
+    case id:                                                                   \
+        DISPATCH(CONCATENATE3(gs, Case, id));                                  \
+        break;
+
 // Declare Visitor functions;
 // e.g. void MTD(SemResolver, visit_SEMI, /, AstNode * node); etc
 #define DECLVISITOR_SEMRESOLVER_GRAMMAR_SYMBOL_AID(gs) VISITOR(gs);
@@ -112,11 +117,6 @@ APPLY_GRAMMAR_SYMBOL_SYNTAX(DECLVISITOR_SEMRESOLVER_GRAMMAR_SYMBOL_AID);
     self->cur_symtab_idx = CALL(SymbolManager, *self->symbol_manager,          \
                                 add_table, /, self->cur_symtab_idx)
 #define POP_SYMTAB() self->cur_symtab_idx = orig_symtab_idx
-
-#define DISPATCH_ENTRY(gs, id)                                                 \
-    case id:                                                                   \
-        DISPATCH(CONCATENATE3(gs, Case, id));                                  \
-        break;
 
 /* ------ */
 

@@ -5,6 +5,8 @@
 #include "tem_vec.h"
 #include "utils.h"
 
+struct TypeManager;
+
 /* Type */
 
 typedef enum TypeKind {
@@ -40,8 +42,6 @@ FUNC_STATIC DEFAULT_INITIALIZER(Type);
 void MTD(Type, clone_from, /, const Type *other);
 FUNC_STATIC DEFAULT_DERIVE_CLONE(Type, /);
 DECLARE_CLASS_VEC(VecType, Type, FUNC_EXTERN);
-
-struct TypeManager;
 
 void MTD(Type, drop, /);
 Type NSMTD(Type, make_array, /, struct TypeManager *manager, usize size,
@@ -91,8 +91,4 @@ bool MTD(TypeManager, is_type_consistency, /, usize type_idx1, usize type_idx2);
 bool MTD(TypeManager, is_type_consistency_with_fun_fix, /, usize type_idx1,
          usize type_idx2);
 void MTD(TypeManager, fill_in_repr, /, usize type_idx);
-
-FUNC_STATIC Type *MTD(TypeManager, get_type, /, usize type_idx) {
-    ASSERT(type_idx < self->types.size, "type_idx out of range");
-    return &self->types.data[type_idx];
-}
+Type *MTD(TypeManager, get_type, /, usize type_idx);

@@ -1,8 +1,8 @@
 #pragma once
 
+#include "ir.h"
 #include "symbol.h"
 #include "type.h"
-#include "ir.h"
 #include "utils.h"
 
 typedef struct TaskEngine {
@@ -20,7 +20,7 @@ typedef struct TaskEngine {
 
     // gen ir
     IRManager ir_manager;
-    bool genir_error;
+    bool gen_ir_error;
 } TaskEngine;
 
 void MTD(TaskEngine, init, /, const char *src_file, const char *ir_file);
@@ -32,3 +32,6 @@ void MTD(TaskEngine, print_ast, /);
 
 /* Semantic */
 void MTD(TaskEngine, analyze_semantic, /, bool add_builtin);
+
+/* Gen IR */
+void MTD(TaskEngine, gen_ir, /);
