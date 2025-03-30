@@ -207,6 +207,10 @@ void MTD(SemResolver, insert_var_dec, /, String *symbol_name, usize type_idx,
                it->value.table != now_symtab) {
         can_insert_in = true;
     } else {
+        if (it->value.kind == SymbolEntryStruct &&
+            it->value.table != now_symtab) {
+            can_insert_in = true;
+        }
         if (info->is_in_struct) {
             report_semerr_fmt(node->line_no, SemErrorStructDefWrong,
                               "redefinition of field \"%s\"",
