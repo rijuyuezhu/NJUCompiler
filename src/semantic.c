@@ -409,14 +409,12 @@ VISITOR(StructSpecifierCase0) {
         HString key = NSCALL(HString, from_inner, /, *struct_tag);
 
         // check if the struct is already defined
-        GET_SYMTAB();
-        MapSymtabIterator it = CALL(SymbolTable, *now_symtab, find_recursive, /,
-                                    &key, self->symbol_manager);
+        GET_TOPSYMTAB();
+        MapSymtabIterator it = CALL(SymbolTable, *top_symtab, find, /, &key);
         if (it == NULL) {
             // ok to insert it (in the top symtab)
             HString key_to_insert = CALL(HString, key, clone, /);
 
-            GET_TOPSYMTAB();
             MapSymtabInsertResult result =
                 CALL(SymbolTable, *top_symtab, insert, /, key_to_insert,
                      SymbolEntryStruct, struct_type_idx);
@@ -449,9 +447,8 @@ VISITOR(StructSpecifierCase1) {
     HString key = NSCALL(HString, from_inner, /, *struct_tag);
 
     // check if the struct is already defined
-    GET_SYMTAB();
-    MapSymtabIterator it = CALL(SymbolTable, *now_symtab, find_recursive, /,
-                                &key, self->symbol_manager);
+    GET_TOPSYMTAB();
+    MapSymtabIterator it = CALL(SymbolTable, *top_symtab, find, /, &key);
 
     if (it == NULL || it->value.kind != SymbolEntryStruct) {
         report_semerr_fmt(node->line_no, SemErrorStructUndef,
