@@ -4,6 +4,7 @@
 
 void MTD(SymbolTable, init, /, usize parent_idx) {
     self->parent_idx = parent_idx;
+    self->offset_acc = 0;
     CALL(MapSymtab, self->mapping, init, /);
 }
 
@@ -14,8 +15,10 @@ bool MTD(SymbolTable, is_root, /) {
 }
 
 MapSymtabInsertResult MTD(SymbolTable, insert, /, HString name,
-                          SymbolEntryKind kind, usize type_idx) {
-    SymbolEntry entry = CREOBJ(SymbolEntry, /, kind, type_idx);
+                          SymbolEntryKind kind, usize type_idx, usize width) {
+    usize offset = self->offset_acc;
+    self->offset_acc += width;
+    SymbolEntry entry = CREOBJ(SymbolEntry, /, kind, type_idx, offset);
     MapSymtabInsertResult result =
         CALL(MapSymtab, self->mapping, insert, /, name, entry);
     if (result.inserted) {

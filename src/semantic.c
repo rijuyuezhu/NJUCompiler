@@ -80,7 +80,7 @@ APPLY_GRAMMAR_SYMBOL_SYNTAX(DECLVISITOR_SEMRESOLVER_GRAMMAR_SYMBOL_AID);
         CALL(SemResolver, *self, CONCATENATE(visit_, gs), /, DATA_CHILD(idx),  \
              info);                                                            \
     })
-#define VISIT_CHILD(gs, idx) VISIT_WITH(gs, idx, NULL);
+#define VISIT_CHILD(gs, idx) VISIT_WITH(gs, idx, NULL)
 
 // Type management
 
@@ -132,8 +132,9 @@ void MTD(SemResolver, add_builtin_func, /) {
 
         String s = NSCALL(String, from_raw, /, "read");
         HString hs = NSCALL(HString, from_inner, /, s);
-        MapSymtabInsertResult result = CALL(SymbolTable, *top_symtab, insert, /,
-                                            hs, SymbolEntryFun, fun_type_idx);
+        MapSymtabInsertResult result =
+            CALL(SymbolTable, *top_symtab, insert, /, hs, SymbolEntryFun,
+                 fun_type_idx, 0);
         ASSERT(result.inserted);
         result.node->value.as_fun.first_decl_line_no = 0;
         result.node->value.as_fun.is_defined = true;
@@ -151,8 +152,9 @@ void MTD(SemResolver, add_builtin_func, /) {
 
         String s = NSCALL(String, from_raw, /, "write");
         HString hs = NSCALL(HString, from_inner, /, s);
-        MapSymtabInsertResult result = CALL(SymbolTable, *top_symtab, insert, /,
-                                            hs, SymbolEntryFun, fun_type_idx);
+        MapSymtabInsertResult result =
+            CALL(SymbolTable, *top_symtab, insert, /, hs, SymbolEntryFun,
+                 fun_type_idx, 0);
         ASSERT(result.inserted);
         result.node->value.as_fun.first_decl_line_no = 0;
         result.node->value.as_fun.is_defined = true;
@@ -186,7 +188,7 @@ void MTD(SemResolver, resolve, /, AstNode *node, bool add_builtin) {
 // Program         NOINFO | void
 // ExtDefList      NOINFO | void
 // ExtDef          NOINFO | void
-// ExtDecList      {give: inherit_type_idx}
+// ExtDecList      {give: inherit_type_idx} | void
 //                     - inherit_type_idx: the type of the declaration
 // Specifier       NOINFO | [int, float, (Sturct type from StructSpecifier)]
 // StructSpecifier NOINFO | (Struct type)
@@ -267,11 +269,14 @@ void MTD(SemResolver, insert_var_dec, /, String *symbol_name, usize type_idx,
 
     if (can_insert_in) {
         HString key_to_insert = CALL(HString, key, clone, /);
+        Type *type =
+            CALL(TypeManager, *self->type_manager, get_type, /, type_idx);
         MapSymtabInsertResult result =
             CALL(SymbolTable, *now_symtab, insert, /, key_to_insert,
-                 SymbolEntryVar, type_idx);
+                 SymbolEntryVar, type_idx, type->width);
         ASSERT(result.inserted, "insertion shall be successful");
         node->symentry_ptr = &result.node->value;
+        result.node->value.as_var.ir_var_idx = (usize)-1;
     }
 }
 
@@ -457,10 +462,11 @@ VISITOR(StructSpecifierCase0) {
         if (it == NULL) {
             // ok to insert it (in the top symtab)
             HString key_to_insert = CALL(HString, key, clone, /);
-
+            Type *type = CALL(TypeManager, *self->type_manager, get_type, /,
+                              struct_type_idx);
             MapSymtabInsertResult result =
                 CALL(SymbolTable, *top_symtab, insert, /, key_to_insert,
-                     SymbolEntryStruct, struct_type_idx);
+                     SymbolEntryStruct, struct_type_idx, type->width);
             ASSERT(result.inserted, "insertion shall be successful");
             node->symentry_ptr = &result.node->value;
         } else {
@@ -626,7 +632,7 @@ VISITOR(FunDec) {
         HString key_to_insert = CALL(HString, key, clone, /);
         MapSymtabInsertResult result =
             CALL(SymbolTable, *now_symtab, insert, /, key_to_insert,
-                 SymbolEntryFun, func_type_idx);
+                 SymbolEntryFun, func_type_idx, 0);
         ASSERT(result.inserted, "insertion shall be successful");
         node->symentry_ptr = &result.node->value;
 

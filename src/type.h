@@ -22,6 +22,7 @@ typedef enum TypeKind {
 typedef struct Type {
     TypeKind kind;
     usize repr_val; // representive index; for fast equal test.
+    usize width;
     union {
         struct {
             usize size;
@@ -47,7 +48,8 @@ void MTD(Type, drop, /);
 Type NSMTD(Type, make_array, /, struct TypeManager *manager, usize size,
            usize subtype_idx);
 Type NSMTD(Type, make_struct, /, usize symtab_idx);
-void MTD(Type, add_struct_field, /, usize field_idx);
+void MTD(Type, add_struct_field, /, struct TypeManager *manager,
+         usize field_idx);
 Type NSMTD(Type, make_fun, /);
 void MTD(Type, add_fun_ret_par, /, usize ret_par_idx);
 int NSMTD(Type, compare, /, const Type *type1, const Type *type2);

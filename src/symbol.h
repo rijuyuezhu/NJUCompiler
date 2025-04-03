@@ -18,6 +18,7 @@ typedef enum SymbolEntryKind {
 typedef struct SymbolEntry {
     SymbolEntryKind kind;
     usize type_idx;
+    usize offset;
 
     // The following things shall be manually set
     struct SymbolTable *table; // points to the table that contains this entry
@@ -27,13 +28,17 @@ typedef struct SymbolEntry {
             bool is_defined;
             int first_decl_line_no;
         } as_fun;
+        struct {
+            usize ir_var_idx;
+        } as_var;
     };
 } SymbolEntry;
 
-FUNC_STATIC void MTD(SymbolEntry, init, /, SymbolEntryKind kind,
-                     usize type_idx) {
+FUNC_STATIC void MTD(SymbolEntry, init, /, SymbolEntryKind kind, usize type_idx,
+                     usize offset) {
     self->kind = kind;
     self->type_idx = type_idx;
+    self->offset = offset;
 }
 
 FUNC_STATIC DEFAULT_DROPER(SymbolEntry);
@@ -51,6 +56,7 @@ DECLARE_MAPPING(MapSymtab, HString, SymbolEntry, FUNC_EXTERN,
 typedef struct SymbolTable {
     usize parent_idx;
     MapSymtab mapping;
+    usize offset_acc;
 } SymbolTable;
 
 void MTD(SymbolTable, init, /, usize parent_idx);
@@ -59,7 +65,7 @@ DELETED_CLONER(SymbolTable, FUNC_STATIC);
 
 bool MTD(SymbolTable, is_root, /);
 MapSymtabInsertResult MTD(SymbolTable, insert, /, HString name,
-                          SymbolEntryKind kind, usize type_idx);
+                          SymbolEntryKind kind, usize type_idx, usize width);
 
 MapSymtabIterator MTD(SymbolTable, find, /, HString *name);
 

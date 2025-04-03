@@ -27,12 +27,13 @@ Type NSMTD(Type, make_array, /, TypeManager *manager, usize size,
         .repr_val = (usize)-1,
         .as_array = {.size = size, .subtype_idx = subtype_idx},
     };
-    Type *subtype = &manager->types.data[subtype_idx];
+    Type *subtype = CALL(TypeManager, *manager, get_type, /, subtype_idx);
     if (subtype->kind == TypeKindArray) {
         result.as_array.dim = subtype->as_array.dim + 1;
     } else {
         result.as_array.dim = 1;
     }
+    result.width = subtype->width * size;
     return result;
 }
 
@@ -45,12 +46,16 @@ Type NSMTD(Type, make_struct, /, usize symtab_idx) {
                 .field_idxes = CREOBJ(VecUSize, /),
                 .symtab_idx = symtab_idx,
             },
+        // for struct, the width is accumulated during add_struct_field
+        .width = 0,
     };
 }
 
-void MTD(Type, add_struct_field, /, usize field_idx) {
+void MTD(Type, add_struct_field, /, TypeManager *manager, usize field_idx) {
     ASSERT(self->kind == TypeKindStruct);
     CALL(VecUSize, self->as_struct.field_idxes, push_back, /, field_idx);
+    Type *field = CALL(TypeManager, *manager, get_type, /, field_idx);
+    self->width += field->width;
 }
 
 Type NSMTD(Type, make_fun, /) {
@@ -58,6 +63,8 @@ Type NSMTD(Type, make_fun, /) {
         .kind = TypeKindFun,
         .repr_val = (usize)-1,
         .as_fun = {.ret_par_idxes = CREOBJ(VecUSize, /)},
+        .width = (usize)-1,
+        // width for function is not used.
     };
 }
 
@@ -202,7 +209,8 @@ usize MTD(TypeManager, make_fun, /) {
 }
 
 void MTD(TypeManager, add_struct_field, /, usize type_idx, usize field_idx) {
-    CALL(Type, self->types.data[type_idx], add_struct_field, /, field_idx);
+    CALL(Type, self->types.data[type_idx], add_struct_field, /, self,
+         field_idx);
 }
 
 void MTD(TypeManager, add_fun_ret_par, /, usize type_idx, usize ret_par_idx) {

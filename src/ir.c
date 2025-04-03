@@ -1,4 +1,5 @@
 #include "ir.h"
+#include "op.h"
 #include "str.h"
 #include "utils.h"
 
@@ -9,6 +10,8 @@ IREntity NSMTD(IREntity, make_imm_int, /, int imm_int) {
     };
 }
 IREntity NSMTD(IREntity, make_var, /, IREntityKind kind, usize idx) {
+    ASSERT(kind == IREntityVar || kind == IREntityAddr ||
+           kind == IREntityDeref);
     return (IREntity){
         .kind = kind,
         .var_idx = idx,
@@ -87,7 +90,7 @@ IR *NSMTD(IR, creheap_label, /, IREntity label) {
 IR *NSMTD(IR, creheap_fun, /, IREntity fun) {
     ASSERT(fun.kind == IREntityFun);
     IR *ir = CREOBJRAWHEAP(IR);
-    ir->kind = IRLabel;
+    ir->kind = IRFunction;
     ir->e1 = fun;
     return ir;
 }
@@ -104,8 +107,9 @@ IR *NSMTD(IR, creheap_assign, /, IREntity lhs, IREntity rhs) {
 }
 IR *NSMTD(IR, creheap_arithassign, /, IREntity lhs, IREntity rhs1,
           IREntity rhs2, ArithopKind aop) {
-    ASSERT(lhs.kind == IREntityVar && rhs1.kind == IREntityVar &&
-           rhs2.kind == IREntityVar);
+    ASSERT(lhs.kind == IREntityVar &&
+           (rhs1.kind == IREntityVar || rhs1.kind == IREntityImmInt) &&
+           (rhs2.kind == IREntityVar || rhs2.kind == IREntityImmInt));
     IR *ir = CREOBJRAWHEAP(IR);
     ir->kind = IRArithAssign;
     ir->ret = lhs;
@@ -148,6 +152,13 @@ IR *NSMTD(IR, creheap_dec, /, IREntity dec, IREntity imm) {
     ir->e1 = imm;
     return ir;
 }
+IR *NSMTD(IR, creheap_arg, /, IREntity arg) {
+    ASSERT(arg.kind == IREntityVar || arg.kind == IREntityAddr);
+    IR *ir = CREOBJRAWHEAP(IR);
+    ir->kind = IRArg;
+    ir->e1 = arg;
+    return ir;
+}
 IR *NSMTD(IR, creheap_call, /, IREntity lhs, IREntity fun) {
     ASSERT(lhs.kind == IREntityVar && fun.kind == IREntityFun);
     IR *ir = CREOBJRAWHEAP(IR);
@@ -178,9 +189,152 @@ IR *NSMTD(IR, creheap_write, /, IREntity par) {
     return ir;
 }
 
+#define BUILD_STR_IR(irkind)                                                   \
+    FUNC_STATIC void MTD(IR, CONCATENATE(build_str_, irkind), /,               \
+                         String * builder)
+#define DECLARE_BUILD_STR_IR_AID(irkind) BUILD_STR_IR(irkind);
+
+APPLY_IR_KIND(DECLARE_BUILD_STR_IR_AID);
+
+#define JUMP_TABLE_IR_BUILD_STR_IR(irkind)                                     \
+    case CONCATENATE(IR, irkind): {                                            \
+        CALL(IR, *self, CONCATENATE(build_str_, irkind), /, builder);          \
+        break;                                                                 \
+    }
+
+BUILD_STR_IR(Label) {
+    CALL(String, *builder, push_str, /, "LABEL ");
+    CALL(IREntity, self->e1, build_str, /, builder);
+    CALL(String, *builder, push_str, /, " :\n");
+}
+
+BUILD_STR_IR(Function) {
+    CALL(String, *builder, push_str, /, "FUNCTION ");
+    CALL(IREntity, self->e1, build_str, /, builder);
+    CALL(String, *builder, push_str, /, " :\n");
+}
+BUILD_STR_IR(Assign) {
+    CALL(IREntity, self->ret, build_str, /, builder);
+    CALL(String, *builder, push_str, /, " := ");
+    CALL(IREntity, self->e1, build_str, /, builder);
+    CALL(String, *builder, push_str, /, "\n");
+}
+BUILD_STR_IR(ArithAssign) {
+    CALL(IREntity, self->ret, build_str, /, builder);
+    CALL(String, *builder, push_str, /, " := ");
+    CALL(IREntity, self->e1, build_str, /, builder);
+    char op;
+    switch (self->arithop_val) {
+    case ArithopAdd:
+        op = '+';
+        break;
+    case ArithopSub:
+        op = '-';
+        break;
+    case ArithopMul:
+        op = '*';
+        break;
+    case ArithopDiv:
+        op = '/';
+        break;
+    default:
+        PANIC("Invalid ArithopKind");
+    }
+    CALL(String, *builder, pushf, /, " %c ", op);
+    CALL(IREntity, self->e2, build_str, /, builder);
+    CALL(String, *builder, push_str, /, "\n");
+}
+
+BUILD_STR_IR(Goto) {
+    CALL(String, *builder, push_str, /, "GOTO ");
+    CALL(IREntity, self->ret, build_str, /, builder);
+    CALL(String, *builder, push_str, /, "\n");
+}
+
+BUILD_STR_IR(CondGoto) {
+    CALL(String, *builder, push_str, /, "IF ");
+    CALL(IREntity, self->e1, build_str, /, builder);
+    const char *op;
+    switch (self->relop_val) {
+    case RelopEQ:
+        op = "==";
+        break;
+    case RelopNE:
+        op = "!=";
+        break;
+    case RelopLT:
+        op = "<";
+        break;
+    case RelopLE:
+        op = "<=";
+        break;
+    case RelopGT:
+        op = ">";
+        break;
+    case RelopGE:
+        op = ">=";
+        break;
+    default:
+        PANIC("Invalid RelopKind");
+    }
+    CALL(String, *builder, pushf, /, " %s ", op);
+    CALL(IREntity, self->e2, build_str, /, builder);
+    CALL(String, *builder, push_str, /, " GOTO ");
+    CALL(IREntity, self->ret, build_str, /, builder);
+    CALL(String, *builder, push_str, /, "\n");
+}
+BUILD_STR_IR(Return) {
+    CALL(String, *builder, push_str, /, "RETURN ");
+    CALL(IREntity, self->e1, build_str, /, builder);
+    CALL(String, *builder, push_str, /, "\n");
+}
+BUILD_STR_IR(Dec) {
+    CALL(String, *builder, push_str, /, "DEC ");
+    CALL(IREntity, self->ret, build_str, /, builder);
+    CALL(String, *builder, push_str, /, " ");
+    CALL(IREntity, self->e1, build_str_nosymprefix, /, builder);
+    CALL(String, *builder, push_str, /, "\n");
+}
+BUILD_STR_IR(Arg) {
+    CALL(String, *builder, push_str, /, "ARG ");
+    CALL(IREntity, self->e1, build_str, /, builder);
+    CALL(String, *builder, push_str, /, "\n");
+}
+BUILD_STR_IR(Call) {
+    CALL(IREntity, self->ret, build_str, /, builder);
+    CALL(String, *builder, push_str, /, " := CALL ");
+    CALL(IREntity, self->e1, build_str, /, builder);
+    CALL(String, *builder, push_str, /, "\n");
+}
+BUILD_STR_IR(Param) {
+    CALL(String, *builder, push_str, /, "PARAM ");
+    CALL(IREntity, self->e1, build_str, /, builder);
+    CALL(String, *builder, push_str, /, "\n");
+}
+BUILD_STR_IR(Read) {
+    CALL(String, *builder, push_str, /, "READ ");
+    CALL(IREntity, self->ret, build_str, /, builder);
+    CALL(String, *builder, push_str, /, "\n");
+}
+BUILD_STR_IR(Write) {
+    CALL(String, *builder, push_str, /, "WRITE ");
+    CALL(IREntity, self->e1, build_str, /, builder);
+    CALL(String, *builder, push_str, /, "\n");
+}
+
+void MTD(IR, build_str, /, String *builder) {
+    switch (self->kind) {
+        APPLY_IR_KIND(JUMP_TABLE_IR_BUILD_STR_IR);
+    default:
+        PANIC("Invalid IRKind");
+    }
+}
+
 void MTD(IRManager, init, /) {
     CALL(VecPtr, self->irs, init, /);
     self->idx_cur = 0;
+    self->zero = CALL(IRManager, *self, gen_ent_imm_int, /, 0);
+    self->one = CALL(IRManager, *self, gen_ent_imm_int, /, 1);
 }
 
 void MTD(IRManager, drop, /) {
@@ -227,6 +381,10 @@ void MTD(IRManager, addir_dec, /, IREntity dec, IREntity imm) {
     IR *ir = NSCALL(IR, creheap_dec, /, dec, imm);
     CALL(VecPtr, self->irs, push_back, /, ir);
 }
+void MTD(IRManager, addir_arg, /, IREntity arg) {
+    IR *ir = NSCALL(IR, creheap_arg, /, arg);
+    CALL(VecPtr, self->irs, push_back, /, ir);
+}
 void MTD(IRManager, addir_call, /, IREntity lhs, IREntity fun) {
     IR *ir = NSCALL(IR, creheap_call, /, lhs, fun);
     CALL(VecPtr, self->irs, push_back, /, ir);
@@ -257,4 +415,17 @@ IREntity MTD(IRManager, gen_ent_label, /) {
 }
 IREntity MTD(IRManager, gen_ent_fun, /, struct String *fun_name) {
     return NSCALL(IREntity, make_fun, /, fun_name);
+}
+
+void MTD(IRManager, build_str, /, String *builder) {
+    for (usize i = 0; i < self->irs.size; i++) {
+        IR *ir = self->irs.data[i];
+        CALL(IR, *ir, build_str, /, builder);
+    }
+}
+
+String MTD(IRManager, get_ir_str, /) {
+    String builder = CREOBJ(String, /);
+    CALL(IRManager, *self, build_str, /, &builder);
+    return builder;
 }

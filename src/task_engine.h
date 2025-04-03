@@ -35,3 +35,4 @@ void MTD(TaskEngine, analyze_semantic, /, bool add_builtin);
 
 /* Gen IR */
 void MTD(TaskEngine, gen_ir, /);
+void MTD(TaskEngine, save_ir_to_file, /);

@@ -20,9 +20,10 @@
     })
 
 #undef PANIC
-#define PANIC(...)                                                             \
+#define PANIC(info)                                                            \
     ({                                                                         \
-        fprintf(stderr, "Panic: %s", __VA_ARGS__);                             \
+        fprintf(stderr, "Panic at %s:%s:%d. %s\n", __FILE__, __func__,         \
+                __LINE__, info);                                               \
         abort();                                                               \
     })
 

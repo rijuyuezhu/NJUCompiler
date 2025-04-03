@@ -54,6 +54,11 @@ static void run_task(TaskEngine *engine) {
     /*
      * gen ir
      */
+    CALL(TaskEngine, *engine, gen_ir, /);
+    if (engine->gen_ir_error) {
+        return;
+    }
+    CALL(TaskEngine, *engine, save_ir_to_file, /);
 }
 
 int main(int argc, char *argv[]) {

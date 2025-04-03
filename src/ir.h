@@ -4,6 +4,8 @@
 #include "op.h"
 #include "utils.h"
 
+struct String;
+
 typedef enum IREntityKind {
     IREntityInvalid,
     IREntityImmInt, // starts with #
@@ -42,6 +44,7 @@ void MTD(IREntity, build_str_nosymprefix, /, struct String *builder);
         f(CondGoto)    /* IF {e1:var} {relop_val} {e2:var} GOTO {ret:label} */ \
         f(Return)      /* RETURN {e1:var} */                                   \
         f(Dec)         /* DEC {ret:var} {e1:imm w/o #} */                      \
+        f(Arg)         /* ARG {e1:var/e1:addr} */                              \
         f(Call)        /* {ret:var} := CALL {e1:fun} */                        \
         f(Param)       /* PARAM {e1:var/e1:addr} */                            \
         f(Read)        /* READ {ret:var} */                                    \
@@ -67,21 +70,28 @@ FUNC_STATIC DEFAULT_DROPER(IR);
 IR *NSMTD(IR, creheap_label, /, IREntity label);
 IR *NSMTD(IR, creheap_fun, /, IREntity fun);
 IR *NSMTD(IR, creheap_assign, /, IREntity lhs, IREntity rhs);
-IR *NSMTD(IR, creheap_arithassign, /, IREntity lhs, IREntity rhs1, IREntity rhs2,
-        ArithopKind aop);
+IR *NSMTD(IR, creheap_arithassign, /, IREntity lhs, IREntity rhs1,
+          IREntity rhs2, ArithopKind aop);
 IR *NSMTD(IR, creheap_goto, /, IREntity label);
 IR *NSMTD(IR, creheap_condgoto, /, IREntity label, IREntity rop1, IREntity rop2,
-        RelopKind rop);
+          RelopKind rop);
 IR *NSMTD(IR, creheap_return, /, IREntity ret);
 IR *NSMTD(IR, creheap_dec, /, IREntity dec, IREntity imm);
+IR *NSMTD(IR, creheap_arg, /, IREntity arg);
 IR *NSMTD(IR, creheap_call, /, IREntity lhs, IREntity fun);
 IR *NSMTD(IR, creheap_param, /, IREntity par);
 IR *NSMTD(IR, creheap_read, /, IREntity ret);
 IR *NSMTD(IR, creheap_write, /, IREntity par);
 
+void MTD(IR, build_str, /, struct String *builder);
+
 typedef struct IRManager {
     VecPtr irs;
     usize idx_cur;
+
+    // some `constants`
+    IREntity zero;
+    IREntity one;
 } IRManager;
 
 void MTD(IRManager, init, /);
@@ -98,6 +108,7 @@ void MTD(IRManager, addir_condgoto, /, IREntity label, IREntity rop1,
          IREntity rop2, RelopKind rop);
 void MTD(IRManager, addir_return, /, IREntity ret);
 void MTD(IRManager, addir_dec, /, IREntity dec, IREntity imm);
+void MTD(IRManager, addir_arg, /, IREntity arg);
 void MTD(IRManager, addir_call, /, IREntity lhs, IREntity fun);
 void MTD(IRManager, addir_param, /, IREntity par);
 void MTD(IRManager, addir_read, /, IREntity ret);
@@ -107,3 +118,6 @@ IREntity MTD(IRManager, gen_ent_imm_int, /, int imm_int);
 IREntity MTD(IRManager, gen_ent_var, /, IREntityKind kind);
 IREntity MTD(IRManager, gen_ent_label, /);
 IREntity MTD(IRManager, gen_ent_fun, /, struct String *fun_name);
+
+void MTD(IRManager, build_str, /, struct String *builder);
+struct String MTD(IRManager, get_ir_str, /);
