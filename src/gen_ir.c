@@ -608,6 +608,7 @@ VISITOR(ExpCase11_12) {
         for (usize i = arglist.size - 1; ~i; i--) {
             ADDIR(arg, arglist.data[i]);
         }
+        DROPOBJ(VecArgs, arglist);
         IREntity fun =
             CALL(IRManager, *self->ir_manager, gen_ent_fun, /, fun_sym->name);
         ADDIR(call, *info->target, fun);
