@@ -21,7 +21,6 @@ void MTD(IRGenerator, init, /, IRManager *ir_manager, TypeManager *type_manager,
 }
 
 DECLARE_PLAIN_VEC(VecArgs, IREntity, FUNC_STATIC);
-DEFINE_PLAIN_VEC(VecArgs, IREntity, FUNC_STATIC);
 
 typedef struct IRPassInfo {
     // inherit
@@ -152,6 +151,142 @@ String MTD(IRGenerator, gen_ir, /, AstNode *node) {
     String ret = CREOBJ(String, /);
     CALL(IRGenerator, *self, visit_Program, /, node, NULL);
     return ret;
+}
+
+static void MTD(IRGenerator, copy_var, /, IREntity dst_ent, usize dst_type_idx,
+                IREntity src_ent, usize src_type_idx) {
+    Type *dst_type =
+        CALL(TypeManager, *self->type_manager, get_type, /, dst_type_idx);
+    Type *src_type =
+        CALL(TypeManager, *self->type_manager, get_type, /, src_type_idx);
+
+    ASSERT(dst_type->kind == src_type->kind,
+           "should not happen: type checking fail because the major classes "
+           "are not the same");
+    TypeKind type_kind = dst_type->kind;
+    if (type_kind == TypeKindInt) {
+        ADDIR(assign, dst_ent, src_ent);
+    } else if (type_kind == TypeKindArray || type_kind == TypeKindStruct) {
+        dst_ent.kind = IREntityVar;
+        usize copy_nelem = Min(dst_type->width, src_type->width);
+        ASSERT(copy_nelem % 4 == 0);
+        copy_nelem /= 4;
+
+        // use a loop to generate copy
+
+        IREntity start = NEW_LABEL();
+        IREntity end = NEW_LABEL();
+        IREntity dst = VAR_NEW_TEMP();
+        IREntity dst_deref = dst;
+        dst_deref.kind = IREntityDeref;
+        IREntity src = VAR_NEW_TEMP();
+        IREntity src_deref = src;
+        src_deref.kind = IREntityDeref;
+        IREntity i = VAR_NEW_TEMP();
+        IREntity temp = VAR_NEW_TEMP();
+        IREntity copy_nelem_imm = CALL(IRManager, *self->ir_manager,
+                                       new_ent_imm_int, /, (int)copy_nelem);
+        IREntity four_imm =
+            CALL(IRManager, *self->ir_manager, new_ent_imm_int, /, 4);
+
+        ADDIR(assign, dst, dst_ent);              // dst := dst_ent
+        ADDIR(assign, src, src_ent);              // src := src_ent
+        ADDIR(assign, i, self->ir_manager->zero); // i := 0
+        ADDIR(label, start);                      // LABEL start:
+        ADDIR(condgoto, end, i, copy_nelem_imm,
+              RelopGE);                 // IF i >= #copy_nelem_imm GOTO end
+        ADDIR(assign, temp, src_deref); // temp := *src
+        ADDIR(assign, dst_deref, temp); // *dst := temp
+        ADDIR(arithassign, temp, dst, four_imm, ArithopAdd); // temp := dst + 4
+        ADDIR(assign, dst, temp);                            // dst := temp
+        ADDIR(arithassign, temp, src, four_imm, ArithopAdd); // temp := src + 4
+        ADDIR(assign, src, temp);                            // src := temp
+        ADDIR(arithassign, temp, i, self->ir_manager->one,
+              ArithopAdd);      // temp := i + 1
+        ADDIR(assign, i, temp); // i := temp
+        ADDIR(goto, start);     // GOTO start
+        ADDIR(label, end);      // LABEL end :
+    } else {
+        PANIC("Unrecognized type kind");
+    }
+}
+
+static IREntity MTD(IRGenerator, get_array_index, /, usize array_type_idx,
+                    IREntity base, IREntity index) {
+    Type *array_type =
+        CALL(TypeManager, *self->type_manager, get_type, /, array_type_idx);
+    ASSERT(array_type->kind == TypeKindArray);
+    usize array_ele_type_idx = array_type->as_array.subtype_idx;
+    Type *array_ele_type =
+        CALL(TypeManager, *self->type_manager, get_type, /, array_ele_type_idx);
+    usize ele_width = array_ele_type->width;
+    IREntity ele_width_imm =
+        CALL(IRManager, *self->ir_manager, new_ent_imm_int, /, (int)ele_width);
+    IREntity offset = VAR_NEW_TEMP();
+    ADDIR(arithassign, offset, index, ele_width_imm, ArithopMul);
+    IREntity result = VAR_NEW_TEMP();
+    ADDIR(arithassign, result, base, offset, ArithopAdd);
+    if (array_ele_type->kind == TypeKindInt) {
+        result.kind = IREntityDeref;
+    }
+    return result;
+}
+
+static IREntity MTD(IRGenerator, get_struct_field, /, usize struct_type_idx,
+                    IREntity base, SymbolEntry *field) {
+    Type *struct_type =
+        CALL(TypeManager, *self->type_manager, get_type, /, struct_type_idx);
+    ASSERT(struct_type->kind == TypeKindStruct);
+    usize offset = field->offset;
+    IREntity offset_imm =
+        CALL(IRManager, *self->ir_manager, new_ent_imm_int, /, (int)offset);
+    IREntity result = VAR_NEW_TEMP();
+    ADDIR(arithassign, result, base, offset_imm, ArithopAdd);
+    Type *field_type =
+        CALL(TypeManager, *self->type_manager, get_type, /, field->type_idx);
+    if (field_type->kind == TypeKindInt) {
+        result.kind = IREntityDeref;
+    }
+    return result;
+}
+
+static IREntity MTD(IRGenerator, exp_array_index_addr, /, AstNode *node) {
+    // only used for Exp -> Exp LB Exp RB
+    ASSERT(node->grammar_symbol == GS_Exp);
+    ASSERT(node->production_id == 13);
+
+    IREntity base = VAR_NEW_TEMP();
+    NEW_SINFO(&base, NULL, NULL, NULL);
+    VISIT_WITH(Exp, 0, &sinfo);
+    IREntity index = VAR_NEW_TEMP();
+    SINFO(&index, NULL, NULL, NULL);
+    VISIT_WITH(Exp, 2, &sinfo);
+    usize array_type_idx = DATA_CHILD(0)->type_idx;
+    IREntity addr = CALL(IRGenerator, *self, get_array_index, /, array_type_idx,
+                         base, index);
+    return addr;
+}
+
+static IREntity MTD(IRGenerator, exp_struct_field_addr, /, AstNode *node) {
+    // only used for Exp -> Exp DOT ID
+    ASSERT(node->grammar_symbol == GS_Exp);
+    ASSERT(node->production_id == 14);
+
+    IREntity base = VAR_NEW_TEMP();
+    NEW_SINFO(&base, NULL, NULL, NULL);
+    VISIT_WITH(Exp, 0, &sinfo);
+    usize struct_type_idx = DATA_CHILD(0)->type_idx;
+    SymbolEntry *sym = node->symentry_ptr;
+    IREntity addr = CALL(IRGenerator, *self, get_struct_field, /,
+                         struct_type_idx, base, sym);
+    return addr;
+}
+
+struct IREntity MTD(IRGenerator, exp_id_itself, /, AstNode *node) {
+    // only used for Exp -> ID
+    ASSERT(node->grammar_symbol == GS_Exp);
+    ASSERT(node->production_id == 15);
+    return VAR_NOWNODE();
 }
 
 // Program -> ExtDefList
@@ -444,15 +579,39 @@ VISITOR(DecList) {
 // Dec -> VarDec
 VISITOR(DecCase0) {
     NOINFO;
-    // TODO: handle the allocation of struct and array
+    usize type_idx = DATA_CHILD(0)->type_idx;
+    Type *type = CALL(TypeManager, *self->type_manager, get_type, /, type_idx);
+    if (type->kind == TypeKindInt) {
+        // do nothing
+    } else if (type->kind == TypeKindFloat) {
+        report_genir_err("float value is not permitted");
+    } else if (type->kind == TypeKindArray || type->kind == TypeKindStruct) {
+        usize width = type->width;
+        IREntity dec = VAR_NEW_TEMP();
+        IREntity imm =
+            CALL(IRManager, *self->ir_manager, new_ent_imm_int, /, (int)width);
+        ADDIR(dec, dec, imm);
+        dec.kind = IREntityAddr;
+        IREntity nowvar = VAR_NOWNODE();
+        ADDIR(assign, nowvar, dec);
+    } else {
+        PANIC("Invalid type->kind");
+    }
 }
 
 // Dec -> VarDec ASSIGNOP Exp
 VISITOR(DecCase1) {
-    NOINFO;
-    IREntity var = VAR_NOWNODE();
-    NEW_SINFO(&var, NULL, NULL, NULL);
+    // delegate to case 0 for allocating appropriate space
+    DISPATCH(DecCase0);
+
+    IREntity temp_var = VAR_NEW_TEMP();
+    NEW_SINFO(&temp_var, NULL, NULL, NULL);
     VISIT_WITH(Exp, 2, &sinfo);
+    IREntity dst_ent = VAR_NOWNODE();
+    usize dst_type_idx = DATA_CHILD(0)->type_idx;
+    usize src_type_idx = DATA_CHILD(2)->type_idx;
+    CALL(IRGenerator, *self, copy_var, /, dst_ent, dst_type_idx, temp_var,
+         src_type_idx);
 }
 
 // Dec Dispatcher
@@ -469,14 +628,29 @@ VISITOR(Dec) {
 
 // Exp -> Exp ASSIGNOP Exp
 VISITOR(ExpCase0) {
-    AstNode *left = DATA_CHILD(0);
-    ASSERT(left->production_id == 15); // Exp -> ID
-    IREntity left_var = VAR_CHILD(0);
-    IREntity temp_var = VAR_NEW_TEMP();
-    NEW_SINFO(&temp_var, NULL, NULL, NULL);
+    AstNode *lnode = DATA_CHILD(0);
+    IREntity dst_ent;
+    // see `semantic.c:is_lvalue` for three kinds of lvalue
+    if (lnode->production_id == 13) {
+        // Exp -> Exp LB Exp RB
+        dst_ent = CALL(IRGenerator, *self, exp_array_index_addr, /, lnode);
+    } else if (lnode->production_id == 14) {
+        // Exp -> Exp DOT ID
+        dst_ent = CALL(IRGenerator, *self, exp_struct_field_addr, /, lnode);
+    } else if (lnode->production_id == 15) {
+        // Exp -> ID
+        dst_ent = CALL(IRGenerator, *self, exp_id_itself, /, lnode);
+    } else {
+        PANIC("Invalid production id");
+    }
+    IREntity src_var = VAR_NEW_TEMP();
+    NEW_SINFO(&src_var, NULL, NULL, NULL);
     VISIT_WITH(Exp, 2, &sinfo);
-    ADDIR(assign, left_var, temp_var);
-    ADDIR(assign, *info->target, left_var);
+    usize dst_type_idx = DATA_CHILD(0)->type_idx;
+    usize src_type_idx = DATA_CHILD(2)->type_idx;
+    CALL(IRGenerator, *self, copy_var, /, dst_ent, dst_type_idx, src_var,
+         src_type_idx);
+    ADDIR(assign, *info->target, dst_ent);
 }
 
 // 1. Exp -> Exp AND Exp
@@ -542,7 +716,7 @@ VISITOR(ExpCase9) {
 
 // 11. Exp -> ID LP Args RP
 // 12. Exp -> ID LP RP
-VISITOR(ExpCase11_12) {
+VISITOR(ExpCaseCall) {
     SymbolEntry *fun_sym = node->symentry_ptr;
     ASSERT(fun_sym);
     if (fun_sym == self->symbol_manager->read_fun) {
@@ -577,10 +751,16 @@ VISITOR(ExpCase11_12) {
 }
 
 // Exp -> Exp LB Exp RB
-VISITOR(ExpCase13) { PANIC("Unimplemented"); }
+VISITOR(ExpCase13) {
+    IREntity addr = CALL(IRGenerator, *self, exp_array_index_addr, /, node);
+    ADDIR(assign, *info->target, addr);
+}
 
 // Exp -> Exp DOT ID
-VISITOR(ExpCase14) { PANIC("Unimplemented"); }
+VISITOR(ExpCase14) {
+    IREntity addr = CALL(IRGenerator, *self, exp_struct_field_addr, /, node);
+    ADDIR(assign, *info->target, addr);
+}
 
 // Exp -> ID
 VISITOR(ExpCase15) {
@@ -629,7 +809,7 @@ VISITOR(Exp) {
 
     case 11:
     case 12:
-        DISPATCH(ExpCase11_12);
+        DISPATCH(ExpCaseCall);
         break;
 
         DISPATCH_ENTRY(Exp, 13);
@@ -663,6 +843,7 @@ VISITOR(ExpCondCase1) {
     VISIT_WITH_UNCHK(ExpCond, 0, &sinfo);
     ADDIR(label, middle);
     SINFO(NULL, info->true_label, info->false_label, NULL);
+    VISIT_WITH_UNCHK(ExpCond, 2, &sinfo);
 }
 
 // Exp -> Exp OR Exp
@@ -672,6 +853,7 @@ VISITOR(ExpCondCase2) {
     VISIT_WITH_UNCHK(ExpCond, 0, &sinfo);
     ADDIR(label, middle);
     SINFO(NULL, info->true_label, info->false_label, NULL);
+    VISIT_WITH_UNCHK(ExpCond, 2, &sinfo);
 }
 
 // Exp -> Exp RELOP Exp
@@ -710,7 +892,7 @@ VISITOR(ExpCondCase10) {
 VISITOR(ExpCondNonLogical) {
     IREntity temp_var = VAR_NEW_TEMP();
     NEW_SINFO(&temp_var, NULL, NULL, NULL);
-    VISIT_WITH(Exp, 0, &sinfo);
+    DISPATCH_WITH(Exp, &sinfo);
     ADDIR(condgoto, *info->true_label, temp_var, self->ir_manager->zero,
           RelopNE);
     ADDIR(goto, *info->false_label);
@@ -761,6 +943,8 @@ VISITOR(Args) {
 
     if (PROD_ID() == 0) {
         // Args -> Exp COMMA Args
-        VISIT_CHILD(Args, 2);
+        VISIT_WITH(Args, 2, info);
     }
 }
+
+DEFINE_PLAIN_VEC(VecArgs, IREntity, FUNC_STATIC);

@@ -161,11 +161,13 @@ void MTD(TypeManager, init, /) {
                               (Type){
                                   .kind = TypeKindInt,
                                   .repr_val = (usize)-1,
+                                  .width = 4,
                               });
     self->float_type_idx = CALL(TypeManager, *self, add_type, /,
                                 (Type){
                                     .kind = TypeKindFloat,
                                     .repr_val = (usize)-1,
+                                    .width = 4,
                                 });
     CALL(TypeManager, *self, fill_in_repr, /, self->void_type_idx);
     CALL(TypeManager, *self, fill_in_repr, /, self->int_type_idx);

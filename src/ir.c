@@ -106,8 +106,9 @@ IR *NSMTD(IR, creheap_goto, /, IREntity label) {
 }
 IR *NSMTD(IR, creheap_condgoto, /, IREntity label, IREntity rop1, IREntity rop2,
           RelopKind rop) {
-    ASSERT(label.kind == IREntityLabel && rop1.kind == IREntityVar &&
-           rop2.kind == IREntityVar);
+    ASSERT(label.kind == IREntityLabel &&
+           (rop1.kind == IREntityVar || rop1.kind == IREntityImmInt) &&
+           (rop2.kind == IREntityVar || rop2.kind == IREntityImmInt));
     IR *ir = CREOBJRAWHEAP(IR);
     ir->kind = IRCondGoto;
     ir->ret = label;
@@ -270,7 +271,7 @@ BUILD_STR_IR(Return) {
 BUILD_STR_IR(Dec) {
     CALL(String, *builder, push_str, /, "DEC ");
     CALL(IREntity, self->ret, build_str, /, builder);
-    CALL(String, *builder, pushf, /, " %d\n", self->e2.imm_int);
+    CALL(String, *builder, pushf, /, " %d\n", self->e1.imm_int);
 }
 BUILD_STR_IR(Arg) {
     CALL(String, *builder, push_str, /, "ARG ");

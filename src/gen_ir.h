@@ -22,14 +22,9 @@ FUNC_STATIC DEFAULT_DROPER(IRGenerator);
 
 struct String MTD(IRGenerator, gen_ir, /, struct AstNode *node);
 
-#define report_genir_err(info)                                                 \
+#define report_genir_err(...)                                                  \
     ({                                                                         \
-        printf("Cannot translate: %s.\n", info);                               \
-        self->gen_ir_error = true;                                             \
-    })
-
-#define report_genir_err_fmt(format, ...)                                      \
-    ({                                                                         \
-        printf("Cannot translate: %s" format ".\n", ##__VA_ARGS__);            \
+        printf("Cannot translate: " VA_ARGS_FIRST(                             \
+            __VA_ARGS__) ".\n" VA_ARGS_EXCEPT_FIRST(__VA_ARGS__));             \
         self->gen_ir_error = true;                                             \
     })

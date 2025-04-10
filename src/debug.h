@@ -12,9 +12,9 @@
     ({                                                                         \
         if (unlikely(!(x))) {                                                  \
             fprintf(stderr,                                                    \
-                    "Assertion failed: `" #x                                   \
-                    "`, at %s:%s:%d. " VA_ARGS_FIRST(__VA_ARGS__) "\n",        \
-                    __FILE__, __func__,                                        \
+                    "Assertion failed: `%s`, at %s:%s:%d. " VA_ARGS_FIRST(     \
+                        __VA_ARGS__) "\n",                                     \
+                    #x, __FILE__, __func__,                                    \
                     __LINE__ VA_ARGS_EXCEPT_FIRST(__VA_ARGS__));               \
             abort();                                                           \
             UNREACHABLE;                                                       \
@@ -38,10 +38,10 @@
         typeof(y) MPROT(ASSERT_EQ_Y) = (y);                                    \
         if (unlikely(MPROT(ASSERT_EQ_X) != MPROT(ASSERT_EQ_Y))) {              \
             fprintf(stderr,                                                    \
-                    "Assertion failed: `" #x "`=`" fmtid                       \
-                    "` is not equal to `" #y "`=`" fmtid                       \
+                    "Assertion failed: `%s`=`" fmtid                           \
+                    "` is not equal to `%s`=`" fmtid                           \
                     "`, at %s:%s:%d. " VA_ARGS_FIRST(__VA_ARGS__) "\n",        \
-                    MPROT(ASSERT_EQ_X), MPROT(ASSERT_EQ_Y), __FILE__,          \
+                    #x, MPROT(ASSERT_EQ_X), #y, MPROT(ASSERT_EQ_Y), __FILE__,  \
                     __func__, __LINE__ VA_ARGS_EXCEPT_FIRST(__VA_ARGS__));     \
             abort();                                                           \
             UNREACHABLE;                                                       \
@@ -55,10 +55,9 @@
         const char *MPROT(ASSERT_EQ_Y) = (y);                                  \
         if (unlikely(strcmp(MPROT(ASSERT_EQ_X), MPROT(ASSERT_EQ_Y)) != 0)) {   \
             fprintf(stderr,                                                    \
-                    "Assertion failed: `" #x "`=`%s` is not equal to `" #y     \
-                    "`=`%s`, "                                                 \
+                    "Assertion failed: `%s`=`%s` is not equal to `%s`=`%s`, "  \
                     "at %s:%s:%d. " VA_ARGS_FIRST(__VA_ARGS__) "\n",           \
-                    MPROT(ASSERT_EQ_X), MPROT(ASSERT_EQ_Y), __FILE__,          \
+                    #x, MPROT(ASSERT_EQ_X), #y, MPROT(ASSERT_EQ_Y), __FILE__,  \
                     __func__, __LINE__ VA_ARGS_EXCEPT_FIRST(__VA_ARGS__));     \
             abort();                                                           \
             UNREACHABLE;                                                       \

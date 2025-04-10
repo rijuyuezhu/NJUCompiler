@@ -41,7 +41,8 @@ void MTD(IREntity, build_str, /, struct String *builder);
         f(ArithAssign) /* {ret:var} := {e1:var/e1:imm_int} {arithop_val}       \
                           {e2:var/e2:imm_int} */                               \
         f(Goto)        /* GOTO {ret:label} */                                  \
-        f(CondGoto)    /* IF {e1:var} {relop_val} {e2:var} GOTO {ret:label} */ \
+        f(CondGoto)    /* IF {e1:var/e1:imm} {relop_val} {e2:var/e2:imm} GOTO  \
+                          {ret:label} */                                       \
         f(Return)      /* RETURN {e1:var} */                                   \
         f(Dec)         /* DEC {ret:var} {e1:imm w/o #} */                      \
         f(Arg)         /* ARG {e1:var/e1:addr} */                              \
