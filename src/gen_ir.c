@@ -764,8 +764,8 @@ VISITOR(ExpCase14) {
 
 // Exp -> ID
 VISITOR(ExpCase15) {
-    IREntity ent = VAR_NOWNODE();
-    ADDIR(assign, *info->target, ent);
+    // optimize: avoid copy
+    *info->target = VAR_NOWNODE();
 }
 
 // Exp -> INT
