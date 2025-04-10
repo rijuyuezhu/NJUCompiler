@@ -126,8 +126,8 @@ void MTD(SemResolver, add_builtin_func, /) {
         // `int read()`
         usize fun_type_idx =
             CALL(TypeManager, *self->type_manager, make_fun, /);
-        CALL(TypeManager, *self->type_manager, add_fun_ret_par, /, fun_type_idx,
-             self->type_manager->int_type_idx);
+        CALL(TypeManager, *self->type_manager, add_fun_ret_param, /,
+             fun_type_idx, self->type_manager->int_type_idx);
         CALL(TypeManager, *self->type_manager, fill_in_repr, /, fun_type_idx);
 
         String s = NSCALL(String, from_raw, /, "read");
@@ -144,10 +144,10 @@ void MTD(SemResolver, add_builtin_func, /) {
     {
         usize fun_type_idx =
             CALL(TypeManager, *self->type_manager, make_fun, /);
-        CALL(TypeManager, *self->type_manager, add_fun_ret_par, /, fun_type_idx,
-             self->type_manager->int_type_idx);
-        CALL(TypeManager, *self->type_manager, add_fun_ret_par, /, fun_type_idx,
-             self->type_manager->int_type_idx);
+        CALL(TypeManager, *self->type_manager, add_fun_ret_param, /,
+             fun_type_idx, self->type_manager->int_type_idx);
+        CALL(TypeManager, *self->type_manager, add_fun_ret_param, /,
+             fun_type_idx, self->type_manager->int_type_idx);
         CALL(TypeManager, *self->type_manager, fill_in_repr, /, fun_type_idx);
 
         String s = NSCALL(String, from_raw, /, "write");
@@ -175,10 +175,10 @@ void MTD(SemResolver, resolve, /, AstNode *node, bool add_builtin) {
     MapSymtabIterator it = CALL(MapSymtab, *top_mapping, begin, /);
     while (it) {
         if (it->value.kind == SymbolEntryFun && !it->value.as_fun.is_defined) {
-            report_semerr_fmt(it->value.as_fun.first_decl_line_no,
-                              SemErrorFunDecButNotDef,
-                              "function \"%s\" declared but not defined",
-                              STRING_C_STR(it->key.s));
+            report_semerr(it->value.as_fun.first_decl_line_no,
+                          SemErrorFunDecButNotDef,
+                          "function \"%s\" declared but not defined",
+                          STRING_C_STR(it->key.s));
         }
         it = CALL(MapSymtab, *top_mapping, next, /, it);
     }
@@ -257,13 +257,13 @@ void MTD(SemResolver, insert_var_dec, /, String *symbol_name, usize type_idx,
             can_insert_in = true;
         }
         if (info->is_in_struct) {
-            report_semerr_fmt(node->line_no, SemErrorStructDefWrong,
-                              "redefinition of field \"%s\"",
-                              STRING_C_STR(*symbol_name));
+            report_semerr(node->line_no, SemErrorStructDefWrong,
+                          "redefinition of field \"%s\"",
+                          STRING_C_STR(*symbol_name));
         } else {
-            report_semerr_fmt(node->line_no, SemErrorVarRedef,
-                              "redefinition of variable \"%s\"",
-                              STRING_C_STR(*symbol_name));
+            report_semerr(node->line_no, SemErrorVarRedef,
+                          "redefinition of variable \"%s\"",
+                          STRING_C_STR(*symbol_name));
         }
     }
 
@@ -297,8 +297,6 @@ VISITOR(ExtDefList) {
         // ExtDefList -> ExtDef ExtDefList
         VISIT_CHILD(ExtDef, 0);
         VISIT_CHILD(ExtDefList, 1);
-    } else {
-        // ExtDefList -> \epsilon
     }
     SAVE_TYPE_BASIC(void);
 }
@@ -387,8 +385,6 @@ VISITOR(ExtDecList) {
     if (PROD_ID() == 1) {
         // ExtDecList -> VarDec COMMA ExtDecList
         VISIT_WITH(ExtDecList, 2, info);
-    } else {
-        // ExtDecList -> VarDec
     }
     SAVE_TYPE_BASIC(void);
 }
@@ -470,9 +466,9 @@ VISITOR(StructSpecifierCase0) {
             ASSERT(result.inserted, "insertion shall be successful");
             node->symentry_ptr = &result.node->value;
         } else {
-            report_semerr_fmt(node->line_no, SemErrorStructRedef,
-                              "redefinition of struct \"%s\"",
-                              STRING_C_STR(*struct_tag));
+            report_semerr(node->line_no, SemErrorStructRedef,
+                          "redefinition of struct \"%s\"",
+                          STRING_C_STR(*struct_tag));
         }
     } else {
         // An anonymous struct; we do not insert anything to the symtab
@@ -500,8 +496,8 @@ VISITOR(StructSpecifierCase1) {
     MapSymtabIterator it = CALL(SymbolTable, *top_symtab, find, /, &key);
 
     if (it == NULL || it->value.kind != SymbolEntryStruct) {
-        report_semerr_fmt(node->line_no, SemErrorStructUndef,
-                          "undefined struct \"%s\"", STRING_C_STR(*struct_tag));
+        report_semerr(node->line_no, SemErrorStructUndef,
+                      "undefined struct \"%s\"", STRING_C_STR(*struct_tag));
         SAVE_TYPE_BASIC(void);
     } else {
         SAVE_TYPE(it->value.type_idx);
@@ -595,7 +591,7 @@ VISITOR(FunDec) {
 
     // create the function type, and add the return type as its 0th-elem
     usize func_type_idx = CALL(TypeManager, *self->type_manager, make_fun, /);
-    CALL(TypeManager, *self->type_manager, add_fun_ret_par, /, func_type_idx,
+    CALL(TypeManager, *self->type_manager, add_fun_ret_param, /, func_type_idx,
          ret_type_idx);
 
     // Handle VarList
@@ -607,9 +603,6 @@ VISITOR(FunDec) {
         // FunDec -> ID LP VarList RP
         NEW_SINFO(func_type_idx, -1, false, false);
         VISIT_WITH(VarList, 2, &sinfo);
-    } else {
-        // FunDec -> ID LP RP
-        // do nothing
     }
     POP_SYMTAB();
 
@@ -647,7 +640,7 @@ VISITOR(FunDec) {
         }
         entry->as_fun.first_decl_line_no = node->line_no;
     } else if (it->value.kind != SymbolEntryFun) {
-        report_semerr_fmt(
+        report_semerr(
             node->line_no, SemErrorFunRedef,
             "conflict definition with previous identifiers for function \"%s\"",
             STRING_C_STR(*fun_name));
@@ -655,16 +648,16 @@ VISITOR(FunDec) {
         SymbolEntry *entry = &it->value;
         if (!is_fun_dec && entry->as_fun.is_defined) {
             // double definition
-            report_semerr_fmt(node->line_no, SemErrorFunRedef,
-                              "redefinition of function \"%s\"",
-                              STRING_C_STR(*fun_name));
+            report_semerr(node->line_no, SemErrorFunRedef,
+                          "redefinition of function \"%s\"",
+                          STRING_C_STR(*fun_name));
         } else {
             if (!CALL(TypeManager, *self->type_manager, is_type_consistency, /,
                       func_type_idx, entry->type_idx)) {
                 // not consistent
-                report_semerr_fmt(node->line_no, SemErrorFunDecConflict,
-                                  "conflicting types for function \"%s\"",
-                                  STRING_C_STR(*fun_name));
+                report_semerr(node->line_no, SemErrorFunDecConflict,
+                              "conflicting types for function \"%s\"",
+                              STRING_C_STR(*fun_name));
             } else if (!is_fun_dec) {
                 // consistent; now it is defined
                 entry->as_fun.is_defined = true;
@@ -684,9 +677,6 @@ VISITOR(VarList) {
     if (PROD_ID() == 0) {
         // VarList -> ParamDec COMMA VarList
         VISIT_WITH(VarList, 2, info);
-    } else {
-        // VarList -> ParamDec
-        // do nothing
     }
     SAVE_TYPE_BASIC(void);
 }
@@ -711,7 +701,7 @@ VISITOR(ParamDec) {
     CALL(SemResolver, *self, insert_var_dec, /, symbol_name, param_type_idx,
          node, info);
 
-    CALL(TypeManager, *self->type_manager, add_fun_ret_par, /, fun_type_idx,
+    CALL(TypeManager, *self->type_manager, add_fun_ret_param, /, fun_type_idx,
          param_type_idx);
 
     SAVE_TYPE_BASIC(void);
@@ -738,9 +728,6 @@ VISITOR(StmtList) {
         // StmtList -> Stmt StmtList
         VISIT_WITH(Stmt, 0, info);
         VISIT_WITH(StmtList, 1, info);
-    } else {
-        // StmtList -> \epsilon
-        // do nothing
     }
     SAVE_TYPE_BASIC(void);
 }
@@ -862,9 +849,6 @@ VISITOR(DefList) {
         // DefList -> Def DefList
         VISIT_WITH(Def, 0, info);
         VISIT_WITH(DefList, 1, info);
-    } else {
-        // DefList -> \epsilon
-        // do nothing
     }
     SAVE_TYPE_BASIC(void);
 }
@@ -893,9 +877,6 @@ VISITOR(DecList) {
     if (PROD_ID() == 1) {
         // DecList -> Dec COMMA DecList
         VISIT_WITH(DecList, 2, info);
-    } else {
-        // DecList -> Dec
-        // do nothing
     }
     SAVE_TYPE_BASIC(void);
 }
@@ -1089,29 +1070,11 @@ VISITOR(ExpCase3) {
     FINISH_BINARY;
 }
 
-// Exp -> Exp PLUS Exp
-VISITOR(ExpCase4) {
-    PREPARE_BINARY;
-    ARITH_CHECK;
-    FINISH_BINARY;
-}
-
-// Exp -> Exp MINUS Exp
-VISITOR(ExpCase5) {
-    PREPARE_BINARY;
-    ARITH_CHECK;
-    FINISH_BINARY;
-}
-
-// Exp -> Exp STAR Exp
-VISITOR(ExpCase6) {
-    PREPARE_BINARY;
-    ARITH_CHECK;
-    FINISH_BINARY;
-}
-
-// Exp -> Exp DIV Exp
-VISITOR(ExpCase7) {
+// 4. Exp -> Exp PLUS Exp
+// 5. Exp -> Exp MINUS Exp
+// 6. Exp -> Exp STAR Exp
+// 7. Exp -> Exp DIV Exp
+VISITOR(ExpCaseArith) {
     PREPARE_BINARY;
     ARITH_CHECK;
     FINISH_BINARY;
@@ -1158,23 +1121,20 @@ VISITOR(ExpCase10) {
 
 // 11. Exp -> ID LP Args RP
 // 12. Exp -> ID LP RP
-VISITOR(ExpCase11_12) {
+VISITOR(ExpCaseCall) {
     NOINFO;
     SAVE_SYMTAB();
 
     usize call_type_idx = CALL(TypeManager, *self->type_manager, make_fun, /);
 
     // add a dummy (void) return type
-    CALL(TypeManager, *self->type_manager, add_fun_ret_par, /, call_type_idx,
+    CALL(TypeManager, *self->type_manager, add_fun_ret_param, /, call_type_idx,
          self->type_manager->void_type_idx);
 
     if (PROD_ID() == 11) {
         // Exp -> ID LP Args RP
         NEW_SINFO(call_type_idx, -1, false, false);
         VISIT_WITH(Args, 2, &sinfo);
-    } else {
-        // Exp -> ID LP RP
-        // do nothing
     }
 
     String *name = &DATA_CHILD(0)->str_val;
@@ -1187,17 +1147,17 @@ VISITOR(ExpCase11_12) {
     MapSymtabIterator it = CALL(SymbolTable, *now_symtab, find_recursive, /,
                                 &key, self->symbol_manager);
     if (it == NULL) {
-        report_semerr_fmt(node->line_no, SemErrorFunUndef,
-                          "undefined function \"%s\"", STRING_C_STR(*name));
+        report_semerr(node->line_no, SemErrorFunUndef,
+                      "undefined function \"%s\"", STRING_C_STR(*name));
     } else if (it->value.kind != SymbolEntryFun) {
-        report_semerr_fmt(node->line_no, SemErrorCallBaseTypeErr,
-                          "\"%s\" is not a function", STRING_C_STR(*name));
+        report_semerr(node->line_no, SemErrorCallBaseTypeErr,
+                      "\"%s\" is not a function", STRING_C_STR(*name));
     } else if (!CALL(TypeManager, *self->type_manager,
                      is_type_consistency_with_fun_fix, /, call_type_idx,
                      it->value.type_idx)) {
-        report_semerr_fmt(node->line_no, SemErrorCallArgParaMismatch,
-                          "conflicting types for function \"%s\"",
-                          STRING_C_STR(*name));
+        report_semerr(node->line_no, SemErrorCallArgParaMismatch,
+                      "conflicting types for function \"%s\"",
+                      STRING_C_STR(*name));
     } else {
         node->symentry_ptr = &it->value;
     }
@@ -1207,7 +1167,7 @@ VISITOR(ExpCase11_12) {
     Type *type =
         CALL(TypeManager, *self->type_manager, get_type, /, call_type_idx);
     ASSERT(type->kind == TypeKindFun);
-    usize ret_type_idx = type->as_fun.ret_par_idxes.data[0];
+    usize ret_type_idx = type->as_fun.ret_param_idxes.data[0];
 
     // to save memory: pop the temporary type
     bool success_pop =
@@ -1276,9 +1236,9 @@ VISITOR(ExpCase14) {
         // we do not find recursively: the fields are not inherited
         MapSymtabIterator it = CALL(SymbolTable, *struct_symtab, find, /, &key);
         if (it == NULL) {
-            report_semerr_fmt(node->line_no, SemErrorFieldNotExist,
-                              "field \"%s\" does not exist in struct",
-                              STRING_C_STR(*field_name));
+            report_semerr(node->line_no, SemErrorFieldNotExist,
+                          "field \"%s\" does not exist in struct",
+                          STRING_C_STR(*field_name));
             SAVE_TYPE_BASIC(void);
         } else {
             usize field_type_idx = it->value.type_idx;
@@ -1303,12 +1263,12 @@ VISITOR(ExpCase15) {
     MapSymtabIterator it = CALL(SymbolTable, *now_symtab, find_recursive, /,
                                 &key, self->symbol_manager);
     if (it == NULL) {
-        report_semerr_fmt(node->line_no, SemErrorVarUndef,
-                          "undefined variable \"%s\"", STRING_C_STR(*name));
+        report_semerr(node->line_no, SemErrorVarUndef,
+                      "undefined variable \"%s\"", STRING_C_STR(*name));
         SAVE_TYPE_BASIC(void);
     } else if (it->value.kind != SymbolEntryVar) {
-        report_semerr_fmt(node->line_no, SemErrorVarUndef,
-                          "\"%s\" is not a variable", STRING_C_STR(*name));
+        report_semerr(node->line_no, SemErrorVarUndef,
+                      "\"%s\" is not a variable", STRING_C_STR(*name));
         SAVE_TYPE_BASIC(void);
     } else {
         node->symentry_ptr = &it->value;
@@ -1355,17 +1315,21 @@ VISITOR(Exp) {
         DISPATCH_ENTRY(Exp, 1);
         DISPATCH_ENTRY(Exp, 2);
         DISPATCH_ENTRY(Exp, 3);
-        DISPATCH_ENTRY(Exp, 4);
-        DISPATCH_ENTRY(Exp, 5);
-        DISPATCH_ENTRY(Exp, 6);
-        DISPATCH_ENTRY(Exp, 7);
+
+    case 4:
+    case 5:
+    case 6:
+    case 7:
+        DISPATCH(ExpCaseArith);
+        break;
+
         DISPATCH_ENTRY(Exp, 8);
         DISPATCH_ENTRY(Exp, 9);
         DISPATCH_ENTRY(Exp, 10);
 
     case 11:
     case 12:
-        DISPATCH(ExpCase11_12);
+        DISPATCH(ExpCaseCall);
         break;
 
         DISPATCH_ENTRY(Exp, 13);
@@ -1389,15 +1353,12 @@ VISITOR(Args) {
     usize call_type_idx = info->inherit_type_idx;
     usize param_type_idx = DATA_CHILD(0)->type_idx;
 
-    CALL(TypeManager, *self->type_manager, add_fun_ret_par, /, call_type_idx,
+    CALL(TypeManager, *self->type_manager, add_fun_ret_param, /, call_type_idx,
          param_type_idx);
 
     if (PROD_ID() == 0) {
         // Args -> Exp COMMA Args
         VISIT_WITH(Args, 2, info);
-    } else {
-        // Args -> Exp
-        // do nothing
     }
 
     SAVE_TYPE_BASIC(void);

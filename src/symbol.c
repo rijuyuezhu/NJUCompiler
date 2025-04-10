@@ -70,11 +70,5 @@ SymbolTable *MTD(SymbolManager, get_table, /, usize idx) {
     return &self->tables.data[idx];
 }
 
-HString MTD(SymbolManager, make_temp, /) {
-    String s = NSCALL(String, from_f, /, "@temp_%zu", self->temp_cnt);
-    self->temp_cnt++;
-    return NSCALL(HString, from_inner, /, s);
-}
-
 DEFINE_MAPPING(MapSymtab, HString, SymbolEntry, FUNC_EXTERN);
 DEFINE_CLASS_VEC(VecSymbolTable, SymbolTable, FUNC_EXTERN);

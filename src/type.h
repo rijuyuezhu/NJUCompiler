@@ -7,13 +7,11 @@
 
 struct TypeManager;
 
-/* Type */
-
 typedef enum TypeKind {
     TypeKindInvalid,
+    TypeKindVoid,
     TypeKindInt,
     TypeKindFloat,
-    TypeKindVoid,
     TypeKindArray,
     TypeKindStruct,
     TypeKindFun,
@@ -34,7 +32,7 @@ typedef struct Type {
             usize symtab_idx;
         } as_struct;
         struct {
-            VecUSize ret_par_idxes; // the 0th element is the return type
+            VecUSize ret_param_idxes; // the 0th element is the return type
         } as_fun;
     };
 } Type;
@@ -51,7 +49,7 @@ Type NSMTD(Type, make_struct, /, usize symtab_idx);
 void MTD(Type, add_struct_field, /, struct TypeManager *manager,
          usize field_idx);
 Type NSMTD(Type, make_fun, /);
-void MTD(Type, add_fun_ret_par, /, usize ret_par_idx);
+void MTD(Type, add_fun_ret_param, /, usize ret_param_idx);
 int NSMTD(Type, compare, /, const Type *type1, const Type *type2);
 
 typedef struct HType {
@@ -74,9 +72,9 @@ typedef struct TypeManager {
     VecType types;
     MapHTypeUSize repr_map;
     usize repr_cnt;
+    usize void_type_idx;
     usize int_type_idx;
     usize float_type_idx;
-    usize void_type_idx;
 } TypeManager;
 
 void MTD(TypeManager, init, /);
@@ -88,7 +86,8 @@ usize MTD(TypeManager, make_array, /, usize size, usize subtype_idx);
 usize MTD(TypeManager, make_struct, /, usize symtab_idx);
 usize MTD(TypeManager, make_fun, /);
 void MTD(TypeManager, add_struct_field, /, usize type_idx, usize field_idx);
-void MTD(TypeManager, add_fun_ret_par, /, usize type_idx, usize ret_par_idx);
+void MTD(TypeManager, add_fun_ret_param, /, usize type_idx,
+         usize ret_param_idx);
 bool MTD(TypeManager, is_type_consistency, /, usize type_idx1, usize type_idx2);
 bool MTD(TypeManager, is_type_consistency_with_fun_fix, /, usize type_idx1,
          usize type_idx2);

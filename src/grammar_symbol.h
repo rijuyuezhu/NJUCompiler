@@ -16,7 +16,6 @@
 #define APPLY_GRAMMAR_SYMBOL(f)                                                \
     f(Invalid) APPLY_GRAMMAR_SYMBOL_LEXICAL(f) APPLY_GRAMMAR_SYMBOL_SYNTAX(f)
 
-// enum like GS_SEMI, etc
 #define ENUM_GRAMMAR_SYMBOL_AID(gs) CONCATENATE(GS_, gs),
 typedef enum GrammarSymbol {
     APPLY_GRAMMAR_SYMBOL(ENUM_GRAMMAR_SYMBOL_AID)

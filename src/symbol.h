@@ -20,7 +20,8 @@ typedef struct SymbolEntry {
     usize type_idx;
     usize offset;
 
-    // The following things shall be manually set
+    // The following members shall be manually set
+
     struct SymbolTable *table; // points to the table that contains this entry
     String *name;              // points to the key in the symbol table
     union {
@@ -89,4 +90,3 @@ void MTD(SymbolManager, init, /);
 void MTD(SymbolManager, drop, /);
 usize MTD(SymbolManager, add_table, /, usize parent_idx);
 SymbolTable *MTD(SymbolManager, get_table, /, usize idx);
-HString MTD(SymbolManager, make_temp, /);

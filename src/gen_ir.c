@@ -70,7 +70,6 @@ VISITOR(ExpCond);
 #define SINFO(...) sinfo = CREOBJ(IRPassInfo, /, ##__VA_ARGS__)
 
 #define INFO_HAS_TARGET ASSERT(info->target, "info->target must not be NULL")
-
 #define INFO_NO_TARGET ASSERT(!info->target, "info->target must be NULL")
 
 #define INFO_HAS_LABEL                                                         \
@@ -110,71 +109,40 @@ VISITOR(ExpCond);
 
 /* ------ */
 
-FUNC_STATIC IREntityKind MTD(IRGenerator, get_var_irentity_kind, /,
-                             usize type_idx) {
-    Type *t = CALL(TypeManager, *self->type_manager, get_type, /, type_idx);
-    IREntityKind kind;
-    if (t->kind == TypeKindInt) {
-        kind = IREntityVar;
-    } else if (t->kind == TypeKindArray || t->kind == TypeKindStruct) {
-        kind = IREntityAddr;
-    } else if (t->kind == TypeKindFloat) {
-        kind = IREntityVar;
-        report_genir_err("float value is not permitted");
-    } else {
-        PANIC("t->kind not correct");
-    }
-    return kind;
-}
-
-FUNC_STATIC usize MTD(IRGenerator, get_var_ir_idx, /, SymbolEntry *sym) {
-    ASSERT(sym->kind == SymbolEntryVar);
-    if (sym->as_var.ir_var_idx == (usize)-1) {
-        IREntityKind kind =
-            CALL(IRGenerator, *self, get_var_irentity_kind, /, sym->type_idx);
-        IREntity ent = CALL(IRManager, *self->ir_manager, gen_ent_var, /, kind);
-        sym->as_var.ir_var_idx = ent.var_idx;
-    }
-    return sym->as_var.ir_var_idx;
-}
-
-FUNC_STATIC IREntity MTD(IRGenerator, get_var_ent, /, SymbolEntry *sym) {
+static IREntity MTD(IRGenerator, var_ent_from_sym, /, SymbolEntry *sym) {
     ASSERT(sym && sym->kind == SymbolEntryVar);
-    usize ir_idx = CALL(IRGenerator, *self, get_var_ir_idx, /, sym);
-    usize type_idx = sym->type_idx;
-    IREntityKind ent_kind =
-        CALL(IRGenerator, *self, get_var_irentity_kind, /, type_idx);
-    return NSCALL(IREntity, make_var, /, ent_kind, ir_idx);
+    if (sym->as_var.ir_var_idx == (usize)-1) {
+        IREntity ret =
+            CALL(IRManager, *self->ir_manager, new_ent_var, /, IREntityVar);
+        sym->as_var.ir_var_idx = ret.var_idx;
+        return ret;
+    } else {
+        usize ir_var_idx = sym->as_var.ir_var_idx;
+        return NSCALL(IREntity, make_var, /, IREntityVar, ir_var_idx);
+    }
 }
 
-#define NEW_VAR_FROM_TYPEIDX(type_idx)                                         \
-    ({                                                                         \
-        IREntityKind ent_kind =                                                \
-            CALL(IRGenerator, *self, get_var_irentity_kind, /, type_idx);      \
-        CALL(IRManager, *self->ir_manager, gen_ent_var, /, ent_kind);          \
-    })
+static IREntity MTD(IRGenerator, var_ent_new_temp, /) {
+    return CALL(IRManager, *self->ir_manager, new_ent_var, /, IREntityVar);
+}
 
-#define NEW_VAR_FROM_CHILD(idx)                                                \
-    ({                                                                         \
-        usize type_idx = DATA_CHILD(idx)->type_idx;                            \
-        NEW_VAR_FROM_TYPEIDX(type_idx);                                        \
-    })
+#define VAR_FROM_SYM(sym) CALL(IRGenerator, *self, var_ent_from_sym, /, sym);
 
-#define GET_VAR_FROM_SYM(sym) CALL(IRGenerator, *self, get_var_ent, /, sym)
+#define VAR_NEW_TEMP() CALL(IRGenerator, *self, var_ent_new_temp, /)
 
-#define GET_VAR()                                                              \
+#define VAR_NOWNODE()                                                          \
     ({                                                                         \
         SymbolEntry *sym = node->symentry_ptr;                                 \
-        GET_VAR_FROM_SYM(sym);                                                 \
+        VAR_FROM_SYM(sym);                                                     \
     })
 
-#define GET_VAR_FROM_CHILD(idx)                                                \
+#define VAR_CHILD(idx)                                                         \
     ({                                                                         \
         SymbolEntry *sym = DATA_CHILD(idx)->symentry_ptr;                      \
-        GET_VAR_FROM_SYM(sym);                                                 \
+        VAR_FROM_SYM(sym);                                                     \
     })
 
-#define NEW_LABEL() CALL(IRManager, *self->ir_manager, gen_ent_label, /)
+#define NEW_LABEL() CALL(IRManager, *self->ir_manager, new_ent_label, /)
 
 #define ADDIR(kind, ...)                                                       \
     CALL(IRManager, *self->ir_manager, CONCATENATE(addir_, kind), /,           \
@@ -200,8 +168,6 @@ VISITOR(ExtDefList) {
         // ExtDefList -> ExtDef ExtDefList
         VISIT_CHILD(ExtDef, 0);
         VISIT_CHILD(ExtDefList, 1);
-    } else {
-        // ExtDefList -> \epsilon
     }
 }
 
@@ -209,7 +175,7 @@ VISITOR(ExtDefList) {
 VISITOR(ExtDefCase0) {
     NOINFO;
     // Detected global variable
-    report_genir_err("detected global variables");
+    report_genir_err("global variables are not allowed");
 }
 
 // ExtDef -> Specifier SEMI
@@ -312,14 +278,12 @@ VISITOR(FunDec) {
     NOINFO;
     SymbolEntry *sym = node->symentry_ptr;
     ASSERT(sym);
-    IREntity fun = NSCALL(IREntity, make_fun, /, sym->name);
+    IREntity fun =
+        CALL(IRManager, *self->ir_manager, new_ent_fun, /, sym->name);
     ADDIR(fun, fun);
     if (PROD_ID() == 0) {
         // FunDec -> ID LP VarList BP
         VISIT_CHILD(VarList, 2);
-    } else {
-        // FunDec -> ID LP BP
-        // do nothing
     }
 }
 
@@ -331,17 +295,14 @@ VISITOR(VarList) {
     if (PROD_ID() == 0) {
         // VarList -> ParamDec COMMA VarList
         VISIT_CHILD(VarList, 2);
-    } else {
-        // VarList -> ParamDec
-        // do nothing
     }
 }
 
 // ParamDec -> Specifier VarDec
 VISITOR(ParamDec) {
     NOINFO;
-    IREntity par = GET_VAR();
-    ADDIR(param, par);
+    IREntity param = VAR_NOWNODE();
+    ADDIR(param, param);
 }
 
 // CompSt -> LC DefList StmtList RC
@@ -359,16 +320,13 @@ VISITOR(StmtList) {
         // StmtList -> Stmt StmtList
         VISIT_CHILD(Stmt, 0);
         VISIT_CHILD(StmtList, 1);
-    } else {
-        // StmtList -> \epsilon
-        // do nothing
     }
 }
 
 // Stmt -> Exp SEMI
 VISITOR(StmtCase0) {
     NOINFO;
-    IREntity temp_var = NEW_VAR_FROM_CHILD(0);
+    IREntity temp_var = VAR_NEW_TEMP();
     NEW_SINFO(&temp_var, NULL, NULL, NULL);
     VISIT_WITH(Exp, 0, &sinfo);
 }
@@ -382,7 +340,7 @@ VISITOR(StmtCase1) {
 // Stmt -> RETURN Exp SEMI
 VISITOR(StmtCase2) {
     NOINFO;
-    IREntity ret = NEW_VAR_FROM_CHILD(1);
+    IREntity ret = VAR_NEW_TEMP();
     NEW_SINFO(&ret, NULL, NULL, NULL);
     VISIT_WITH(Exp, 1, &sinfo);
     if (ret.kind != IREntityVar) {
@@ -484,12 +442,15 @@ VISITOR(DecList) {
 }
 
 // Dec -> VarDec
-VISITOR(DecCase0) { NOINFO; }
+VISITOR(DecCase0) {
+    NOINFO;
+    // TODO: handle the allocation of struct and array
+}
 
 // Dec -> VarDec ASSIGNOP Exp
 VISITOR(DecCase1) {
     NOINFO;
-    IREntity var = GET_VAR();
+    IREntity var = VAR_NOWNODE();
     NEW_SINFO(&var, NULL, NULL, NULL);
     VISIT_WITH(Exp, 2, &sinfo);
 }
@@ -510,8 +471,8 @@ VISITOR(Dec) {
 VISITOR(ExpCase0) {
     AstNode *left = DATA_CHILD(0);
     ASSERT(left->production_id == 15); // Exp -> ID
-    IREntity left_var = GET_VAR_FROM_SYM(left->symentry_ptr);
-    IREntity temp_var = NEW_VAR_FROM_CHILD(2);
+    IREntity left_var = VAR_CHILD(0);
+    IREntity temp_var = VAR_NEW_TEMP();
     NEW_SINFO(&temp_var, NULL, NULL, NULL);
     VISIT_WITH(Exp, 2, &sinfo);
     ADDIR(assign, left_var, temp_var);
@@ -539,11 +500,11 @@ VISITOR(ExpCaseLogical) {
 // 6. Exp -> Exp STAR Exp
 // 7. Exp -> Exp DIV Exp
 VISITOR(ExpCaseArith) {
-    IREntity t1 = NEW_VAR_FROM_CHILD(0);
+    IREntity t1 = VAR_NEW_TEMP();
     NEW_SINFO(&t1, NULL, NULL, NULL);
     VISIT_WITH(Exp, 0, &sinfo);
 
-    IREntity t2 = NEW_VAR_FROM_CHILD(2);
+    IREntity t2 = VAR_NEW_TEMP();
     SINFO(&t2, NULL, NULL, NULL);
     VISIT_WITH(Exp, 2, &sinfo);
 
@@ -572,7 +533,7 @@ VISITOR(ExpCase8) { VISIT_WITH(Exp, 1, info); }
 
 // Exp -> MINUS Exp
 VISITOR(ExpCase9) {
-    IREntity t = NEW_VAR_FROM_CHILD(1);
+    IREntity t = VAR_NEW_TEMP();
     NEW_SINFO(&t, NULL, NULL, NULL);
     VISIT_WITH(Exp, 1, &sinfo);
 
@@ -594,7 +555,7 @@ VISITOR(ExpCase11_12) {
                "In write, args must be a single arg");
         AstNode *exp = args->children.data[0];
         ASSERT(exp->grammar_symbol == GS_Exp);
-        IREntity temp_var = NEW_VAR_FROM_TYPEIDX(exp->type_idx);
+        IREntity temp_var = VAR_NEW_TEMP();
         NEW_SINFO(&temp_var, NULL, NULL, NULL);
         CALL(IRGenerator, *self, visit_Exp, /, exp, &sinfo);
         ADDIR(write, temp_var);
@@ -610,7 +571,7 @@ VISITOR(ExpCase11_12) {
         }
         DROPOBJ(VecArgs, arglist);
         IREntity fun =
-            CALL(IRManager, *self->ir_manager, gen_ent_fun, /, fun_sym->name);
+            CALL(IRManager, *self->ir_manager, new_ent_fun, /, fun_sym->name);
         ADDIR(call, *info->target, fun);
     }
 }
@@ -623,8 +584,7 @@ VISITOR(ExpCase14) { PANIC("Unimplemented"); }
 
 // Exp -> ID
 VISITOR(ExpCase15) {
-    SymbolEntry *sym = node->symentry_ptr;
-    IREntity ent = GET_VAR_FROM_SYM(sym);
+    IREntity ent = VAR_NOWNODE();
     ADDIR(assign, *info->target, ent);
 }
 
@@ -632,7 +592,7 @@ VISITOR(ExpCase15) {
 VISITOR(ExpCase16) {
     int v = DATA_CHILD(0)->int_val;
     IREntity imm_int =
-        CALL(IRManager, *self->ir_manager, gen_ent_imm_int, /, v);
+        CALL(IRManager, *self->ir_manager, new_ent_imm_int, /, v);
     ADDIR(assign, *info->target, imm_int);
 }
 
@@ -716,10 +676,10 @@ VISITOR(ExpCondCase2) {
 
 // Exp -> Exp RELOP Exp
 VISITOR(ExpCondCase3) {
-    IREntity t1 = NEW_VAR_FROM_CHILD(0);
+    IREntity t1 = VAR_NEW_TEMP();
     NEW_SINFO(&t1, NULL, NULL, NULL);
     VISIT_WITH(Exp, 0, &sinfo);
-    IREntity t2 = NEW_VAR_FROM_CHILD(0);
+    IREntity t2 = VAR_NEW_TEMP();
     SINFO(&t2, NULL, NULL, NULL);
     VISIT_WITH(Exp, 2, &sinfo);
     RelopKind relop_kind = DATA_CHILD(1)->relop_val;
@@ -748,7 +708,7 @@ VISITOR(ExpCondCase10) {
 // Exp -> INT
 // Exp -> FLOAT
 VISITOR(ExpCondNonLogical) {
-    IREntity temp_var = NEW_VAR_FROM_TYPEIDX(node->type_idx);
+    IREntity temp_var = VAR_NEW_TEMP();
     NEW_SINFO(&temp_var, NULL, NULL, NULL);
     VISIT_WITH(Exp, 0, &sinfo);
     ADDIR(condgoto, *info->true_label, temp_var, self->ir_manager->zero,
@@ -794,7 +754,7 @@ VISITOR(Args) {
     INFO_NO_LABEL;
     INFO_NO_TARGET;
     ASSERT(info->arglist, "info->arglist must not be NULL");
-    IREntity arg = NEW_VAR_FROM_CHILD(0);
+    IREntity arg = VAR_NEW_TEMP();
     NEW_SINFO(&arg, NULL, NULL, NULL);
     VISIT_WITH(Exp, 0, &sinfo);
     CALL(VecArgs, *info->arglist, push_back, /, arg);

@@ -15,8 +15,8 @@ static AstNode *common_init(int line_no, GrammarSymbol grammar_symbol,
     node->line_no = line_no;
     node->grammar_symbol = grammar_symbol;
     node->production_id = production_id;
-    node->symtab_idx = 0;
-    node->type_idx = 0;
+    node->symtab_idx = (usize)-1;
+    node->type_idx = (usize)-1;
     node->symentry_ptr = NULL;
     return node;
 }
@@ -108,7 +108,7 @@ void MTD(AstNode, print_subtree, /, usize depth) {
         }
         break;
     default:
-        PANIC("Invalid AstNodeType");
+        PANIC("Invalid AstNodeType: %d", self->kind);
     }
 }
 

@@ -7,8 +7,8 @@ void MTD(Type, clone_from, /, const Type *other) {
         self->as_struct.field_idxes =
             CALL(VecUSize, other->as_struct.field_idxes, clone, /);
     } else if (self->kind == TypeKindFun) {
-        self->as_fun.ret_par_idxes =
-            CALL(VecUSize, other->as_fun.ret_par_idxes, clone, /);
+        self->as_fun.ret_param_idxes =
+            CALL(VecUSize, other->as_fun.ret_param_idxes, clone, /);
     }
 }
 
@@ -16,7 +16,7 @@ void MTD(Type, drop, /) {
     if (self->kind == TypeKindStruct) {
         DROPOBJ(VecUSize, self->as_struct.field_idxes);
     } else if (self->kind == TypeKindFun) {
-        DROPOBJ(VecUSize, self->as_fun.ret_par_idxes);
+        DROPOBJ(VecUSize, self->as_fun.ret_param_idxes);
     }
 }
 
@@ -25,7 +25,11 @@ Type NSMTD(Type, make_array, /, TypeManager *manager, usize size,
     Type result = (Type){
         .kind = TypeKindArray,
         .repr_val = (usize)-1,
-        .as_array = {.size = size, .subtype_idx = subtype_idx},
+        .as_array =
+            {
+                .size = size,
+                .subtype_idx = subtype_idx,
+            },
     };
     Type *subtype = CALL(TypeManager, *manager, get_type, /, subtype_idx);
     if (subtype->kind == TypeKindArray) {
@@ -62,23 +66,16 @@ Type NSMTD(Type, make_fun, /) {
     return (Type){
         .kind = TypeKindFun,
         .repr_val = (usize)-1,
-        .as_fun = {.ret_par_idxes = CREOBJ(VecUSize, /)},
-        .width = (usize)-1,
-        // width for function is not used.
+        .as_fun = {.ret_param_idxes = CREOBJ(VecUSize, /)},
+        .width = 0,
+        // width here is never used
     };
 }
 
-void MTD(Type, add_fun_ret_par, /, usize ret_par_idx) {
+void MTD(Type, add_fun_ret_param, /, usize ret_param_idx) {
     ASSERT(self->kind == TypeKindFun);
-    CALL(VecUSize, self->as_fun.ret_par_idxes, push_back, /, ret_par_idx);
+    CALL(VecUSize, self->as_fun.ret_param_idxes, push_back, /, ret_param_idx);
 }
-
-#define NORMALCMP(a, b)                                                        \
-    ({                                                                         \
-        typeof(a) MPROT(X) = (a);                                              \
-        typeof(b) MPROT(Y) = (b);                                              \
-        MPROT(X) < MPROT(Y) ? -1 : (MPROT(X) > MPROT(Y) ? 1 : 0);              \
-    })
 
 int NSMTD(Type, compare, /, const Type *type1, const Type *type2) {
     if (type1->kind != type2->kind) {
@@ -88,6 +85,7 @@ int NSMTD(Type, compare, /, const Type *type1, const Type *type2) {
         type1->kind == TypeKindFloat || type1->kind == TypeKindVoid) {
         return 0;
     } else if (type1->kind == TypeKindArray) {
+        // NOTE: the size of the array is not part of the comparison
         if (type1->as_array.dim != type2->as_array.dim) {
             return NORMALCMP(type1->as_array.dim, type2->as_array.dim);
         }
@@ -103,8 +101,8 @@ int NSMTD(Type, compare, /, const Type *type1, const Type *type2) {
         }
         return NORMALCMP(v1->size, v2->size);
     } else if (type1->kind == TypeKindFun) {
-        const VecUSize *v1 = &type1->as_fun.ret_par_idxes;
-        const VecUSize *v2 = &type2->as_fun.ret_par_idxes;
+        const VecUSize *v1 = &type1->as_fun.ret_param_idxes;
+        const VecUSize *v2 = &type2->as_fun.ret_param_idxes;
         for (usize i = 0; i < v1->size && i < v2->size; i++) {
             if (v1->data[i] != v2->data[i]) {
                 return NORMALCMP(v1->data[i], v2->data[i]);
@@ -129,7 +127,7 @@ void MTD(HType, rehash, /) {
             hash = hash * BASE + v->data[i];
         }
     } else if (t->kind == TypeKindFun) {
-        const VecUSize *v = &t->as_fun.ret_par_idxes;
+        const VecUSize *v = &t->as_fun.ret_param_idxes;
         for (usize i = 0; i < v->size; i++) {
             hash = hash * BASE + v->data[i];
         }
@@ -154,6 +152,11 @@ void MTD(TypeManager, init, /) {
     CALL(VecType, self->types, init, /);
     CALL(MapHTypeUSize, self->repr_map, init, /);
     self->repr_cnt = 0;
+    self->void_type_idx = CALL(TypeManager, *self, add_type, /,
+                               (Type){
+                                   .kind = TypeKindVoid,
+                                   .repr_val = (usize)-1,
+                               });
     self->int_type_idx = CALL(TypeManager, *self, add_type, /,
                               (Type){
                                   .kind = TypeKindInt,
@@ -164,14 +167,9 @@ void MTD(TypeManager, init, /) {
                                     .kind = TypeKindFloat,
                                     .repr_val = (usize)-1,
                                 });
-    self->void_type_idx = CALL(TypeManager, *self, add_type, /,
-                               (Type){
-                                   .kind = TypeKindVoid,
-                                   .repr_val = (usize)-1,
-                               });
+    CALL(TypeManager, *self, fill_in_repr, /, self->void_type_idx);
     CALL(TypeManager, *self, fill_in_repr, /, self->int_type_idx);
     CALL(TypeManager, *self, fill_in_repr, /, self->float_type_idx);
-    CALL(TypeManager, *self, fill_in_repr, /, self->void_type_idx);
 }
 
 void MTD(TypeManager, drop, /) {
@@ -213,8 +211,9 @@ void MTD(TypeManager, add_struct_field, /, usize type_idx, usize field_idx) {
          field_idx);
 }
 
-void MTD(TypeManager, add_fun_ret_par, /, usize type_idx, usize ret_par_idx) {
-    CALL(Type, self->types.data[type_idx], add_fun_ret_par, /, ret_par_idx);
+void MTD(TypeManager, add_fun_ret_param, /, usize type_idx,
+         usize ret_param_idx) {
+    CALL(Type, self->types.data[type_idx], add_fun_ret_param, /, ret_param_idx);
 }
 
 static bool MTD(TypeManager, is_type_array_consistency, /, Type *t1, Type *t2) {
@@ -240,8 +239,8 @@ static bool MTD(TypeManager, is_type_struct_consistency, /, Type *t1,
 }
 static bool MTD(TypeManager, is_type_fun_consistency, /, Type *t1, Type *t2,
                 bool fix) {
-    VecUSize *r1 = &t1->as_fun.ret_par_idxes;
-    VecUSize *r2 = &t2->as_fun.ret_par_idxes;
+    VecUSize *r1 = &t1->as_fun.ret_param_idxes;
+    VecUSize *r2 = &t2->as_fun.ret_param_idxes;
     if (r1->size != r2->size) {
         return false;
     }
@@ -342,11 +341,11 @@ void MTD(TypeManager, fill_in_repr, /, usize type_idx) {
             repr_t.as_struct.field_idxes.data[i] = field->repr_val;
         }
     } else if (t->kind == TypeKindFun) {
-        for (usize i = 0; i < t->as_fun.ret_par_idxes.size; i++) {
-            Type *ret_par = CALL(TypeManager, *self, get_type, /,
-                                 t->as_fun.ret_par_idxes.data[i]);
-            ASSERT(ret_par->repr_val != (usize)-1);
-            repr_t.as_fun.ret_par_idxes.data[i] = ret_par->repr_val;
+        for (usize i = 0; i < t->as_fun.ret_param_idxes.size; i++) {
+            Type *ret_param = CALL(TypeManager, *self, get_type, /,
+                                   t->as_fun.ret_param_idxes.data[i]);
+            ASSERT(ret_param->repr_val != (usize)-1);
+            repr_t.as_fun.ret_param_idxes.data[i] = ret_param->repr_val;
         }
     } // else, basic type; no change
 

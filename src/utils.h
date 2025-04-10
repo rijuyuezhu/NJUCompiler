@@ -20,15 +20,30 @@
 #define CONCATENATE3(x, y, z) CONCATENATE(CONCATENATE(x, y), z)
 #undef CONCATENATE4
 #define CONCATENATE4(x, y, z, w) CONCATENATE(CONCATENATE3(x, y, z), w)
-#undef VA_OPT_IDENTITY
-#define VA_OPT_IDENTITY(x) x
-#undef VA_OPT_EMPTY
-#define VA_OPT_EMPTY(x)
-#undef CHOOSE_3rd
-#define CHOOSE_3rd(a, b, c, ...) c
-#undef VA_OPT_ONE
-#define VA_OPT_ONE(s, ...)                                                     \
-    CHOOSE_3rd(_0, ##__VA_ARGS__, VA_OPT_IDENTITY, VA_OPT_EMPTY)(s)
+
+#undef VA_ARGS_FIRST_AID
+#define VA_ARGS_FIRST_AID(x, ...) x
+#undef VA_ARGS_FIRST
+#define VA_ARGS_FIRST(...) VA_ARGS_FIRST_AID(__VA_ARGS__, )
+#undef MACRO_HAS_AT_LEAST_TWO_ARGS
+#define MACRO_HAS_AT_LEAST_TWO_ARGS(...)                                       \
+    MACRO_HAS_AT_LEAST_TWO_ARGS_(__VA_ARGS__, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
+#undef MACRO_HAS_AT_LEAST_TWO_ARGS_
+#define MACRO_HAS_AT_LEAST_TWO_ARGS_(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10,  \
+                                     _11, N, ...)                              \
+    N
+
+#undef VA_ARGS_EXCEPT_FIRST
+#define VA_ARGS_EXCEPT_FIRST(...)                                              \
+    VA_ARGS_EXCEPT_FIRST_IMPL(MACRO_HAS_AT_LEAST_TWO_ARGS(__VA_ARGS__),        \
+                              __VA_ARGS__)
+#undef VA_ARGS_EXCEPT_FIRST_IMPL
+#define VA_ARGS_EXCEPT_FIRST_IMPL(has_args, ...)                               \
+    CONCATENATE(VA_ARGS_EXCEPT_FIRST_IMPL_, has_args)(__VA_ARGS__)
+#undef VA_ARGS_EXCEPT_FIRST_IMPL_1
+#define VA_ARGS_EXCEPT_FIRST_IMPL_1(first, ...) , ##__VA_ARGS__
+#undef VA_ARGS_EXCEPT_FIRST_IMPL_0
+#define VA_ARGS_EXCEPT_FIRST_IMPL_0(...)
 
 #undef typeof
 #define typeof __typeof__
@@ -68,6 +83,14 @@
         typeof(x) MPROT(MIN_X) = (x);                                          \
         typeof(y) MPROT(MIN_Y) = (y);                                          \
         MPROT(MIN_X) < MPROT(MIN_Y) ? MPROT(MIN_X) : MPROT(MIN_Y);             \
+    })
+
+#undef NORMALCMP
+#define NORMALCMP(a, b)                                                        \
+    ({                                                                         \
+        typeof(a) MPROT(X) = (a);                                              \
+        typeof(b) MPROT(Y) = (b);                                              \
+        MPROT(X) < MPROT(Y) ? -1 : (MPROT(X) > MPROT(Y) ? 1 : 0);              \
     })
 
 /* method call support */
@@ -169,11 +192,9 @@
     STORAGE void MTD(cls, clone_from, /,                                       \
                      ATTR_UNUSED const typeof(cls) *MPROT(other)) {            \
         PANIC("Cloning is not allowed for " #cls);                             \
-        UNREACHABLE;                                                           \
     }                                                                          \
     STORAGE typeof(cls) MTDCONST(cls, clone, /) {                              \
         PANIC("Cloning is not allowed for " #cls);                             \
-        UNREACHABLE;                                                           \
     }
 
 /* type definitions */

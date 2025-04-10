@@ -77,7 +77,7 @@ static RelopKind parse_to_relop(const char *str) {
             return RelopEQ;
         }
     }
-    ASSERT(false);
+    PANIC("Unreachable");
 }
 %}
 

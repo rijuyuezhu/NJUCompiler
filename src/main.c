@@ -28,7 +28,7 @@ static void run_task(TaskEngine *engine) {
 }
 
 int main(int argc, char *argv[]) {
-    ASSERT(argc == 2);
+    ASSERT(argc == 2, "Usage: %s <source file>", argv[0]);
     TaskEngine *engine = CREOBJHEAP(TaskEngine, /, argv[1], NULL);
     run_task(engine);
     DROPOBJHEAP(TaskEngine, engine);
@@ -62,7 +62,7 @@ static void run_task(TaskEngine *engine) {
 }
 
 int main(int argc, char *argv[]) {
-    ASSERT(argc == 3);
+    ASSERT(argc == 3, "Usage: %s <source file> <output file>", argv[0]);
     TaskEngine *engine = CREOBJHEAP(TaskEngine, /, argv[1], argv[2]);
     run_task(engine);
     DROPOBJHEAP(TaskEngine, engine);

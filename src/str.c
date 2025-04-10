@@ -84,13 +84,6 @@ int MTD(String, pushfv, /, const char *format, va_list args) {
     return ret_val;
 }
 
-#define NORMALCMP(a, b)                                                        \
-    ({                                                                         \
-        typeof(a) MPROT(X) = (a);                                              \
-        typeof(b) MPROT(Y) = (b);                                              \
-        MPROT(X) < MPROT(Y) ? -1 : (MPROT(X) > MPROT(Y) ? 1 : 0);              \
-    })
-
 int NSMTD(String, compare, /, const String *a, const String *b) {
     for (usize i = 0; i < a->size && i < b->size; i++) {
         if (a->data[i] != b->data[i]) {

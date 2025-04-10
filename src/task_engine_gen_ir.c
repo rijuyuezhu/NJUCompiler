@@ -12,12 +12,15 @@ void MTD(TaskEngine, gen_ir, /) {
 }
 
 void MTD(TaskEngine, save_ir_to_file, /) {
-    ASSERT(!self->gen_ir_error);
+    ASSERT(!self->gen_ir_error, "IR generation error occurred");
 
     String ir_str = CALL(IRManager, self->ir_manager, get_ir_str, /);
 
     FILE *fp = fopen(self->ir_file, "w");
-    ASSERT(fp, "Cannot open file");
+    if (!fp) {
+        perror(self->ir_file);
+        exit(EXIT_FAILURE);
+    }
     fprintf(fp, "%s", STRING_C_STR(ir_str));
     fclose(fp);
     DROPOBJ(String, ir_str);

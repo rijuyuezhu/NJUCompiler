@@ -5,7 +5,7 @@ extern void yyrestart(FILE *input_file);
 extern void yylex_destroy();
 
 void MTD(TaskEngine, parse_ast, /) {
-    ASSERT(self->ast_root == NULL, "AST already analyzed");
+    ASSERT(!self->ast_root, "AST already analyzed");
 
     FILE *fp = fopen(self->input_file, "r");
     if (!fp) {

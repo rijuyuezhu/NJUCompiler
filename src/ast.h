@@ -24,24 +24,6 @@ typedef struct AstNode {
     GrammarSymbol grammar_symbol;
     usize production_id;
 
-    /* Semantic Info */
-    usize symtab_idx;
-    usize type_idx;
-
-    // only maybe non-null for grammar_symbols below:
-    // 1. StructSpecifier and its father (Specifier with prod_id 1); the struct
-    // name
-    // ---
-    // 2. ExpDecList, ParamDec, Dec; the declared var name
-    // 3. FunDec; the declared func
-    // 4. Exp (prod_id 11, 12 -- call exprs); the called func name
-    // 5. Exp (prod_id 14 -- field access); the field name
-    // 6. Exp (prod_id 15 -- Exp -> ID); the id name
-    //
-    // The last five are used in IR generation
-    struct SymbolEntry *symentry_ptr;
-
-    /* Attribute_value */
     union {
         int int_val;
         float float_val;
@@ -49,6 +31,25 @@ typedef struct AstNode {
         RelopKind relop_val;
         VecPtr children;
     };
+
+    /* Semantic Info */
+    usize symtab_idx;
+    usize type_idx;
+
+    // only non-null for grammar_symbols below:
+    // 1. StructSpecifier and its father (Specifier with prod_id 1);
+    //    the struct name
+    //
+    // ---
+    // 2. ExpDecList, ParamDec, Dec; the declared var name (VarDec itself does
+    //    not have non-null symentry_ptrm)
+    // 3. FunDec; the declared func
+    // 4. Exp (prod_id 11, 12 -- call exprs); the called func name
+    // 5. Exp (prod_id 14 -- field access); the field name
+    // 6. Exp (prod_id 15 -- Exp -> ID); the id name
+    //
+    // The last five are used in IR generation
+    struct SymbolEntry *symentry_ptr;
 } AstNode;
 
 AstNode *NSMTD(AstNode, creheap_basic, /, int line_no,

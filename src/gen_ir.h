@@ -17,6 +17,7 @@ typedef struct IRGenerator {
 void MTD(IRGenerator, init, /, struct IRManager *ir_manager,
          struct TypeManager *type_manager,
          struct SymbolManager *symbol_manager);
+
 FUNC_STATIC DEFAULT_DROPER(IRGenerator);
 
 struct String MTD(IRGenerator, gen_ir, /, struct AstNode *node);

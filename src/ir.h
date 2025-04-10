@@ -19,10 +19,10 @@ typedef enum IREntityKind {
 typedef struct IREntity {
     IREntityKind kind;
     union {
-        int imm_int;
-        usize var_idx;
-        usize label_idx;
-        struct String *fun_name;
+        int imm_int;             // for IREntityImmInt
+        usize var_idx;           // for IREntityVar, IREntityAddr, IREntityDeref
+        usize label_idx;         // for IREntityLabel
+        struct String *fun_name; // for IREntityFun
     };
 } IREntity;
 
@@ -32,14 +32,14 @@ IREntity NSMTD(IREntity, make_label, /, usize idx);
 IREntity NSMTD(IREntity, make_fun, /, struct String *fun_name);
 
 void MTD(IREntity, build_str, /, struct String *builder);
-void MTD(IREntity, build_str_nosymprefix, /, struct String *builder);
 
 #define APPLY_IR_KIND(f)                                                       \
     f(Label)           /* LABEL {e1:label} : */                                \
         f(Function)    /* FUNCTION {e1:fun} : */                               \
         f(Assign)      /* {ret:var} := {e1:var/e1:imm_int/e1:addr/e1:deref},   \
                           {ret:deref} := {e1:var} */                           \
-        f(ArithAssign) /* {ret:var} := {e1:var} {arithop_val} {e2:var} */      \
+        f(ArithAssign) /* {ret:var} := {e1:var/e1:imm_int} {arithop_val}       \
+                          {e2:var/e2:imm_int} */                               \
         f(Goto)        /* GOTO {ret:label} */                                  \
         f(CondGoto)    /* IF {e1:var} {relop_val} {e2:var} GOTO {ret:label} */ \
         f(Return)      /* RETURN {e1:var} */                                   \
@@ -79,9 +79,9 @@ IR *NSMTD(IR, creheap_return, /, IREntity ret);
 IR *NSMTD(IR, creheap_dec, /, IREntity dec, IREntity imm);
 IR *NSMTD(IR, creheap_arg, /, IREntity arg);
 IR *NSMTD(IR, creheap_call, /, IREntity lhs, IREntity fun);
-IR *NSMTD(IR, creheap_param, /, IREntity par);
+IR *NSMTD(IR, creheap_param, /, IREntity param);
 IR *NSMTD(IR, creheap_read, /, IREntity ret);
-IR *NSMTD(IR, creheap_write, /, IREntity par);
+IR *NSMTD(IR, creheap_write, /, IREntity param);
 
 void MTD(IR, build_str, /, struct String *builder);
 
@@ -89,7 +89,7 @@ typedef struct IRManager {
     VecPtr irs;
     usize idx_cur;
 
-    // some `constants`
+    // some predefined `constants`
     IREntity zero;
     IREntity one;
 } IRManager;
@@ -110,14 +110,14 @@ void MTD(IRManager, addir_return, /, IREntity ret);
 void MTD(IRManager, addir_dec, /, IREntity dec, IREntity imm);
 void MTD(IRManager, addir_arg, /, IREntity arg);
 void MTD(IRManager, addir_call, /, IREntity lhs, IREntity fun);
-void MTD(IRManager, addir_param, /, IREntity par);
+void MTD(IRManager, addir_param, /, IREntity param);
 void MTD(IRManager, addir_read, /, IREntity ret);
-void MTD(IRManager, addir_write, /, IREntity par);
+void MTD(IRManager, addir_write, /, IREntity param);
 
-IREntity MTD(IRManager, gen_ent_imm_int, /, int imm_int);
-IREntity MTD(IRManager, gen_ent_var, /, IREntityKind kind);
-IREntity MTD(IRManager, gen_ent_label, /);
-IREntity MTD(IRManager, gen_ent_fun, /, struct String *fun_name);
+IREntity MTD(IRManager, new_ent_imm_int, /, int imm_int);
+IREntity MTD(IRManager, new_ent_var, /, IREntityKind kind);
+IREntity MTD(IRManager, new_ent_label, /);
+IREntity MTD(IRManager, new_ent_fun, /, struct String *fun_name);
 
 void MTD(IRManager, build_str, /, struct String *builder);
 struct String MTD(IRManager, get_ir_str, /);

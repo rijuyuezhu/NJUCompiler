@@ -57,29 +57,6 @@ void MTD(IREntity, build_str, /, String *builder) {
     }
 }
 
-void MTD(IREntity, build_str_nosymprefix, /, String *builder) {
-    switch (self->kind) {
-    case IREntityImmInt:
-        CALL(String, *builder, pushf, /, "%d", self->imm_int);
-        break;
-    case IREntityVar:
-    case IREntityAddr:
-    case IREntityDeref:
-        CALL(String, *builder, pushf, /, "v%zu", self->var_idx);
-        break;
-    case IREntityLabel:
-        CALL(String, *builder, pushf, /, "l%zu", self->label_idx);
-        break;
-    case IREntityFun: {
-        const char *fun_name = STRING_C_STR(*self->fun_name);
-        CALL(String, *builder, pushf, /, "%s", fun_name);
-        break;
-    }
-    default:
-        PANIC("Invalid IREntityKind");
-    }
-}
-
 IR *NSMTD(IR, creheap_label, /, IREntity label) {
     ASSERT(label.kind == IREntityLabel);
     IR *ir = CREOBJRAWHEAP(IR);
@@ -87,6 +64,7 @@ IR *NSMTD(IR, creheap_label, /, IREntity label) {
     ir->e1 = label;
     return ir;
 }
+
 IR *NSMTD(IR, creheap_fun, /, IREntity fun) {
     ASSERT(fun.kind == IREntityFun);
     IR *ir = CREOBJRAWHEAP(IR);
@@ -94,6 +72,7 @@ IR *NSMTD(IR, creheap_fun, /, IREntity fun) {
     ir->e1 = fun;
     return ir;
 }
+
 IR *NSMTD(IR, creheap_assign, /, IREntity lhs, IREntity rhs) {
     ASSERT((lhs.kind == IREntityVar &&
             (rhs.kind == IREntityVar || rhs.kind == IREntityAddr ||
@@ -167,11 +146,11 @@ IR *NSMTD(IR, creheap_call, /, IREntity lhs, IREntity fun) {
     ir->e1 = fun;
     return ir;
 }
-IR *NSMTD(IR, creheap_param, /, IREntity par) {
-    ASSERT(par.kind == IREntityVar || par.kind == IREntityAddr);
+IR *NSMTD(IR, creheap_param, /, IREntity param) {
+    ASSERT(param.kind == IREntityVar || param.kind == IREntityAddr);
     IR *ir = CREOBJRAWHEAP(IR);
     ir->kind = IRParam;
-    ir->e1 = par;
+    ir->e1 = param;
     return ir;
 }
 IR *NSMTD(IR, creheap_read, /, IREntity ret) {
@@ -181,11 +160,11 @@ IR *NSMTD(IR, creheap_read, /, IREntity ret) {
     ir->ret = ret;
     return ir;
 }
-IR *NSMTD(IR, creheap_write, /, IREntity par) {
-    ASSERT(par.kind == IREntityVar);
+IR *NSMTD(IR, creheap_write, /, IREntity param) {
+    ASSERT(param.kind == IREntityVar);
     IR *ir = CREOBJRAWHEAP(IR);
     ir->kind = IRWrite;
-    ir->e1 = par;
+    ir->e1 = param;
     return ir;
 }
 
@@ -291,9 +270,7 @@ BUILD_STR_IR(Return) {
 BUILD_STR_IR(Dec) {
     CALL(String, *builder, push_str, /, "DEC ");
     CALL(IREntity, self->ret, build_str, /, builder);
-    CALL(String, *builder, push_str, /, " ");
-    CALL(IREntity, self->e1, build_str_nosymprefix, /, builder);
-    CALL(String, *builder, push_str, /, "\n");
+    CALL(String, *builder, pushf, /, " %d\n", self->e2.imm_int);
 }
 BUILD_STR_IR(Arg) {
     CALL(String, *builder, push_str, /, "ARG ");
@@ -333,8 +310,8 @@ void MTD(IR, build_str, /, String *builder) {
 void MTD(IRManager, init, /) {
     CALL(VecPtr, self->irs, init, /);
     self->idx_cur = 0;
-    self->zero = CALL(IRManager, *self, gen_ent_imm_int, /, 0);
-    self->one = CALL(IRManager, *self, gen_ent_imm_int, /, 1);
+    self->zero = CALL(IRManager, *self, new_ent_imm_int, /, 0);
+    self->one = CALL(IRManager, *self, new_ent_imm_int, /, 1);
 }
 
 void MTD(IRManager, drop, /) {
@@ -389,31 +366,31 @@ void MTD(IRManager, addir_call, /, IREntity lhs, IREntity fun) {
     IR *ir = NSCALL(IR, creheap_call, /, lhs, fun);
     CALL(VecPtr, self->irs, push_back, /, ir);
 }
-void MTD(IRManager, addir_param, /, IREntity par) {
-    IR *ir = NSCALL(IR, creheap_param, /, par);
+void MTD(IRManager, addir_param, /, IREntity param) {
+    IR *ir = NSCALL(IR, creheap_param, /, param);
     CALL(VecPtr, self->irs, push_back, /, ir);
 }
 void MTD(IRManager, addir_read, /, IREntity ret) {
     IR *ir = NSCALL(IR, creheap_read, /, ret);
     CALL(VecPtr, self->irs, push_back, /, ir);
 }
-void MTD(IRManager, addir_write, /, IREntity par) {
-    IR *ir = NSCALL(IR, creheap_write, /, par);
+void MTD(IRManager, addir_write, /, IREntity param) {
+    IR *ir = NSCALL(IR, creheap_write, /, param);
     CALL(VecPtr, self->irs, push_back, /, ir);
 }
 
-IREntity MTD(IRManager, gen_ent_imm_int, /, int imm_int) {
+IREntity MTD(IRManager, new_ent_imm_int, /, int imm_int) {
     return NSCALL(IREntity, make_imm_int, /, imm_int);
 }
-IREntity MTD(IRManager, gen_ent_var, /, IREntityKind kind) {
+IREntity MTD(IRManager, new_ent_var, /, IREntityKind kind) {
     usize idx = CALL(IRManager, *self, new_idx, /);
     return NSCALL(IREntity, make_var, /, kind, idx);
 }
-IREntity MTD(IRManager, gen_ent_label, /) {
+IREntity MTD(IRManager, new_ent_label, /) {
     usize idx = CALL(IRManager, *self, new_idx, /);
     return NSCALL(IREntity, make_label, /, idx);
 }
-IREntity MTD(IRManager, gen_ent_fun, /, struct String *fun_name) {
+IREntity MTD(IRManager, new_ent_fun, /, struct String *fun_name) {
     return NSCALL(IREntity, make_fun, /, fun_name);
 }
 
