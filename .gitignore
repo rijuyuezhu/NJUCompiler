@@ -8,6 +8,7 @@
 !*.py
 !*.cmm
 !*.typ
+!*.png
 
 !Makefile
 !README.md

@@ -31,7 +31,7 @@
 #set underline(offset: .1em, stroke: .05em, evade: false)
 
 
-= #text(font: ("Libertinus Serif", "STZhongsong"))[编译原理 Project 2 实验报告]
+= #text(font: ("Libertinus Serif", "STZhongsong"))[编译原理 Project 3 实验报告]
 
 #align(center)[
   #v(1em)
@@ -48,73 +48,60 @@
 
 == 程序实现功能 <impl>
 
-我在项目中实现了编译原理 Project 2 的全部内容，包括：
-- 符号表与类型系统的建立（@symtab[Sec]）；
-- 语义分析的实现（@semantic[Sec]）。
+我在项目中实现了编译原理 Project 3 的全部内容，包括：
+- 中间代码的程序内表示和输出转换（@ir[Sec]）；
+- 源代码到中间代码的转换（@genir[Sec]）；
 
-=== 符号表与类型系统 <symtab>
+=== 中间代码的程序内表示和输出转换 <ir>
 
-符号表的实现使用了在 Project 1 中就预先实现的平衡二叉搜索树（用 Treap 实现），实现了从 `HString` 到 `SymbolEntry` 的映射：
+在程序内我希望使用一种简单的编码方式来进行中间代码的表示和保存，从而可以方便后续的处理。我采用的是两层抽象，第一层抽象“地址”（即下文中的 `IREntity`），第二层则抽象 IR（即下文中的 `IR`）:
 
 ```c
-typedef struct HString {
-    String s;
-    u64 stored_hash;
-} HString;
+typedef enum IREntityKind {
+    IREntityInvalid,
+    IREntityImmInt, // starts with #
+    IREntityVar,    // starts with v
+    IREntityAddr,   // starts with &v
+    IREntityDeref,  // starts with *v
+    IREntityLabel,  // starts with l
+    IREntityFun,    // fun_name->name
+} IREntityKind;
 
-typedef struct SymbolEntry {
-    SymbolEntryKind kind;
-    usize type_idx;
-
-    struct SymbolTable *table;
-    String *name;
+typedef struct IREntity {
+    IREntityKind kind;
     union {
-        struct {
-            bool is_defined;
-            int first_decl_line_no;
-        } as_fun;
+        int imm_int;             // for IREntityImmInt
+        usize var_idx;           // for IREntityVar, IREntityAddr, IREntityDeref
+        usize label_idx;         // for IREntityLabel
+        struct String *fun_name; // for IREntityFun
     };
-} SymbolEntry;
-```
-其中 `HString` 是缓存了哈希值的 `String`（`String` 是可变长的、类似于 C++ 中 `std::string` 的字符串，是以在 Project 1 中实现的、以宏作为模板的 `Vector` 为基础实现的），缓存哈希主要是为了能够则平衡二叉搜索树中快速比较；`SymbolEntry` 主要包括了一个表示该符号对应类型的 `type_idx`，以及其他所需信息。
+} IREntity;
 
-而*每个*符号表则是以从 `HString` 到 `SymbolEntry` 的 Mapping 为基础实现的，不同的符号表构成父子关系，用以支持变量作用域的嵌套：
-```c
-typedef struct SymbolTable {
-    usize parent_idx; // father symtab
-    MapSymtab mapping;
-} SymbolTable;
-```
+typedef struct IR {
+    IRKind kind;
+    IREntity e1;
+    IREntity e2;
+    IREntity ret;
 
-而类型系统则是以 `Type` 结构体为基础实现的：
-```c
-typedef struct Type {
-    TypeKind kind;
-    usize repr_val; // representive index; for fast equal test. See Sec 4.2
     union {
-        struct {
-            usize size, dim, subtype_idx;
-        } as_array;
-        struct {
-            VecUSize field_idxes;
-            usize symtab_idx;
-        } as_struct;
-        struct {
-            VecUSize ret_par_idxes; // the 0th element is the return type
-        } as_fun;
+        ArithopKind arithop_val;
+        RelopKind relop_val;
     };
-} Type;
+} IR;
 ```
 
-值得注意的是，在符号表和类型系统中，指代其他的符号表/类型的索引均使用 `usize`；这是因为我使用了可变长的 `Vector` 来进行符号表/类型管理。该 `Vector` 可能由于扩容而导致指针失效，故使用整数索引较为稳妥。
+之后，使用 `Vector`（详见 Project 1 实验报告）来维护 IR 的列表。为了将 IR 输出，我实现了成员函数
 
-=== 语义分析 <semantic>
+```c
+void MTD(IR, build_str, /, struct String *builder);
+```
 
-基于这一套符号表和类型系统，我实现了语义分析，主要包括了：
+它可以递增地将当前 IR 产生的字符串接到 `builder` 后（`builder` 的类型是基于 `Vector` 的可变长 `String`）。
 
-- 遍历 AST，在该过程中按照语义，传递各种 attributes，从而适当地进行符号表嵌套、类型生成（`Struct` 和 `Fun` 类型）和符号表填充；
-- 当遇到语法错误时，按照规定进行报错。
+=== 源代码到中间代码的转换 <genir>
 
+为了在类型检查的基础上，继续实现中间代码的生成，我在类型检查*之后*，再遍历了一次 Parse Tree。为了方便效率的提高，对于某些结点（如
+`ExpDecList`, `ParamDec`, `Dec`, `FunDec` 和一些 `Exp`），我在类型检查的过程中记录了它们的符号表 `Entry` 信息，从而避免了在生成 IR 的过程中再次查询符号表。
 
 == 程序编译指令 <compile>
 
@@ -139,42 +126,26 @@ typedef struct Type {
 
 == 其它亮点 <other>
 
-=== 应用“空类型”减少非本质报错
+=== "CALL Matcher in C" neovim 插件的开发 <neovim>
 
-在计算过程中，若发现了错误，我希望能够在报错时尽可能减少因该错误而连带引起的错误。解决方法是引入空类型 `void`（其实相当于 bottom 类型 $bot$)：在语义分析出现错误时，程序会报错，并将可能产生的“结果”（如 Exp 的求值，StructSpecifier 的解析等）的类型设为 `void`。在类型相容性检查时给予 `void` 较高的兼容性以减少连锁报错。
+在 Project 1 中，我提到，为了方便程序的编写，我在 C 中用宏实现了一套 OOP 原语，且使用类似 Rust 的移动语义来实现了（手动的）内存管理与 RAII。这一套语法系统主要包括：
 
-=== 高效进行类型相容性检查
+- `CALL(class, name, method, /, params)` 用来进行方法调用，类似于 `name.method(params)` 的用法，其中 `name` 的类型是 `class`；
+- `NSCALL(class, method, /, params)` 用来进行静态方法调用，类似于 `class::method(params)` 的用法；
+- `MTD(class, method, /, params)` 用来进行方法声明和定义，在方法定义内部可以使用类型为 `class *` 的变量 `self` 来指代当前对象；
+- `NSMTD(class, method, /, params)` 用来进行静态方法声明和定义。
 
-由于按照讲义的编译器实现中，对类型相容性检查需要递归进行（例如对两个 `Struct` 的相容性判断需要递归地对每个 Field 依次判断，对两个 `Fun` 的相容性判断需要递归地对参数和返回值进行判断），在一些极端情况下会导致低效。例如，在以下构造的样例中会导致指数型的判断递归：
+然而这一套宏在使用过程中可读性较差。为了方便程序的编写，我开发了对这种"DSL"的自动解析的 neovim 插件 "Call Matcher in C"#footnote[#link("https://github.com/rijuyuezhu/call-matcher-in-C.nvim")]，它可以将上述宏对应的 OOP 写法显示在 neovim 的虚拟行中，效果类似于：
 
-```c
-struct A0{
-  int val;
-};
-struct A1{
-	struct A0 v0, v1;
-};
-struct A2{
-	struct A1 v0, v1;
-};
-// ...
-struct A2999{
-	struct A2998 v0, v1;
-};
-int main(){
-  struct A2999 a, b; struct A2997 c; struct A2997 d; struct A2998 e;
-  a = b; a = c; b = c; a = d; b = d; c = d; a = e; b = e; c = e; d = e;
-}
-```
+#figure(image("1.png", width: 70%))
 
-为了解决这个问题，我为每个类型引入了一个 `repr_val`，用以快速判断两个类型是否相容。所有相容的类型都有相同的 `repr_val`。这使得能够在常数时间内判断两个类型是否相同。
+这可以方便地解析这一种 DSL。
 
-具体做法是，维护一个 `Type` 到 `usize` 的 Map（使用平衡二叉搜索树实现；实际键值为 `HType`，即缓存了哈希的 `Type`，用以提高搜索效率），用以维护不同类型的等价类（以相容性为等价关系）。在一个类型构造完成时（如 `Struct` 添加了所有的 Field 后，或是 `Fun` 添加了所有返回值和参数后），会试图在该 Map 中寻找是否有与之相容的类型；若找到了，则将 `repr_val` 设为 Map 中对应的值；否则新建一个独特的值并插入 Map 中。而“在该 Map 中寻找是否有与之相容的类型”的操作则也较为简单：对于普通类型，直接在 Map 中进行比对即可；对于包含其他类型的复合类型，如 `Array`, `Struct` 和 `Fun`，则将其所包含的所有子类型先改写成其对应的 `repr_val`，再将改写后的类型插入 Map。该算法其实是龙书第六章对应算法的一个实现。
 
 == 实验感想 <thought>
 
-这次实验相比上一次实验，正确性的不确定性小了很多（语义分析有着更为明确的规范），但是实现的复杂度也有所增加。我在 Project 1 中实现的 `Vector`, `Mapping`, `String` 等基础设施，以及一套在 C 语言中实现的面向对象原语派上了用场，能够实现在任何输入下的*无内存泄漏*、*高正确性*、*高效率*的编译器。两次实验我的工作量增量大概如下(含 `.c`, `.h`, `.l`, `.y` 的、非自动生成的文件)：
-- Project 1: 2328 行；
-- Project 2: 2252 行。
+这一次实验较为简单，再次遍历 Parse Tree 的过程和 Type Checking 的过程类似，中间代码的生成的过程也有详细的讲义。三次 Project 的代码增量（含 `.c`, `.h`, `.l`, `.y` 的、非自动生成的文件）如下：
 
-使用 C 进行编译器实现，经常会出现 Segmentation Fault；使用 gdb 能较为高效地进行查错。
+- Project 1: 2328 行；
+- Project 2: 2203 行；
+- Project 3: 1643 行。
