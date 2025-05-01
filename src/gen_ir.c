@@ -733,6 +733,7 @@ VISITOR(ExpCaseCall) {
         NEW_SINFO(&temp_var, NULL, NULL, NULL);
         CALL(IRGenerator, *self, visit_Exp, /, exp, &sinfo);
         ADDIR(write, temp_var);
+        ADDIR(assign, *info->target, self->ir_manager->zero);
     } else {
         VecArgs arglist = CREOBJ(VecArgs, /);
         if (PROD_ID() == 11) {
