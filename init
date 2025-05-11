@@ -99,7 +99,7 @@ class CommandSpace:
         crun("cp ./build/Lab/Code/parser ./build/Lab/parser")
         crun("chmod +x ./build/Lab/parser")
         iprint("Compilation done. Try to test")
-        crun("cd ./build/Lab/Code/ && ../parser ../Test/test1.cmm /tmp/result.ir && cat /tmp/result.ir | head -n8")
+        crun("cd ./build/Lab/Code/ && ../parser ../Test/test1.cmm /tmp/result.s && cat /tmp/result.s | head -n8")
         iprint("Test done. Clean up")
         crun("cd ./build/Lab/Code/ && make clean")
         iprint("Generate report")
