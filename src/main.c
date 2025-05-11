@@ -95,7 +95,9 @@ static void run_task(TaskEngine *engine) {
     if (engine->gen_ir_error) {
         return;
     }
-    CALL(TaskEngine, *engine, save_ir_to_file, /);
+    if (engine->ir_file) {
+        CALL(TaskEngine, *engine, save_ir_to_file, /);
+    }
     /*
      * codegen_mips32
      */
@@ -104,7 +106,8 @@ static void run_task(TaskEngine *engine) {
 }
 
 int main(int argc, char *argv[]) {
-    ASSERT(argc == 4, "Usage: %s <source file> <output file>", argv[0]);
+    ASSERT(3 <= argc && argc <= 4,
+           "Usage: %s <source file> <asm file> [<ir file>]", argv[0]);
     TaskEngine *engine = CREOBJHEAP(TaskEngine, /, argv[1], argv[3], argv[2]);
     run_task(engine);
     DROPOBJHEAP(TaskEngine, engine);

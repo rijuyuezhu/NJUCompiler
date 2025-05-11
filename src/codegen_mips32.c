@@ -22,13 +22,13 @@ static const char *const REG_TO_NAME[NUM_REGS] = {
 };
 
 static const usize USABLE_REGS[] = {
+    // --- callee saved ---
+    REG_S0, REG_S1, REG_S2, REG_S3, REG_S4, REG_S5, REG_S6, REG_S7,
     // --- caller saved ---
     REG_V1,
     REG_T0, REG_T1, REG_T2, REG_T3, REG_T4, REG_T5, REG_T6, REG_T7,
     REG_T8, REG_T9,
     REG_A0, REG_A1, REG_A2, REG_A3,
-    // --- callee saved ---
-    REG_S0, REG_S1, REG_S2, REG_S3, REG_S4, REG_S5, REG_S6, REG_S7,
 };
 static const usize CALLER_SAVED_REGS[] = {
     REG_V1,
@@ -43,13 +43,13 @@ static const usize CALLEE_SAVED_REGS[] = {
 
 typedef struct AddrDesc {
     isize offset; // the virtual address of the variable: offset($fp)
-    usize corr_reg;
+    usize corr_reg_idx;
 } AddrDesc;
 
 typedef struct RegDesc {
     AddrDesc *corr_addr;
     bool dirty;
-    bool used;
+    bool was_used;
 } RegDesc;
 
 DECLARE_MAPPING(MapVarAddr, usize, AddrDesc, FUNC_STATIC, GENERATOR_PLAIN_KEY,
@@ -58,12 +58,12 @@ DEFINE_MAPPING(MapVarAddr, usize, AddrDesc, FUNC_STATIC);
 
 typedef struct FuncInfo {
     usize arity;
-    usize func_number;
+    String *func_name;
     String body_asm;
     MapVarAddr var_to_addr;
     RegDesc regs[NUM_REGS];
     isize offset_occupied;
-    usize candicate_evict_reg;
+    usize candidate_evict_reg;
     VecPtr arglist; // of type IREntity*
     usize num_parsed_arg;
     bool has_func_call;
@@ -71,16 +71,17 @@ typedef struct FuncInfo {
 
 FUNC_STATIC void MTD(FuncInfo, init, /) {
     self->arity = 0;
+    self->func_name = NULL;
     CALL(String, self->body_asm, init, /);
     CALL(MapVarAddr, self->var_to_addr, init, /);
     for (usize i = 0; i < NUM_REGS; i++) {
         self->regs[i].corr_addr = NULL;
-        self->regs[i].used = false;
+        self->regs[i].was_used = false;
         self->regs[i].dirty = false;
     }
     self->offset_occupied = -4 * (2 + LENGTH(CALLEE_SAVED_REGS));
-    // start from -4; ra, fp, callee saved
-    self->candicate_evict_reg = 0;
+    // -4; ra, fp, callee saved
+    self->candidate_evict_reg = 0;
     CALL(VecPtr, self->arglist, init, /);
     self->num_parsed_arg = 0;
     self->has_func_call = false;
@@ -107,7 +108,7 @@ static AddrDesc *get_addr(FuncInfo *info, usize var_idx) {
         isize now_offset = info->offset_occupied;
         MapVarAddrInsertResult res =
             CALL(MapVarAddr, info->var_to_addr, insert, /, var_idx,
-                 (AddrDesc){.offset = now_offset, .corr_reg = (usize)-1});
+                 (AddrDesc){.offset = now_offset, .corr_reg_idx = (usize)-1});
         ASSERT(res.inserted);
         iter = res.node;
     }
@@ -115,6 +116,31 @@ static AddrDesc *get_addr(FuncInfo *info, usize var_idx) {
 }
 
 #define MAX_REG_IN_IR 3
+
+static void writeback_reg(FuncInfo *info, usize reg) {
+    RegDesc *reg_desc = &info->regs[reg];
+    AddrDesc *addr_desc = reg_desc->corr_addr;
+    if (addr_desc && reg_desc->dirty) {
+        // write back dirty reg
+        CALL(String, info->body_asm, pushf, /, "  sw %s, %zd($fp)\n",
+             REG_TO_NAME[reg], addr_desc->offset);
+    }
+    if (addr_desc) {
+        addr_desc->corr_reg_idx = (usize)-1;
+    }
+    // clear reg
+    reg_desc->corr_addr = NULL;
+    reg_desc->dirty = false;
+}
+
+static void writeback_regs(FuncInfo *info) {
+    for (usize i = 0; i < LENGTH(USABLE_REGS); i++) {
+        usize reg = USABLE_REGS[i];
+        writeback_reg(info, reg);
+    }
+    info->candidate_evict_reg = 0;
+}
+
 static void get_reg(FuncInfo *info, usize num, usize var_idxs[],
                     usize reg_idxs[], bool has_ret) {
     ASSERT(num <= MAX_REG_IN_IR);
@@ -122,6 +148,8 @@ static void get_reg(FuncInfo *info, usize num, usize var_idxs[],
     for (usize i = 0; i < num; i++) {
         reg_idxs[i] = (usize)-1;
     }
+
+    // for those addr that are already in reg
     for (usize i = 0; i < num; i++) {
         usize var_idx = var_idxs[i];
         if (var_idx == (usize)-1) {
@@ -130,21 +158,24 @@ static void get_reg(FuncInfo *info, usize num, usize var_idxs[],
         }
         AddrDesc *addr_desc = get_addr(info, var_idx);
         addr_descs[i] = addr_desc;
-        if (addr_desc->corr_reg != (usize)-1) {
-            reg_idxs[i] = addr_desc->corr_reg;
+        if (addr_desc->corr_reg_idx != (usize)-1) {
+            reg_idxs[i] = addr_desc->corr_reg_idx;
         }
     }
 
+    // for those addr that are not in reg
     for (usize i = 0; i < num; i++) {
         if (reg_idxs[i] != (usize)-1) {
             continue;
         }
+
+        // find a proper reg
         usize candidate;
         while (true) {
-            candidate = USABLE_REGS[info->candicate_evict_reg];
-            info->candicate_evict_reg += 1;
-            if (info->candicate_evict_reg >= LENGTH(USABLE_REGS)) {
-                info->candicate_evict_reg = 0;
+            candidate = USABLE_REGS[info->candidate_evict_reg];
+            info->candidate_evict_reg += 1;
+            if (info->candidate_evict_reg == LENGTH(USABLE_REGS)) {
+                info->candidate_evict_reg = 0;
             }
 
             if (!info->regs[candidate].corr_addr) {
@@ -162,41 +193,24 @@ static void get_reg(FuncInfo *info, usize num, usize var_idxs[],
                 break;
             }
         }
-        if (info->regs[candidate].corr_addr && info->regs[candidate].dirty) {
-            AddrDesc *corr_addr = info->regs[candidate].corr_addr;
-            CALL(String, info->body_asm, pushf, /, "  sw %s, %zd($fp)\n",
-                 REG_TO_NAME[candidate], corr_addr->offset);
-            corr_addr->corr_reg = (usize)-1;
-            info->regs[candidate].dirty = false;
-        }
-        info->regs[candidate].used = true;
-        if (addr_descs[i]) {
-            info->regs[candidate].corr_addr = addr_descs[i];
-            addr_descs[i]->corr_reg = candidate;
-            if (!(i == 0 && has_ret)) { // the ret var need not to be loaded
+        reg_idxs[i] = candidate;
+        writeback_reg(info, candidate);
+
+        RegDesc *reg_desc = &info->regs[candidate];
+        reg_desc->was_used = true;
+
+        // assign reg if not temp
+        AddrDesc *addr_desc = addr_descs[i];
+        if (addr_desc) {
+            reg_desc->corr_addr = addr_desc;
+            addr_desc->corr_reg_idx = candidate;
+            if (!(i == 0 && has_ret)) {
+                // the ret var need not to be loaded
                 CALL(String, info->body_asm, pushf, /, "  lw %s, %zd($fp)\n",
-                     REG_TO_NAME[candidate], addr_descs[i]->offset);
+                     REG_TO_NAME[candidate], addr_desc->offset);
             }
         }
-        reg_idxs[i] = candidate;
     }
-}
-
-static void writeback_regs(FuncInfo *info) {
-    for (usize i = 0; i < LENGTH(USABLE_REGS); i++) {
-        usize reg = USABLE_REGS[i];
-        AddrDesc *addr_desc = info->regs[reg].corr_addr;
-        if (addr_desc && info->regs[reg].dirty) {
-            CALL(String, info->body_asm, pushf, /, "  sw %s, %zd($fp)\n",
-                 REG_TO_NAME[reg], addr_desc->offset);
-        }
-        if (addr_desc) {
-            addr_desc->corr_reg = (usize)-1;
-            info->regs[reg].corr_addr = NULL;
-            info->regs[reg].dirty = false;
-        }
-    }
-    info->candicate_evict_reg = 0;
 }
 
 void MTD(CodegenMips32, generate, /) {
@@ -204,21 +218,19 @@ void MTD(CodegenMips32, generate, /) {
 
     VecPtr *irs = &self->ir_manager->irs;
     usize last_func_start = (usize)-1;
-    usize func_cnt = 0;
     for (usize i = 0; i < irs->size; i++) {
         IR *ir = (IR *)irs->data[i];
         if (ir->kind == IRFunction) {
             if (last_func_start != (usize)-1) {
-                CALL(CodegenMips32, *self, generate_func, /, last_func_start, i,
-                     func_cnt);
-                func_cnt += 1;
+                CALL(CodegenMips32, *self, generate_func, /, last_func_start,
+                     i);
             }
             last_func_start = i;
         }
     }
     if (last_func_start != (usize)-1) {
-        CALL(CodegenMips32, *self, generate_func, /, last_func_start, irs->size,
-             func_cnt);
+        CALL(CodegenMips32, *self, generate_func, /, last_func_start,
+             irs->size);
     }
 }
 
@@ -264,45 +276,56 @@ static const CodeGeneratorFunc CODE_GENERATOR_DISPATCH_BY_IRKIND[] = {
 
 };
 
-static void get_func_info(IR *ir, usize *arity, String **name) {
+static void get_func_info_from_dec(FuncInfo *info, IR *ir) {
     ASSERT(ir->kind == IRFunction);
     IREntity *ent = &ir->e1;
     ASSERT(ent->kind == IREntityFun);
-    *arity = ent->as_fun.arity;
-    *name = ent->as_fun.name;
+    info->arity = ent->as_fun.arity;
+    info->func_name = ent->as_fun.name;
 }
 
-void MTD(CodegenMips32, generate_func, /, usize start, usize end,
-         usize func_cnt) {
+void MTD(CodegenMips32, generate_func, /, usize start, usize end) {
     VecPtr *irs = &self->ir_manager->irs;
 
     FuncInfo *info = CREOBJHEAP(FuncInfo, /);
-    String *name;
-    get_func_info(irs->data[start], &info->arity, &name);
-    info->func_number = func_cnt;
+    get_func_info_from_dec(info, irs->data[start]);
 
+    // handle the function body
     for (usize i = start + 1; i < end; i++) {
         IR *ir = irs->data[i];
         ASSERT(ir->kind != IRInvalid);
+
+        // comment the ir code in the asm code
         CALL(String, info->body_asm, push_str, /, "  # ");
         CALL(IR, *ir, build_str, /, &info->body_asm);
+
         CODE_GENERATOR_DISPATCH_BY_IRKIND[ir->kind](self, ir, info);
+
+        // writeback
+        // TODO: only writeback at the end of the basic block
         writeback_regs(info);
     }
 
-    const char *func_name = STRING_C_STR(*name);
+    // start to generate the complete code
+
+    const char *func_name = STRING_C_STR(*info->func_name);
+
+    // generate the function prologue
     if (strcmp(func_name, "main") == 0) {
         CALL(String, self->result, push_str, /, "\nmain:\n");
     } else {
         CALL(String, self->result, pushf, /, "\n_F%s:\n", func_name);
     }
+
     usize frame_size = -info->offset_occupied;
     CALL(String, self->result, pushf, /, "  subu $sp, $sp, %zu\n", frame_size);
+
     if (info->has_func_call) {
 
         CALL(String, self->result, pushf, /, "  sw $ra, %zu($sp)\n",
              frame_size - 4);
     }
+
     CALL(String, self->result, pushf, /,
          "  sw $fp, %zu($sp)\n"
          "  addi $fp, $sp, %zu\n",
@@ -310,19 +333,22 @@ void MTD(CodegenMips32, generate_func, /, usize start, usize end,
 
     for (usize i = 0; i < LENGTH(CALLEE_SAVED_REGS); i++) {
         usize reg = CALLEE_SAVED_REGS[i];
-        if (info->regs[reg].used) {
+        if (info->regs[reg].was_used) {
             CALL(String, self->result, pushf, /, "  sw %s, %zi($fp)\n",
                  REG_TO_NAME[reg], -4 * (3 + i));
         }
     }
+
+    // the body
     const char *body_codegen = STRING_C_STR(info->body_asm);
     CALL(String, self->result, push_str, /, body_codegen);
 
-    CALL(String, self->result, pushf, /, "_R%zu:\n", func_cnt);
+    // generate the function epilogue
+    CALL(String, self->result, pushf, /, "_R%s:\n", func_name);
 
     for (usize i = 0; i < LENGTH(CALLEE_SAVED_REGS); i++) {
         usize reg = CALLEE_SAVED_REGS[i];
-        if (info->regs[reg].used) {
+        if (info->regs[reg].was_used) {
             CALL(String, self->result, pushf, /, "  lw %s, %zi($fp)\n",
                  REG_TO_NAME[reg], -4 * (3 + i));
         }
@@ -336,6 +362,8 @@ void MTD(CodegenMips32, generate_func, /, usize start, usize end,
          "  addi $sp, $sp, %zu\n"
          "  jr $ra\n",
          frame_size - 8, frame_size);
+
+    // done
     DROPOBJHEAP(FuncInfo, info);
 }
 
@@ -353,9 +381,11 @@ CODE_GENERATOR(Assign) {
         get_reg(info, 1, var_idxs, reg_idxs, true);
         usize ret_reg = reg_idxs[0];
         if (e1->kind == IREntityImmInt) {
+            // <ret:var> = <e1:imm>
             CALL(String, info->body_asm, pushf, /, "  li %s, %d\n",
                  REG_TO_NAME[ret_reg], e1->imm_int);
         } else {
+            // <ret:var> = <e1:addr>
             AddrDesc *addr_desc = get_addr(info, e1->var_idx);
             CALL(String, info->body_asm, pushf, /, "  addi %s, $fp, %zd\n",
                  REG_TO_NAME[ret_reg], addr_desc->offset);
@@ -364,15 +394,19 @@ CODE_GENERATOR(Assign) {
     } else {
         usize var_idxs[2] = {ret->var_idx, e1->var_idx};
         usize reg_idxs[2];
-        // NOTE: for deref, we need to get the actual value
-        get_reg(info, 2, var_idxs, reg_idxs, ret->kind == IREntityVar);
+        // NOTE: for <ret:deref> = <e1:var>, we need to get the actual value;
+        // thus has_ret shall be false
+        bool has_ret = ret->kind == IREntityVar;
+        get_reg(info, 2, var_idxs, reg_idxs, has_ret);
         usize ret_reg = reg_idxs[0];
         usize e1_reg = reg_idxs[1];
         if (ret->kind == IREntityVar) {
             if (e1->kind == IREntityVar) {
+                // <ret:var> = <e1:var>
                 CALL(String, info->body_asm, pushf, /, "  move %s, %s\n",
                      REG_TO_NAME[ret_reg], REG_TO_NAME[e1_reg]);
             } else if (e1->kind == IREntityDeref) {
+                // <ret:var> = <e1:deref>
                 CALL(String, info->body_asm, pushf, /, "  lw %s, 0(%s)\n",
                      REG_TO_NAME[ret_reg], REG_TO_NAME[e1_reg]);
             } else {
@@ -380,6 +414,7 @@ CODE_GENERATOR(Assign) {
             }
             info->regs[ret_reg].dirty = true;
         } else if (ret->kind == IREntityDeref) {
+            // <ret:deref> = <e1:var>
             ASSERT(e1->kind == IREntityVar, "e1 should be var");
             CALL(String, info->body_asm, pushf, /, "  sw %s, 0(%s)\n",
                  REG_TO_NAME[e1_reg], REG_TO_NAME[ret_reg]);
@@ -426,7 +461,7 @@ CODE_GENERATOR(ArithAssign) {
         CALL(String, info->body_asm, pushf, /, "  mflo %s\n",
              REG_TO_NAME[ret_reg]);
     } else {
-        PANIC("Should not be called");
+        PANIC("Should not be reached");
     }
     info->regs[ret_reg].dirty = true;
 }
@@ -454,7 +489,7 @@ CODE_GENERATOR(CondGoto) {
         CALL(String, info->body_asm, pushf, /, "  li %s, %d\n",
              REG_TO_NAME[e2_reg], e2->imm_int);
     }
-    const char *RELOP_TO_STR[] = {
+    static const char *const RELOP_TO_STR[] = {
         [RelopGT] = "bgt", [RelopLT] = "blt", [RelopGE] = "bge",
         [RelopLE] = "ble", [RelopEQ] = "beq", [RelopNE] = "bne",
     };
@@ -471,7 +506,8 @@ CODE_GENERATOR(Return) {
     usize e1_reg = reg_idxs[0];
     CALL(String, info->body_asm, pushf, /, "  move $v0, %s\n",
          REG_TO_NAME[e1_reg]);
-    CALL(String, info->body_asm, pushf, /, "  j _R%zu\n", info->func_number);
+    const char *func_name = STRING_C_STR(*info->func_name);
+    CALL(String, info->body_asm, pushf, /, "  j _R%s\n", func_name);
 }
 CODE_GENERATOR(Dec) {
     IREntity *dec = &ir->ret;
@@ -482,7 +518,7 @@ CODE_GENERATOR(Dec) {
     isize offset = info->offset_occupied;
     MapVarAddrInsertResult res =
         CALL(MapVarAddr, info->var_to_addr, insert, /, dec->var_idx,
-             (AddrDesc){.offset = offset, .corr_reg = (usize)-1});
+             (AddrDesc){.offset = offset, .corr_reg_idx = (usize)-1});
     ASSERT(res.inserted);
 }
 CODE_GENERATOR(Arg) {
@@ -501,18 +537,13 @@ CODE_GENERATOR(Call) {
     usize callee_arity = fun->as_fun.arity;
     const char *callee_name = STRING_C_STR(*fun->as_fun.name);
 
+    // writeback caller saved regs
     for (usize i = 0; i < LENGTH(CALLER_SAVED_REGS); i++) {
         usize reg = CALLER_SAVED_REGS[i];
-        if (info->regs[reg].corr_addr != NULL) {
-            if (info->regs[reg].dirty) {
-                CALL(String, info->body_asm, pushf, /, "  sw %s, %zd($fp)\n",
-                     REG_TO_NAME[reg], info->regs[reg].corr_addr->offset);
-            }
-            info->regs[reg].corr_addr->corr_reg = (usize)-1;
-            info->regs[reg].corr_addr = NULL;
-            info->regs[reg].dirty = false;
-        }
+        writeback_reg(info, reg);
     }
+
+    // prepare parameter
     ASSERT(info->arglist.size >= callee_arity);
     usize num_pass_by_reg = Min((usize)4, callee_arity);
     usize num_pass_by_stack = callee_arity - num_pass_by_reg;
@@ -520,40 +551,51 @@ CODE_GENERATOR(Call) {
         CALL(String, info->body_asm, pushf, /, "  subu $sp, $sp, %zu\n",
              4 * num_pass_by_stack);
     }
+
     for (usize i = 0; i < callee_arity; i++) {
         IREntity *arg = *CALL(VecPtr, info->arglist, back, /);
         CALL(VecPtr, info->arglist, pop_back, /);
+
         AddrDesc *addr_desc = get_addr(info, arg->var_idx);
         if (i < num_pass_by_reg) {
-            if (addr_desc->corr_reg != (usize)-1) {
+            if (addr_desc->corr_reg_idx != (usize)-1) {
                 CALL(String, info->body_asm, pushf, /, "  move %s, %s\n",
-                     REG_TO_NAME[REG_A0 + i], REG_TO_NAME[addr_desc->corr_reg]);
+                     REG_TO_NAME[REG_A0 + i],
+                     REG_TO_NAME[addr_desc->corr_reg_idx]);
             } else {
                 CALL(String, info->body_asm, pushf, /, "  lw %s, %zd($fp)\n",
                      REG_TO_NAME[REG_A0 + i], addr_desc->offset);
             }
         } else {
-            if (addr_desc->corr_reg != (usize)-1) {
-                CALL(String, info->body_asm, pushf, /, "  move $v1, %s\n",
-                     REG_TO_NAME[addr_desc->corr_reg]);
+            if (addr_desc->corr_reg_idx != (usize)-1) {
+                CALL(String, info->body_asm, pushf, /, "  sw %s, %zu($sp)\n",
+                     REG_TO_NAME[addr_desc->corr_reg_idx],
+                     4 * (i - num_pass_by_reg));
             } else {
+                // NOTE: use $v1 to temporarily store the value
                 CALL(String, info->body_asm, pushf, /, "  lw $v1, %zd($fp)\n",
                      addr_desc->offset);
+                CALL(String, info->body_asm, pushf, /, "  sw $v1, %zu($sp)\n",
+                     4 * (i - num_pass_by_reg));
             }
-            CALL(String, info->body_asm, pushf, /, "  sw $v1, %zu($sp)\n",
-                 4 * (i - num_pass_by_reg));
         }
     }
+
+    // call the function
     if (strcmp(callee_name, "main") == 0) {
         CALL(String, info->body_asm, pushf, /, "  jal main\n");
     } else {
         CALL(String, info->body_asm, pushf, /, "  jal _F%s\n", callee_name);
     }
+
+    // resume sp
     if (num_pass_by_stack != 0) {
         CALL(String, info->body_asm, pushf, /, "  addu $sp, $sp, %zu\n",
              4 * num_pass_by_stack);
     }
-    if (ret->var_idx != (usize)-1) { // for moked write
+
+    // return value
+    if (ret->var_idx != (usize)-1) { // for moked write, which has no ret
         usize var_idxs[1] = {ret->var_idx};
         usize reg_idxs[1];
         get_reg(info, 1, var_idxs, reg_idxs, true);
@@ -573,22 +615,23 @@ CODE_GENERATOR(Param) {
     if (now_parsed_param < 4) {
         AddrDesc *addr_desc = get_addr(info, param_var_idx);
         usize target_reg = REG_A0 + now_parsed_param;
-        ASSERT(addr_desc->corr_reg == (usize)-1);
-        ASSERT(info->regs[target_reg].corr_addr == NULL);
-        addr_desc->corr_reg = target_reg;
-        info->regs[target_reg].corr_addr = addr_desc;
-        info->regs[target_reg].dirty = true;
+        RegDesc *reg_desc = &info->regs[target_reg];
+        ASSERT(addr_desc->corr_reg_idx == (usize)-1);
+        ASSERT(reg_desc->corr_addr == NULL);
+        addr_desc->corr_reg_idx = target_reg;
+        reg_desc->corr_addr = addr_desc;
+        reg_desc->dirty = true;
     } else {
         isize offset = 4 * (now_parsed_param - 4);
         MapVarAddrInsertResult res =
             CALL(MapVarAddr, info->var_to_addr, insert, /, param_var_idx,
-                 (AddrDesc){.offset = offset, .corr_reg = (usize)-1});
+                 (AddrDesc){.offset = offset, .corr_reg_idx = (usize)-1});
         ASSERT(res.inserted);
     }
 }
 CODE_GENERATOR(Read) {
-    String name = NSCALL(String, mock_raw, /, "read");
-    IR moke_read = {
+    String mocked_name = NSCALL(String, mock_raw, /, "read");
+    IR moked_read = {
         .kind = IRFunction,
         .ret = ir->ret,
         .e1 =
@@ -597,24 +640,26 @@ CODE_GENERATOR(Read) {
                 .as_fun =
                     {
                         .arity = 0,
-                        .name = &name,
+                        .name = &mocked_name,
                     },
             },
     };
-    CALL(CodegenMips32, *self, code_generator_Call, /, &moke_read, info);
+    CALL(CodegenMips32, *self, code_generator_Call, /, &moked_read, info);
 }
 CODE_GENERATOR(Write) {
-    String name = NSCALL(String, mock_raw, /, "write");
-    IR moke_write_param = {
+    String mocked_name = NSCALL(String, mock_raw, /, "write");
+    IR moked_write_arg = {
         .kind = IRParam,
         .e1 = ir->e1,
     };
-    IR moke_write = {
+    IR moked_write = {
         .kind = IRFunction,
         .ret =
             {
                 .kind = IREntityVar,
-                .var_idx = (usize)-1, // hack in code_generator_Function
+                // hack in code_generator_Function: no ret var
+                .var_idx = (usize)-1,
+
             },
         .e1 =
             {
@@ -622,10 +667,10 @@ CODE_GENERATOR(Write) {
                 .as_fun =
                     {
                         .arity = 1,
-                        .name = &name,
+                        .name = &mocked_name,
                     },
             },
     };
-    CALL(CodegenMips32, *self, code_generator_Arg, /, &moke_write_param, info);
-    CALL(CodegenMips32, *self, code_generator_Call, /, &moke_write, info);
+    CALL(CodegenMips32, *self, code_generator_Arg, /, &moked_write_arg, info);
+    CALL(CodegenMips32, *self, code_generator_Call, /, &moked_write, info);
 }

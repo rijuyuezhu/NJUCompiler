@@ -16,5 +16,5 @@ void MTD(CodegenMips32, generate, /);
 
 void MTD(CodegenMips32, add_predefined_snippets, /);
 
-void MTD(CodegenMips32, generate_func, /, usize start, usize end,
-         usize func_cnt); // [start, end)
+void MTD(CodegenMips32, generate_func, /, usize start,
+         usize end); // [start, end)
