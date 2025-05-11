@@ -22,13 +22,13 @@ static const char *const REG_TO_NAME[NUM_REGS] = {
 };
 
 static const usize USABLE_REGS[] = {
-    // --- callee saved ---
-    REG_S0, REG_S1, REG_S2, REG_S3, REG_S4, REG_S5, REG_S6, REG_S7,
     // --- caller saved ---
     REG_V1,
     REG_T0, REG_T1, REG_T2, REG_T3, REG_T4, REG_T5, REG_T6, REG_T7,
     REG_T8, REG_T9,
     REG_A0, REG_A1, REG_A2, REG_A3,
+    // --- callee saved ---
+    REG_S0, REG_S1, REG_S2, REG_S3, REG_S4, REG_S5, REG_S6, REG_S7,
 };
 static const usize CALLER_SAVED_REGS[] = {
     REG_V1,
@@ -125,6 +125,14 @@ static void writeback_reg(FuncInfo *info, usize reg) {
         CALL(String, info->body_asm, pushf, /, "  sw %s, %zd($fp)\n",
              REG_TO_NAME[reg], addr_desc->offset);
     }
+    reg_desc->dirty = false;
+}
+
+static void clear_reg(FuncInfo *info, usize reg) {
+    RegDesc *reg_desc = &info->regs[reg];
+    AddrDesc *addr_desc = reg_desc->corr_addr;
+    // never clear a dirty reg
+    ASSERT(reg_desc->dirty == false);
     if (addr_desc) {
         addr_desc->corr_reg_idx = (usize)-1;
     }
@@ -137,6 +145,12 @@ static void writeback_regs(FuncInfo *info) {
     for (usize i = 0; i < LENGTH(USABLE_REGS); i++) {
         usize reg = USABLE_REGS[i];
         writeback_reg(info, reg);
+    }
+}
+static void clear_regs(FuncInfo *info) {
+    for (usize i = 0; i < LENGTH(USABLE_REGS); i++) {
+        usize reg = USABLE_REGS[i];
+        clear_reg(info, reg);
     }
     info->candidate_evict_reg = 0;
 }
@@ -195,6 +209,7 @@ static void get_reg(FuncInfo *info, usize num, usize var_idxs[],
         }
         reg_idxs[i] = candidate;
         writeback_reg(info, candidate);
+        clear_reg(info, candidate);
 
         RegDesc *reg_desc = &info->regs[candidate];
         reg_desc->was_used = true;
@@ -284,6 +299,29 @@ static void get_func_info_from_dec(FuncInfo *info, IR *ir) {
     info->func_name = ent->as_fun.name;
 }
 
+typedef enum RegCachePolicy {
+    RegCacheNone,
+    RegCacheWritebackBeforeGenClearAfterGen,
+    RegCacheWritebackAfterGenClearAfterGen,
+} RegCachePolicy;
+
+static RegCachePolicy get_write_back_policy(VecPtr *irs,
+                                            ATTR_UNUSED usize func_start,
+                                            usize func_end, usize now_idx) {
+    IR *now_ir = irs->data[now_idx];
+    if (now_ir->kind == IRGoto || now_ir->kind == IRCondGoto) {
+        return RegCacheWritebackBeforeGenClearAfterGen;
+    }
+    if (now_idx + 1 == func_end) {
+        return RegCacheNone;
+    }
+    IR *next_ir = irs->data[now_idx + 1];
+    if (next_ir->kind == IRLabel) {
+        return RegCacheWritebackAfterGenClearAfterGen;
+    }
+    return RegCacheNone;
+}
+
 void MTD(CodegenMips32, generate_func, /, usize start, usize end) {
     VecPtr *irs = &self->ir_manager->irs;
 
@@ -299,11 +337,18 @@ void MTD(CodegenMips32, generate_func, /, usize start, usize end) {
         CALL(String, info->body_asm, push_str, /, "  # ");
         CALL(IR, *ir, build_str, /, &info->body_asm);
 
+        RegCachePolicy policy = get_write_back_policy(irs, start, end, i);
+        if (policy == RegCacheWritebackBeforeGenClearAfterGen) {
+            writeback_regs(info);
+        }
         CODE_GENERATOR_DISPATCH_BY_IRKIND[ir->kind](self, ir, info);
-
-        // writeback
-        // TODO: only writeback at the end of the basic block
-        writeback_regs(info);
+        if (policy == RegCacheWritebackAfterGenClearAfterGen) {
+            writeback_regs(info);
+        }
+        if (policy == RegCacheWritebackBeforeGenClearAfterGen ||
+            policy == RegCacheWritebackAfterGenClearAfterGen) {
+            clear_regs(info);
+        }
     }
 
     // start to generate the complete code
@@ -541,6 +586,7 @@ CODE_GENERATOR(Call) {
     for (usize i = 0; i < LENGTH(CALLER_SAVED_REGS); i++) {
         usize reg = CALLER_SAVED_REGS[i];
         writeback_reg(info, reg);
+        clear_reg(info, reg);
     }
 
     // prepare parameter
