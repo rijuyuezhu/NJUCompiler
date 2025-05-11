@@ -15,7 +15,7 @@ void MTD(TaskEngine, save_ir_to_file, /) {
     ASSERT(!self->gen_ir_error, "IR generation error occurred");
 
     String ir_str = CALL(IRManager, self->ir_manager, get_ir_str, /);
-
+    ASSERT(self->ir_file);
     FILE *fp = fopen(self->ir_file, "w");
     if (!fp) {
         perror(self->ir_file);

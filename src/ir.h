@@ -19,17 +19,20 @@ typedef enum IREntityKind {
 typedef struct IREntity {
     IREntityKind kind;
     union {
-        int imm_int;             // for IREntityImmInt
-        usize var_idx;           // for IREntityVar, IREntityAddr, IREntityDeref
-        usize label_idx;         // for IREntityLabel
-        struct String *fun_name; // for IREntityFun
+        int imm_int;     // for IREntityImmInt
+        usize var_idx;   // for IREntityVar, IREntityAddr, IREntityDeref
+        usize label_idx; // for IREntityLabel
+        struct {
+            usize arity;
+            struct String *name;
+        } as_fun; // for IREntityFun
     };
 } IREntity;
 
 IREntity NSMTD(IREntity, make_imm_int, /, int imm_int);
 IREntity NSMTD(IREntity, make_var, /, IREntityKind kind, usize idx);
 IREntity NSMTD(IREntity, make_label, /, usize idx);
-IREntity NSMTD(IREntity, make_fun, /, struct String *fun_name);
+IREntity NSMTD(IREntity, make_fun, /, usize arity, struct String *name);
 
 void MTD(IREntity, build_str, /, struct String *builder);
 
@@ -45,9 +48,9 @@ void MTD(IREntity, build_str, /, struct String *builder);
                           {ret:label} */                                       \
         f(Return)      /* RETURN {e1:var} */                                   \
         f(Dec)         /* DEC {ret:var} {e1:imm w/o #} */                      \
-        f(Arg)         /* ARG {e1:var/e1:addr} */                              \
+        f(Arg)         /* ARG {e1:var} */                                      \
         f(Call)        /* {ret:var} := CALL {e1:fun} */                        \
-        f(Param)       /* PARAM {e1:var/e1:addr} */                            \
+        f(Param)       /* PARAM {e1:var} */                                    \
         f(Read)        /* READ {ret:var} */                                    \
         f(Write)       /* WRITE {e1:var} */
 
@@ -118,7 +121,7 @@ void MTD(IRManager, addir_write, /, IREntity param);
 IREntity MTD(IRManager, new_ent_imm_int, /, int imm_int);
 IREntity MTD(IRManager, new_ent_var, /, IREntityKind kind);
 IREntity MTD(IRManager, new_ent_label, /);
-IREntity MTD(IRManager, new_ent_fun, /, struct String *fun_name);
+IREntity MTD(IRManager, new_ent_fun, /, usize arity, struct String *name);
 
 void MTD(IRManager, build_str, /, struct String *builder);
 struct String MTD(IRManager, get_ir_str, /);

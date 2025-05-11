@@ -88,6 +88,8 @@ usize MTD(TypeManager, make_fun, /);
 void MTD(TypeManager, add_struct_field, /, usize type_idx, usize field_idx);
 void MTD(TypeManager, add_fun_ret_param, /, usize type_idx,
          usize ret_param_idx);
+
+usize MTD(TypeManager, get_fun_arity, /, usize type_idx);
 bool MTD(TypeManager, is_type_consistency, /, usize type_idx1, usize type_idx2);
 bool MTD(TypeManager, is_type_consistency_with_fun_fix, /, usize type_idx1,
          usize type_idx2);

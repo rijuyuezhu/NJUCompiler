@@ -48,7 +48,7 @@ void MTD(SemResolver, resolve, /, struct AstNode *node, bool add_builtin);
 
 #define report_semerr(line_no, error, ...)                                     \
     ({                                                                         \
-        printf("Error type %d at Line %d: semantic error" VA_ARGS_FIRST(       \
+        printf("Error type %d at Line %d: semantic error, " VA_ARGS_FIRST(     \
                    __VA_ARGS__) ".\n",                                         \
                error, line_no VA_ARGS_EXCEPT_FIRST(__VA_ARGS__));              \
         self->sem_error = true;                                                \

@@ -218,6 +218,13 @@ void MTD(TypeManager, add_fun_ret_param, /, usize type_idx,
     CALL(Type, self->types.data[type_idx], add_fun_ret_param, /, ret_param_idx);
 }
 
+usize MTD(TypeManager, get_fun_arity, /, usize type_idx) {
+    Type *type = CALL(TypeManager, *self, get_type, /, type_idx);
+    ASSERT(type->kind == TypeKindFun);
+    VecUSize *ret_param_idxes = &type->as_fun.ret_param_idxes;
+    return ret_param_idxes->size - 1;
+}
+
 static bool MTD(TypeManager, is_type_array_consistency, /, Type *t1, Type *t2) {
     return t1->as_array.dim == t2->as_array.dim &&
            CALL(TypeManager, *self, is_type_consistency, /,

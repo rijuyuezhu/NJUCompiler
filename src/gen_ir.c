@@ -282,7 +282,7 @@ static IREntity MTD(IRGenerator, exp_struct_field_addr, /, AstNode *node) {
     return addr;
 }
 
-struct IREntity MTD(IRGenerator, exp_id_itself, /, AstNode *node) {
+static struct IREntity MTD(IRGenerator, exp_id_itself, /, AstNode *node) {
     // only used for Exp -> ID
     ASSERT(node->grammar_symbol == GS_Exp);
     ASSERT(node->production_id == 15);
@@ -413,8 +413,10 @@ VISITOR(FunDec) {
     NOINFO;
     SymbolEntry *sym = node->symentry_ptr;
     ASSERT(sym);
+    usize arity =
+        CALL(TypeManager, *self->type_manager, get_fun_arity, /, sym->type_idx);
     IREntity fun =
-        CALL(IRManager, *self->ir_manager, new_ent_fun, /, sym->name);
+        CALL(IRManager, *self->ir_manager, new_ent_fun, /, arity, sym->name);
     ADDIR(fun, fun);
     if (PROD_ID() == 0) {
         // FunDec -> ID LP VarList BP
@@ -745,8 +747,10 @@ VISITOR(ExpCaseCall) {
             ADDIR(arg, arglist.data[i]);
         }
         DROPOBJ(VecArgs, arglist);
-        IREntity fun =
-            CALL(IRManager, *self->ir_manager, new_ent_fun, /, fun_sym->name);
+        usize arity = CALL(TypeManager, *self->type_manager, get_fun_arity, /,
+                           fun_sym->type_idx);
+        IREntity fun = CALL(IRManager, *self->ir_manager, new_ent_fun, /, arity,
+                            fun_sym->name);
         ADDIR(call, *info->target, fun);
     }
 }

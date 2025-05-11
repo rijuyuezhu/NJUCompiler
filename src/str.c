@@ -43,7 +43,9 @@ String NSMTD(String, mock_raw_with_len, /, const char *s, usize len) {
 
 const char *MTD(String, c_str, /) {
     CALL(String, *self, check_expansion, /);
-    self->data[self->size] = '\0';
+    if (self->data[self->size] != '\0') {
+        self->data[self->size] = '\0';
+    }
     return self->data;
 }
 
