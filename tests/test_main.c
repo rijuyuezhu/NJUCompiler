@@ -17,6 +17,7 @@ int main(int argc, char *argv[]) {
         TESTENTRY(class_vec),
         TESTENTRY(map),
         TESTENTRY(hstr),
+        TESTENTRY(list),
     };
 
     const usize n_tests = LENGTH(tests);

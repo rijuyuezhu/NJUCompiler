@@ -44,6 +44,7 @@
 #include <stdlib.h>
 
 #include "debug.h"
+#include "tem_memory_primitive.h"
 #include "utils.h"
 
 #undef DECLARE_MAPPING
@@ -62,61 +63,6 @@
                          CONCATENATE(Mapping, InsertResult),                   \
                          CONCATENATE(Mapping, Iterator), typeof(K), typeof(V), \
                          STORAGE);
-
-#undef GENERATOR_PLAIN_COMPARATOR
-#define GENERATOR_PLAIN_COMPARATOR(Mapping, K)                                 \
-    FUNC_STATIC int NSMTD(Mapping, comparator, /, const typeof(K) *MPROT(a),   \
-                          const typeof(K) *MPROT(b)) {                         \
-        return *MPROT(a) < *MPROT(b) ? -1 : (*MPROT(a) > *MPROT(b) ? 1 : 0);   \
-    }
-
-#undef GENERATOR_CLASS_COMPARATOR
-#define GENERATOR_CLASS_COMPARATOR(Mapping, K)                                 \
-    FUNC_STATIC int NSMTD(Mapping, comparator, /, const typeof(K) *MPROT(a),   \
-                          const typeof(K) *MPROT(b)) {                         \
-        return NSCALL(K, compare, /, MPROT(a), MPROT(b));                      \
-    }
-
-#undef GENERATOR_CUSTOM_COMPARATOR
-#define GENERATOR_CUSTOM_COMPARATOR(Mapping, K)
-
-#undef GENERATOR_PLAIN_KEY
-#define GENERATOR_PLAIN_KEY(Mapping, K)                                        \
-    FUNC_STATIC void NSMTD(Mapping, drop_key, /,                               \
-                           ATTR_UNUSED typeof(K) *MPROT(key)) {}               \
-    FUNC_STATIC typeof(K) NSMTD(Mapping, clone_key, /,                         \
-                                const typeof(K) *MPROT(other)) {               \
-        return *MPROT(other);                                                  \
-    }
-
-#undef GENERATOR_CLASS_KEY
-#define GENERATOR_CLASS_KEY(Mapping, K)                                        \
-    FUNC_STATIC void NSMTD(Mapping, drop_key, /, typeof(K) *MPROT(key)) {      \
-        CALL(K, *MPROT(key), drop, /);                                         \
-    }                                                                          \
-    FUNC_STATIC typeof(K) NSMTD(Mapping, clone_key, /,                         \
-                                const typeof(K) *MPROT(other)) {               \
-        return CALL(K, *MPROT(other), clone, /);                               \
-    }
-
-#undef GENERATOR_PLAIN_VALUE
-#define GENERATOR_PLAIN_VALUE(Mapping, V)                                      \
-    FUNC_STATIC void NSMTD(Mapping, drop_value, /,                             \
-                           ATTR_UNUSED typeof(V) *MPROT(value)) {}             \
-    FUNC_STATIC typeof(V) NSMTD(Mapping, clone_value, /,                       \
-                                const typeof(V) *MPROT(other)) {               \
-        return *MPROT(other);                                                  \
-    }
-
-#undef GENERATOR_CLASS_VALUE
-#define GENERATOR_CLASS_VALUE(Mapping, V)                                      \
-    FUNC_STATIC void NSMTD(Mapping, drop_value, /, typeof(V) *MPROT(value)) {  \
-        CALL(V, *MPROT(value), drop, /);                                       \
-    }                                                                          \
-    FUNC_STATIC typeof(V) NSMTD(Mapping, clone_value, /,                       \
-                                const typeof(V) *MPROT(other)) {               \
-        return CALL(V, *MPROT(other), clone, /);                               \
-    }
 
 #undef DECLARE_MAPPING_INNER
 #define DECLARE_MAPPING_INNER(Mapping, MappingNode, MappingInsertResult,       \

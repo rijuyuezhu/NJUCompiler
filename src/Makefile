@@ -23,7 +23,7 @@ runvg: $(BUILD_DIR)/src/parser
 
 $(BUILD_DIR)/src/parser: $(YFO) $(filter-out $(LFO),$(OBJS))
 	@echo + LD src/$(notdir $@) >&2
-	@$(CC) $(CFLAGS) -o $@ $(filter-out $(LFO),$(OBJS)) -lfl -ly
+	@$(CC) $(CFLAGS) -o $@ $(filter-out $(LFO),$(OBJS)) # -lfl -ly
 
 $(BUILD_DIR)/libcompiler.a: $(YFO) $(filter-out $(LFO) $(BUILD_DIR)/src/./main.c.o,$(OBJS))
 	@echo + AR $(notdir $@) >&2
