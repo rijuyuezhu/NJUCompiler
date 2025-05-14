@@ -1,5 +1,6 @@
 #include "gen_list.h"
 #include "str.h"
+#include "utils.h"
 
 static void naive() {
     ListI32 list = CREOBJ(ListI32, /);
@@ -83,6 +84,18 @@ static void naive() {
     }
     ASSERT(list.size == 0);
     ASSERT(CALL(ListI32, list, empty, /));
+    DROPOBJ(ListI32, list);
+
+    list = CREOBJ(ListI32, /);
+    CALL(ListI32, list, push_back, /, 1);
+    CALL(ListI32, list, push_back, /, 4);
+    ListI32Node *it = list.head;
+    ASSERT(it && it->data == 1);
+    it = it->next;
+    ASSERT(it && it->data == 4);
+    it = CALL(ListI32, list, remove, /, it);
+    ASSERT(!it);
+    ASSERT(list.size == 1);
     DROPOBJ(ListI32, list);
 }
 

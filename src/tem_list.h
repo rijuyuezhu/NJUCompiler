@@ -93,6 +93,9 @@
     /* List.pop_back() -> T */                                                 \
     STORAGE T MTD(List, pop_back, /);                                          \
                                                                                \
+    /* List.remove(ListNode *it) -> ListNode */                                \
+    STORAGE ListNode *MTD(List, remove, /, ListNode * it);                     \
+                                                                               \
     /* NOTE: static methods that are not required to implement in .c */        \
                                                                                \
     /* List.init() */                                                          \
@@ -250,4 +253,22 @@
         free(MPROT(now));                                                      \
         self->size--;                                                          \
         return MPROT(value);                                                   \
+    }                                                                          \
+    /* List.remove(ListNode *it) -> ListNode */                                \
+    STORAGE ListNode *MTD(List, remove, /, ListNode * MPROT(it)) {             \
+        if (MPROT(it)->prev != NULL) {                                         \
+            MPROT(it)->prev->next = MPROT(it)->next;                           \
+        } else {                                                               \
+            self->head = MPROT(it)->next;                                      \
+        }                                                                      \
+        if (MPROT(it)->next != NULL) {                                         \
+            MPROT(it)->next->prev = MPROT(it)->prev;                           \
+        } else {                                                               \
+            self->tail = MPROT(it)->prev;                                      \
+        }                                                                      \
+        ListNode *MPROT(ret) = MPROT(it)->next;                                       \
+        NSCALL(List, drop_value, /, &MPROT(it)->data);                         \
+        self->size--;                                                          \
+        free(MPROT(it));                                                       \
+        return MPROT(ret);                                                     \
     }
