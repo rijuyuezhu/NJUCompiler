@@ -164,6 +164,12 @@
         }                                                                      \
     })
 
+/// virtual functions
+#undef BASETYPE
+#define BASETYPE(cls) typeof(((cls *)0)->base)
+#undef VMTD
+#define VMTD(cls, method, slash, ...)                                          \
+    NSMTD(cls, method, slash, ATTR_UNUSED BASETYPE(cls) * self, ##__VA_ARGS__)
 /// helper macros for defining default initializers and dropers
 #undef DEFAULT_INITIALIZER
 #define DEFAULT_INITIALIZER(cls)                                               \

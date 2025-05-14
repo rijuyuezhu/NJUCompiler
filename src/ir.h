@@ -2,126 +2,164 @@
 
 #include "general_vec.h"
 #include "op.h"
+#include "str.h"
 #include "utils.h"
 
-struct String;
+typedef struct SliceUSize {
+    usize *data;
+    usize size;
+} SliceUSize;
 
-typedef enum IREntityKind {
-    IREntityInvalid,
-    IREntityImmInt, // starts with #
-    IREntityVar,    // starts with v
-    IREntityAddr,   // starts with &v
-    IREntityDeref,  // starts with *v
-    IREntityLabel,  // starts with l
-    IREntityFun,    // fun_name->name
-} IREntityKind;
+#define APPLY_IRSTMT_KIND(f)                                                   \
+    f(Assign)     /* x := y */                                                 \
+        f(Load)   /* x := *y */                                                \
+        f(Store)  /* *x := y */                                                \
+        f(Arith)  /* x := y aop z */                                           \
+        f(Goto)   /* GOTO l */                                                 \
+        f(If)     /* IF x rop y GOTO l */                                      \
+        f(Call)   /* x := CALL f */                                            \
+        f(Return) /* RETURN x */                                               \
+        f(Read)   /* READ x */                                                 \
+        f(Write)  /* WRITE y */
 
-typedef struct IREntity {
-    IREntityKind kind;
+#define ENUM_IRSTMT_KIND_AID(kind) CONCATENATE(IRStmtKind, kind),
+typedef enum IRStmtKind {
+    IRStmtKindInvalid,
+    APPLY_IRSTMT_KIND(ENUM_IRSTMT_KIND_AID)
+} IRStmtKind;
+
+typedef struct IRStmtBase {
+    // virtual table
+    void (*drop)(struct IRStmtBase *self);
+    void (*build_str)(struct IRStmtBase *self, String *builder);
+    usize (*get_def)(struct IRStmtBase *self);
+    SliceUSize (*get_use)(struct IRStmtBase *self);
+
+    // other
+    IRStmtKind kind;
+    bool is_dead;
+} IRStmtBase;
+
+typedef struct IRStmtAssign {
+    IRStmtBase base;
+    usize dst;
     union {
-        int imm_int;     // for IREntityImmInt
-        usize var_idx;   // for IREntityVar, IREntityAddr, IREntityDeref
-        usize label_idx; // for IREntityLabel
+        usize use_repr[1];
+        usize src;
+    };
+} IRStmtAssign;
+void MTD(IRStmtAssign, init, /, usize dst, usize src);
+
+typedef struct IRStmtLoad {
+    IRStmtBase base;
+    usize dst;
+    union {
+        usize use_repr[1];
+        usize src_addr;
+    };
+} IRStmtLoad;
+
+typedef struct IRStmtStore {
+    IRStmtBase base;
+    union {
+        usize use_repr[2];
         struct {
-            usize arity;
-            struct String *name;
-        } as_fun; // for IREntityFun
+            usize dst_addr;
+            usize src;
+        };
     };
-} IREntity;
+} IRStmtStore;
 
-IREntity NSMTD(IREntity, make_imm_int, /, int imm_int);
-IREntity NSMTD(IREntity, make_var, /, IREntityKind kind, usize idx);
-IREntity NSMTD(IREntity, make_label, /, usize idx);
-IREntity NSMTD(IREntity, make_fun, /, usize arity, struct String *name);
-
-void MTD(IREntity, build_str, /, struct String *builder);
-
-#define APPLY_IR_KIND(f)                                                       \
-    f(Label)           /* LABEL {e1:label} : */                                \
-        f(Function)    /* FUNCTION {e1:fun} : */                               \
-        f(Assign)      /* {ret:var} := {e1:var/e1:imm_int/e1:addr/e1:deref},   \
-                          {ret:deref} := {e1:var} */                           \
-        f(ArithAssign) /* {ret:var} := {e1:var/e1:imm_int} {arithop_val}       \
-                          {e2:var/e2:imm_int} */                               \
-        f(Goto)        /* GOTO {ret:label} */                                  \
-        f(CondGoto)    /* IF {e1:var/e1:imm} {relop_val} {e2:var/e2:imm} GOTO  \
-                          {ret:label} */                                       \
-        f(Return)      /* RETURN {e1:var} */                                   \
-        f(Dec)         /* DEC {ret:var} {e1:imm w/o #} */                      \
-        f(Arg)         /* ARG {e1:var} */                                      \
-        f(Call)        /* {ret:var} := CALL {e1:fun} */                        \
-        f(Param)       /* PARAM {e1:var} */                                    \
-        f(Read)        /* READ {ret:var} */                                    \
-        f(Write)       /* WRITE {e1:var} */
-
-#define ENUM_IR_KIND_AID(irkind) CONCATENATE(IR, irkind),
-typedef enum IRKind { IRInvalid, APPLY_IR_KIND(ENUM_IR_KIND_AID) } IRKind;
-
-typedef struct IR {
-    IRKind kind;
-    IREntity e1;
-    IREntity e2;
-    IREntity ret;
-
+typedef struct IRStmtArith {
+    IRStmtBase base;
+    usize dst;
     union {
-        ArithopKind arithop_val;
-        RelopKind relop_val;
+        usize use_repr[2];
+        struct {
+            usize src1;
+            usize src2;
+        };
     };
-} IR;
+    ArithopKind aop;
+} IRStmtArith;
 
-FUNC_STATIC DEFAULT_DROPER(IR);
+typedef struct IRStmtGoto {
+    IRStmtBase base;
+    usize label;
+} IRStmtGoto;
 
-IR *NSMTD(IR, creheap_label, /, IREntity label);
-IR *NSMTD(IR, creheap_fun, /, IREntity fun);
-IR *NSMTD(IR, creheap_assign, /, IREntity lhs, IREntity rhs);
-IR *NSMTD(IR, creheap_arithassign, /, IREntity lhs, IREntity rhs1,
-          IREntity rhs2, ArithopKind aop);
-IR *NSMTD(IR, creheap_goto, /, IREntity label);
-IR *NSMTD(IR, creheap_condgoto, /, IREntity label, IREntity rop1, IREntity rop2,
-          RelopKind rop);
-IR *NSMTD(IR, creheap_return, /, IREntity ret);
-IR *NSMTD(IR, creheap_dec, /, IREntity dec, IREntity imm);
-IR *NSMTD(IR, creheap_arg, /, IREntity arg);
-IR *NSMTD(IR, creheap_call, /, IREntity lhs, IREntity fun);
-IR *NSMTD(IR, creheap_param, /, IREntity param);
-IR *NSMTD(IR, creheap_read, /, IREntity ret);
-IR *NSMTD(IR, creheap_write, /, IREntity param);
+typedef struct IRStmtIf {
+    IRStmtBase base;
+    union {
+        usize use_repr[2];
+        struct {
+            usize src1;
+            usize src2;
+        };
+    };
+    RelopKind rop;
+    usize label;
+} IRStmtIf;
 
-void MTD(IR, build_str, /, struct String *builder);
+typedef struct IRStmtCall {
+    IRStmtBase base;
+    usize dst;
+    String func_name;
+    VecUSize args;
+} IRStmtCall;
 
-typedef struct IRManager {
-    VecPtr irs;
-    usize idx_cur;
+typedef struct IRStmtReturn {
+    IRStmtBase base;
+    union {
+        usize use_repr[1];
+        usize src;
+    };
+} IRStmtReturn;
 
-    // some predefined `constants`
-    IREntity zero;
-    IREntity one;
-} IRManager;
+typedef struct IRStmtRead {
+    IRStmtBase base;
+    union {
+        usize use_repr[1];
+        usize dst;
+    };
+} IRStmtRead;
 
-void MTD(IRManager, init, /);
-void MTD(IRManager, drop, /);
-usize MTD(IRManager, new_idx, /);
+typedef struct IRStmtWrite {
+    IRStmtBase base;
+    usize src;
+} IRStmtWrite;
 
-void MTD(IRManager, addir_label, /, IREntity label);
-void MTD(IRManager, addir_fun, /, IREntity fun);
-void MTD(IRManager, addir_assign, /, IREntity lhs, IREntity rhs);
-void MTD(IRManager, addir_arithassign, /, IREntity lhs, IREntity rhs1,
-         IREntity rhs2, ArithopKind aop);
-void MTD(IRManager, addir_goto, /, IREntity label);
-void MTD(IRManager, addir_condgoto, /, IREntity label, IREntity rop1,
-         IREntity rop2, RelopKind rop);
-void MTD(IRManager, addir_return, /, IREntity ret);
-void MTD(IRManager, addir_dec, /, IREntity dec, IREntity imm);
-void MTD(IRManager, addir_arg, /, IREntity arg);
-void MTD(IRManager, addir_call, /, IREntity lhs, IREntity fun);
-void MTD(IRManager, addir_param, /, IREntity param);
-void MTD(IRManager, addir_read, /, IREntity ret);
-void MTD(IRManager, addir_write, /, IREntity param);
+#define DEFINE_IRSTMT_STRUCT(kindname, classname)                              \
+    /* require define */                                                       \
+    void MTD(classname, drop, /);                                              \
+    void MTD(classname, build_str, /, String * builder);                       \
+    usize MTD(classname, get_def, /);                                          \
+    SliceUSize MTD(classname, get_use, /);                                     \
+                                                                               \
+    /* auto gen */                                                             \
+    FUNC_STATIC void VMTD(classname, v_drop, /) {                              \
+        CALL(classname, *(classname *)self, drop, /);                          \
+    }                                                                          \
+    FUNC_STATIC void VMTD(classname, v_build_str, /, String * builder) {       \
+        CALL(classname, *(classname *)self, build_str, /, builder);            \
+    }                                                                          \
+    FUNC_STATIC usize VMTD(classname, v_get_def, /) {                          \
+        return CALL(classname, *(classname *)self, get_def, /);                \
+    }                                                                          \
+    FUNC_STATIC SliceUSize VMTD(classname, v_get_use, /) {                     \
+        return CALL(classname, *(classname *)self, get_use, /);                \
+    }                                                                          \
+    FUNC_STATIC void MTD(classname, base_init, /) {                            \
+        self->base.drop = MTDNAME(classname, v_drop);                          \
+        self->base.build_str = MTDNAME(classname, v_build_str);                \
+        self->base.get_def = MTDNAME(classname, v_get_def);                    \
+        self->base.get_use = MTDNAME(classname, v_get_use);                    \
+        self->base.kind = kindname;                                            \
+        self->base.is_dead = false;                                            \
+    }
 
-IREntity MTD(IRManager, new_ent_imm_int, /, int imm_int);
-IREntity MTD(IRManager, new_ent_var, /, IREntityKind kind);
-IREntity MTD(IRManager, new_ent_label, /);
-IREntity MTD(IRManager, new_ent_fun, /, usize arity, struct String *name);
+#define DEFINE_IRSTMT_STRUCT_AID(kind)                                         \
+    DEFINE_IRSTMT_STRUCT(CONCATENATE(IRStmtKind, kind),                        \
+                         CONCATENATE(IRStmt, kind))
 
-void MTD(IRManager, build_str, /, struct String *builder);
-struct String MTD(IRManager, get_ir_str, /);
+APPLY_IRSTMT_KIND(DEFINE_IRSTMT_STRUCT_AID)

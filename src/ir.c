@@ -1,413 +1,227 @@
 #include "ir.h"
-#include "op.h"
 #include "str.h"
 #include "utils.h"
 
-IREntity NSMTD(IREntity, make_imm_int, /, int imm_int) {
-    return (IREntity){
-        .kind = IREntityImmInt,
-        .imm_int = imm_int,
-    };
+// IRStmtAssign
+void MTD(IRStmtAssign, init, /, usize dst, usize src) {
+    CALL(IRStmtAssign, *self, base_init, /);
+    self->dst = dst;
+    self->src = src;
 }
-IREntity NSMTD(IREntity, make_var, /, IREntityKind kind, usize idx) {
-    ASSERT(kind == IREntityVar || kind == IREntityAddr ||
-           kind == IREntityDeref);
-    return (IREntity){
-        .kind = kind,
-        .var_idx = idx,
-    };
+DEFAULT_DROPER(IRStmtAssign);
+void MTD(IRStmtAssign, build_str, /, String *builder) {
+    CALL(String, *builder, pushf, /, "v%zu := v%zu", self->dst, self->src);
 }
-IREntity NSMTD(IREntity, make_label, /, usize idx) {
-    return (IREntity){
-        .kind = IREntityLabel,
-        .label_idx = idx,
-    };
-}
-IREntity NSMTD(IREntity, make_fun, /, usize arity, String *name) {
-    return (IREntity){
-        .kind = IREntityFun,
-        .as_fun =
-            {
-                .arity = arity,
-                .name = name,
-            },
+usize MTD(IRStmtAssign, get_def, /) { return self->dst; }
+SliceUSize MTD(IRStmtAssign, get_use, /) {
+    return (SliceUSize){
+        .data = self->use_repr,
+        .size = LENGTH(self->use_repr),
     };
 }
 
-void MTD(IREntity, build_str, /, String *builder) {
-    switch (self->kind) {
-    case IREntityImmInt:
-        CALL(String, *builder, pushf, /, "#%d", self->imm_int);
-        break;
-    case IREntityVar:
-        CALL(String, *builder, pushf, /, "v%zu", self->var_idx);
-        break;
-    case IREntityAddr:
-        CALL(String, *builder, pushf, /, "&v%zu", self->var_idx);
-        break;
-    case IREntityDeref:
-        CALL(String, *builder, pushf, /, "*v%zu", self->var_idx);
-        break;
-    case IREntityLabel:
-        CALL(String, *builder, pushf, /, "l%zu", self->label_idx);
-        break;
-    case IREntityFun: {
-        const char *fun_name = STRING_C_STR(*self->as_fun.name);
-        CALL(String, *builder, pushf, /, "%s", fun_name);
-        break;
-    }
-    default:
-        PANIC("Invalid IREntityKind");
-    }
+// IRStmtArith
+void MTD(IRStmtLoad, init, /, usize dst, usize src_addr) {
+    CALL(IRStmtLoad, *self, base_init, /);
+    self->dst = dst;
+    self->src_addr = src_addr;
+}
+DEFAULT_DROPER(IRStmtLoad);
+void MTD(IRStmtLoad, build_str, /, String *builder) {
+    CALL(String, *builder, pushf, /, "v%zu := *v%zu", self->dst,
+         self->src_addr);
+}
+usize MTD(IRStmtLoad, get_def, /) { return self->dst; }
+SliceUSize MTD(IRStmtLoad, get_use, /) {
+    return (SliceUSize){
+        .data = self->use_repr,
+        .size = LENGTH(self->use_repr),
+    };
 }
 
-IR *NSMTD(IR, creheap_label, /, IREntity label) {
-    ASSERT(label.kind == IREntityLabel);
-    IR *ir = CREOBJRAWHEAP(IR);
-    ir->kind = IRLabel;
-    ir->e1 = label;
-    return ir;
+// IRStmtStore
+void MTD(IRStmtStore, init, /, usize dst_addr, usize src) {
+    CALL(IRStmtStore, *self, base_init, /);
+    self->dst_addr = dst_addr;
+    self->src = src;
+}
+DEFAULT_DROPER(IRStmtStore);
+void MTD(IRStmtStore, build_str, /, String *builder) {
+    CALL(String, *builder, pushf, /, "*v%zu := v%zu", self->dst_addr,
+         self->src);
+}
+usize MTD(IRStmtStore, get_def, /) { return (usize)-1; }
+SliceUSize MTD(IRStmtStore, get_use, /) {
+    return (SliceUSize){
+        .data = self->use_repr,
+        .size = LENGTH(self->use_repr),
+    };
 }
 
-IR *NSMTD(IR, creheap_fun, /, IREntity fun) {
-    ASSERT(fun.kind == IREntityFun);
-    IR *ir = CREOBJRAWHEAP(IR);
-    ir->kind = IRFunction;
-    ir->e1 = fun;
-    return ir;
+// IRStmtArith
+void MTD(IRStmtArith, init, /, usize dst, usize src1, usize src2,
+         ArithopKind aop) {
+    CALL(IRStmtArith, *self, base_init, /);
+    self->dst = dst;
+    self->src1 = src1;
+    self->src2 = src2;
+    self->aop = aop;
 }
-
-IR *NSMTD(IR, creheap_assign, /, IREntity lhs, IREntity rhs) {
-    ASSERT((lhs.kind == IREntityVar &&
-            (rhs.kind == IREntityVar || rhs.kind == IREntityAddr ||
-             rhs.kind == IREntityDeref || rhs.kind == IREntityImmInt)) ||
-           (lhs.kind == IREntityDeref && rhs.kind == IREntityVar));
-    IR *ir = CREOBJRAWHEAP(IR);
-    ir->kind = IRAssign;
-    ir->ret = lhs;
-    ir->e1 = rhs;
-    return ir;
-}
-IR *NSMTD(IR, creheap_arithassign, /, IREntity lhs, IREntity rhs1,
-          IREntity rhs2, ArithopKind aop) {
-    ASSERT(lhs.kind == IREntityVar &&
-           (rhs1.kind == IREntityVar || rhs1.kind == IREntityImmInt) &&
-           (rhs2.kind == IREntityVar || rhs2.kind == IREntityImmInt));
-    IR *ir = CREOBJRAWHEAP(IR);
-    ir->kind = IRArithAssign;
-    ir->ret = lhs;
-    ir->e1 = rhs1;
-    ir->e2 = rhs2;
-    ir->arithop_val = aop;
-    return ir;
-}
-IR *NSMTD(IR, creheap_goto, /, IREntity label) {
-    ASSERT(label.kind == IREntityLabel);
-    IR *ir = CREOBJRAWHEAP(IR);
-    ir->kind = IRGoto;
-    ir->ret = label;
-    return ir;
-}
-IR *NSMTD(IR, creheap_condgoto, /, IREntity label, IREntity rop1, IREntity rop2,
-          RelopKind rop) {
-    ASSERT(label.kind == IREntityLabel &&
-           (rop1.kind == IREntityVar || rop1.kind == IREntityImmInt) &&
-           (rop2.kind == IREntityVar || rop2.kind == IREntityImmInt));
-    IR *ir = CREOBJRAWHEAP(IR);
-    ir->kind = IRCondGoto;
-    ir->ret = label;
-    ir->e1 = rop1;
-    ir->e2 = rop2;
-    ir->relop_val = rop;
-    return ir;
-}
-IR *NSMTD(IR, creheap_return, /, IREntity ret) {
-    ASSERT(ret.kind == IREntityVar);
-    IR *ir = CREOBJRAWHEAP(IR);
-    ir->kind = IRReturn;
-    ir->e1 = ret;
-    return ir;
-}
-IR *NSMTD(IR, creheap_dec, /, IREntity dec, IREntity imm) {
-    ASSERT(dec.kind == IREntityVar && imm.kind == IREntityImmInt);
-    IR *ir = CREOBJRAWHEAP(IR);
-    ir->kind = IRDec;
-    ir->ret = dec;
-    ir->e1 = imm;
-    return ir;
-}
-IR *NSMTD(IR, creheap_arg, /, IREntity arg) {
-    ASSERT(arg.kind == IREntityVar);
-    IR *ir = CREOBJRAWHEAP(IR);
-    ir->kind = IRArg;
-    ir->e1 = arg;
-    return ir;
-}
-IR *NSMTD(IR, creheap_call, /, IREntity lhs, IREntity fun) {
-    ASSERT(lhs.kind == IREntityVar && fun.kind == IREntityFun);
-    IR *ir = CREOBJRAWHEAP(IR);
-    ir->kind = IRCall;
-    ir->ret = lhs;
-    ir->e1 = fun;
-    return ir;
-}
-IR *NSMTD(IR, creheap_param, /, IREntity param) {
-    ASSERT(param.kind == IREntityVar);
-    IR *ir = CREOBJRAWHEAP(IR);
-    ir->kind = IRParam;
-    ir->e1 = param;
-    return ir;
-}
-IR *NSMTD(IR, creheap_read, /, IREntity ret) {
-    ASSERT(ret.kind == IREntityVar);
-    IR *ir = CREOBJRAWHEAP(IR);
-    ir->kind = IRRead;
-    ir->ret = ret;
-    return ir;
-}
-IR *NSMTD(IR, creheap_write, /, IREntity param) {
-    ASSERT(param.kind == IREntityVar);
-    IR *ir = CREOBJRAWHEAP(IR);
-    ir->kind = IRWrite;
-    ir->e1 = param;
-    return ir;
-}
-
-#define BUILD_STR_IR(irkind)                                                   \
-    FUNC_STATIC void MTD(IR, CONCATENATE(build_str_, irkind), /,               \
-                         String * builder)
-#define DECLARE_BUILD_STR_IR_AID(irkind) BUILD_STR_IR(irkind);
-
-APPLY_IR_KIND(DECLARE_BUILD_STR_IR_AID);
-
-#define JUMP_TABLE_IR_BUILD_STR_IR(irkind)                                     \
-    case CONCATENATE(IR, irkind): {                                            \
-        CALL(IR, *self, CONCATENATE(build_str_, irkind), /, builder);          \
-        break;                                                                 \
-    }
-
-BUILD_STR_IR(Label) {
-    CALL(String, *builder, push_str, /, "LABEL ");
-    CALL(IREntity, self->e1, build_str, /, builder);
-    CALL(String, *builder, push_str, /, " :\n");
-}
-
-BUILD_STR_IR(Function) {
-    CALL(String, *builder, push_str, /, "FUNCTION ");
-    CALL(IREntity, self->e1, build_str, /, builder);
-    CALL(String, *builder, push_str, /, " :\n");
-}
-BUILD_STR_IR(Assign) {
-    CALL(IREntity, self->ret, build_str, /, builder);
-    CALL(String, *builder, push_str, /, " := ");
-    CALL(IREntity, self->e1, build_str, /, builder);
-    CALL(String, *builder, push_str, /, "\n");
-}
-BUILD_STR_IR(ArithAssign) {
-    CALL(IREntity, self->ret, build_str, /, builder);
-    CALL(String, *builder, push_str, /, " := ");
-    CALL(IREntity, self->e1, build_str, /, builder);
-    char op;
-    switch (self->arithop_val) {
+DEFAULT_DROPER(IRStmtArith);
+static const char *ArithopKind_to_str(ArithopKind aop) {
+    switch (aop) {
     case ArithopAdd:
-        op = '+';
-        break;
+        return "+";
     case ArithopSub:
-        op = '-';
-        break;
+        return "-";
     case ArithopMul:
-        op = '*';
-        break;
+        return "*";
     case ArithopDiv:
-        op = '/';
-        break;
+        return "/";
     default:
-        PANIC("Invalid ArithopKind");
+        PANIC("Should not reach here");
     }
-    CALL(String, *builder, pushf, /, " %c ", op);
-    CALL(IREntity, self->e2, build_str, /, builder);
-    CALL(String, *builder, push_str, /, "\n");
+}
+void MTD(IRStmtArith, build_str, /, String *builder) {
+    CALL(String, *builder, pushf, /, "v%zu := v%zu %s v%zu", self->dst,
+         self->src1, ArithopKind_to_str(self->aop), self->src2);
+}
+usize MTD(IRStmtArith, get_def, /) { return self->dst; }
+SliceUSize MTD(IRStmtArith, get_use, /) {
+    return (SliceUSize){
+        .data = self->use_repr,
+        .size = LENGTH(self->use_repr),
+    };
 }
 
-BUILD_STR_IR(Goto) {
-    CALL(String, *builder, push_str, /, "GOTO ");
-    CALL(IREntity, self->ret, build_str, /, builder);
-    CALL(String, *builder, push_str, /, "\n");
+// IRStmtGoto
+void MTD(IRStmtGoto, init, /, usize label) {
+    CALL(IRStmtGoto, *self, base_init, /);
+    self->label = label;
+}
+DEFAULT_DROPER(IRStmtGoto);
+void MTD(IRStmtGoto, build_str, /, String *builder) {
+    CALL(String, *builder, pushf, /, "GOTO L%zu", self->label);
+}
+usize MTD(IRStmtGoto, get_def, /) { return (usize)-1; }
+SliceUSize MTD(IRStmtGoto, get_use, /) {
+    return (SliceUSize){
+        .data = NULL,
+        .size = 0,
+    };
 }
 
-BUILD_STR_IR(CondGoto) {
-    CALL(String, *builder, push_str, /, "IF ");
-    CALL(IREntity, self->e1, build_str, /, builder);
-    const char *op;
-    switch (self->relop_val) {
+// IRStmtIf
+void MTD(IRStmtIf, init, /, usize src1, usize src2, RelopKind rop,
+         usize label) {
+    CALL(IRStmtIf, *self, base_init, /);
+    self->src1 = src1;
+    self->src2 = src2;
+    self->rop = rop;
+    self->label = label;
+}
+DEFAULT_DROPER(IRStmtIf);
+static const char *RelopKind_to_str(RelopKind rop) {
+    switch (rop) {
     case RelopEQ:
-        op = "==";
-        break;
+        return "==";
     case RelopNE:
-        op = "!=";
-        break;
+        return "!=";
     case RelopLT:
-        op = "<";
-        break;
+        return "<";
     case RelopLE:
-        op = "<=";
-        break;
+        return "<=";
     case RelopGT:
-        op = ">";
-        break;
+        return ">";
     case RelopGE:
-        op = ">=";
-        break;
+        return ">=";
     default:
-        PANIC("Invalid RelopKind");
-    }
-    CALL(String, *builder, pushf, /, " %s ", op);
-    CALL(IREntity, self->e2, build_str, /, builder);
-    CALL(String, *builder, push_str, /, " GOTO ");
-    CALL(IREntity, self->ret, build_str, /, builder);
-    CALL(String, *builder, push_str, /, "\n");
-}
-BUILD_STR_IR(Return) {
-    CALL(String, *builder, push_str, /, "RETURN ");
-    CALL(IREntity, self->e1, build_str, /, builder);
-    CALL(String, *builder, push_str, /, "\n");
-}
-BUILD_STR_IR(Dec) {
-    CALL(String, *builder, push_str, /, "DEC ");
-    CALL(IREntity, self->ret, build_str, /, builder);
-    CALL(String, *builder, pushf, /, " %d\n", self->e1.imm_int);
-}
-BUILD_STR_IR(Arg) {
-    CALL(String, *builder, push_str, /, "ARG ");
-    CALL(IREntity, self->e1, build_str, /, builder);
-    CALL(String, *builder, push_str, /, "\n");
-}
-BUILD_STR_IR(Call) {
-    CALL(IREntity, self->ret, build_str, /, builder);
-    CALL(String, *builder, push_str, /, " := CALL ");
-    CALL(IREntity, self->e1, build_str, /, builder);
-    CALL(String, *builder, push_str, /, "\n");
-}
-BUILD_STR_IR(Param) {
-    CALL(String, *builder, push_str, /, "PARAM ");
-    CALL(IREntity, self->e1, build_str, /, builder);
-    CALL(String, *builder, push_str, /, "\n");
-}
-BUILD_STR_IR(Read) {
-    CALL(String, *builder, push_str, /, "READ ");
-    CALL(IREntity, self->ret, build_str, /, builder);
-    CALL(String, *builder, push_str, /, "\n");
-}
-BUILD_STR_IR(Write) {
-    CALL(String, *builder, push_str, /, "WRITE ");
-    CALL(IREntity, self->e1, build_str, /, builder);
-    CALL(String, *builder, push_str, /, "\n");
-}
-
-void MTD(IR, build_str, /, String *builder) {
-    switch (self->kind) {
-        APPLY_IR_KIND(JUMP_TABLE_IR_BUILD_STR_IR);
-    default:
-        PANIC("Invalid IRKind");
+        PANIC("Should not reach here");
     }
 }
-
-void MTD(IRManager, init, /) {
-    CALL(VecPtr, self->irs, init, /);
-    self->idx_cur = 0;
-    self->zero = CALL(IRManager, *self, new_ent_imm_int, /, 0);
-    self->one = CALL(IRManager, *self, new_ent_imm_int, /, 1);
+void MTD(IRStmtIf, build_str, /, String *builder) {
+    CALL(String, *builder, pushf, /, "IF v%zu %s v%zu GOTO l%zu", self->src1,
+         RelopKind_to_str(self->rop), self->src2, self->label);
+}
+usize MTD(IRStmtIf, get_def, /) { return (usize)-1; }
+SliceUSize MTD(IRStmtIf, get_use, /) {
+    return (SliceUSize){
+        .data = self->use_repr,
+        .size = LENGTH(self->use_repr),
+    };
 }
 
-void MTD(IRManager, drop, /) {
-    for (usize i = 0; i < self->irs.size; i++) {
-        DROPOBJHEAP(IR, self->irs.data[i]);
-    }
-    DROPOBJ(VecPtr, self->irs);
+// IRStmtCall
+void MTD(IRStmtCall, init, /, usize dst, String func_name, VecUSize args) {
+    CALL(IRStmtCall, *self, base_init, /);
+    self->dst = dst;
+    self->func_name = func_name;
+    self->args = args;
+}
+void MTD(IRStmtCall, drop, /) {
+    DROPOBJ(VecUSize, self->args);
+    DROPOBJ(String, self->func_name);
+}
+void MTD(IRStmtCall, build_str, /, String *builder) {
+    const char *func_name = STRING_C_STR(self->func_name);
+    CALL(String, *builder, pushf, /, "v%zu := CALL %s", self->dst, func_name);
 }
 
-usize MTD(IRManager, new_idx, /) { return self->idx_cur++; }
-
-void MTD(IRManager, addir_label, /, IREntity label) {
-    IR *ir = NSCALL(IR, creheap_label, /, label);
-    CALL(VecPtr, self->irs, push_back, /, ir);
+usize MTD(IRStmtCall, get_def, /) { return self->dst; }
+SliceUSize MTD(IRStmtCall, get_use, /) {
+    return (SliceUSize){
+        .data = self->args.data,
+        .size = self->args.size,
+    };
 }
 
-void MTD(IRManager, addir_fun, /, IREntity fun) {
-    IR *ir = NSCALL(IR, creheap_fun, /, fun);
-    CALL(VecPtr, self->irs, push_back, /, ir);
+// IRStmtReturn
+void MTD(IRStmtReturn, init, /, usize src) {
+    CALL(IRStmtReturn, *self, base_init, /);
+    self->src = src;
 }
-void MTD(IRManager, addir_assign, /, IREntity lhs, IREntity rhs) {
-    IR *ir = NSCALL(IR, creheap_assign, /, lhs, rhs);
-    CALL(VecPtr, self->irs, push_back, /, ir);
+DEFAULT_DROPER(IRStmtReturn);
+void MTD(IRStmtReturn, build_str, /, String *builder) {
+    CALL(String, *builder, pushf, /, "RETURN v%zu", self->src);
 }
-void MTD(IRManager, addir_arithassign, /, IREntity lhs, IREntity rhs1,
-         IREntity rhs2, ArithopKind aop) {
-    IR *ir = NSCALL(IR, creheap_arithassign, /, lhs, rhs1, rhs2, aop);
-    CALL(VecPtr, self->irs, push_back, /, ir);
-}
-void MTD(IRManager, addir_goto, /, IREntity label) {
-    IR *ir = NSCALL(IR, creheap_goto, /, label);
-    CALL(VecPtr, self->irs, push_back, /, ir);
-}
-void MTD(IRManager, addir_condgoto, /, IREntity label, IREntity rop1,
-         IREntity rop2, RelopKind rop) {
-    IR *ir = NSCALL(IR, creheap_condgoto, /, label, rop1, rop2, rop);
-    CALL(VecPtr, self->irs, push_back, /, ir);
-}
-void MTD(IRManager, addir_return, /, IREntity ret) {
-    IR *ir = NSCALL(IR, creheap_return, /, ret);
-    CALL(VecPtr, self->irs, push_back, /, ir);
-}
-void MTD(IRManager, addir_dec, /, IREntity dec, IREntity imm) {
-    IR *ir = NSCALL(IR, creheap_dec, /, dec, imm);
-    CALL(VecPtr, self->irs, push_back, /, ir);
-}
-void MTD(IRManager, addir_arg, /, IREntity arg) {
-    IR *ir = NSCALL(IR, creheap_arg, /, arg);
-    CALL(VecPtr, self->irs, push_back, /, ir);
-}
-void MTD(IRManager, addir_call, /, IREntity lhs, IREntity fun) {
-    IR *ir = NSCALL(IR, creheap_call, /, lhs, fun);
-    CALL(VecPtr, self->irs, push_back, /, ir);
-}
-void MTD(IRManager, addir_param, /, IREntity param) {
-    IR *ir = NSCALL(IR, creheap_param, /, param);
-    CALL(VecPtr, self->irs, push_back, /, ir);
-}
-void MTD(IRManager, addir_read, /, IREntity ret) {
-    IR *ir = NSCALL(IR, creheap_read, /, ret);
-    CALL(VecPtr, self->irs, push_back, /, ir);
-}
-void MTD(IRManager, addir_write, /, IREntity param) {
-    IR *ir = NSCALL(IR, creheap_write, /, param);
-    CALL(VecPtr, self->irs, push_back, /, ir);
+usize MTD(IRStmtReturn, get_def, /) { return (usize)-1; }
+SliceUSize MTD(IRStmtReturn, get_use, /) {
+    return (SliceUSize){
+        .data = self->use_repr,
+        .size = LENGTH(self->use_repr),
+    };
 }
 
-IREntity MTD(IRManager, new_ent_imm_int, /, int imm_int) {
-    return NSCALL(IREntity, make_imm_int, /, imm_int);
+// IRStmtRead
+void MTD(IRStmtRead, init, /, usize dst) {
+    CALL(IRStmtRead, *self, base_init, /);
+    self->dst = dst;
 }
-IREntity MTD(IRManager, new_ent_var, /, IREntityKind kind) {
-    usize idx = CALL(IRManager, *self, new_idx, /);
-    return NSCALL(IREntity, make_var, /, kind, idx);
+DEFAULT_DROPER(IRStmtRead);
+void MTD(IRStmtRead, build_str, /, String *builder) {
+    CALL(String, *builder, pushf, /, "READ v%zu", self->dst);
 }
-IREntity MTD(IRManager, new_ent_label, /) {
-    usize idx = CALL(IRManager, *self, new_idx, /);
-    return NSCALL(IREntity, make_label, /, idx);
-}
-IREntity MTD(IRManager, new_ent_fun, /, usize arity, struct String *name) {
-    return NSCALL(IREntity, make_fun, /, arity, name);
-}
-
-void MTD(IRManager, build_str, /, String *builder) {
-    for (usize i = 0; i < self->irs.size; i++) {
-        IR *ir = self->irs.data[i];
-        CALL(IR, *ir, build_str, /, builder);
-    }
+usize MTD(IRStmtRead, get_def, /) { return self->dst; }
+SliceUSize MTD(IRStmtRead, get_use, /) {
+    return (SliceUSize){
+        .data = self->use_repr,
+        .size = LENGTH(self->use_repr),
+    };
 }
 
-String MTD(IRManager, get_ir_str, /) {
-    String builder = CREOBJ(String, /);
-    CALL(IRManager, *self, build_str, /, &builder);
-    return builder;
+// IRStmtWrite
+void MTD(IRStmtWrite, init, /, usize src) {
+    CALL(IRStmtWrite, *self, base_init, /);
+    self->src = src;
+}
+DEFAULT_DROPER(IRStmtWrite);
+void MTD(IRStmtWrite, build_str, /, String *builder) {
+    CALL(String, *builder, pushf, /, "WRITE v%zu", self->src);
+}
+usize MTD(IRStmtWrite, get_def, /) { return (usize)-1; }
+SliceUSize MTD(IRStmtWrite, get_use, /) {
+    return (SliceUSize){
+        .data = NULL,
+        .size = 0,
+    };
 }

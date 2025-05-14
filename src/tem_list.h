@@ -23,6 +23,7 @@
 ///     List.pop_back() -> T: pop a value from the back of the list.
 ///     List.remove_front(): remove the front element of the list.
 ///     List.remove_back(): remove the back element of the list.
+///     List.remove(ListNode *it) -> ListNode *: remove a node from the list, and return the next node.
 ///     List.swap(List *other): swap the list with another list.
 ///     List.empty() -> bool: check if the list is empty.
 ///     List.clear(): clear the list.

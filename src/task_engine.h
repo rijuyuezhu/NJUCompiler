@@ -9,4 +9,5 @@ typedef struct TaskEngine {
 } TaskEngine;
 
 void MTD(TaskEngine, init, /, const char *input_ir_file, const char *output_ir_file);
+void MTD(TaskEngine, ir_opt, /);
 void MTD(TaskEngine, drop, /);
