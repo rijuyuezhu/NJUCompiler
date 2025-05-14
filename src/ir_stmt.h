@@ -1,14 +1,10 @@
 #pragma once
 
-#include "general_vec.h"
+#include "general_container.h"
+#include "general_structure.h"
 #include "op.h"
 #include "str.h"
 #include "utils.h"
-
-typedef struct SliceUSize {
-    usize *data;
-    usize size;
-} SliceUSize;
 
 #define APPLY_IRSTMT_KIND(f)                                                   \
     f(Assign)     /* x := y */                                                 \
@@ -28,12 +24,17 @@ typedef enum IRStmtKind {
     APPLY_IRSTMT_KIND(ENUM_IRSTMT_KIND_AID)
 } IRStmtKind;
 
-typedef struct IRStmtBase {
-    // virtual table
+struct IRStmtBase;
+
+typedef struct IRStmtBaseVTable {
     void (*drop)(struct IRStmtBase *self);
     void (*build_str)(struct IRStmtBase *self, String *builder);
     usize (*get_def)(struct IRStmtBase *self);
     SliceUSize (*get_use)(struct IRStmtBase *self);
+} IRStmtBaseVTable;
+
+typedef struct IRStmtBase {
+    const IRStmtBaseVTable *vtable;
 
     // other
     IRStmtKind kind;
@@ -98,7 +99,8 @@ typedef struct IRStmtIf {
         };
     };
     RelopKind rop;
-    usize label;
+    usize true_label;
+    usize false_label;
 } IRStmtIf;
 
 typedef struct IRStmtCall {
@@ -150,10 +152,12 @@ typedef struct IRStmtWrite {
         return CALL(classname, *(classname *)self, get_use, /);                \
     }                                                                          \
     FUNC_STATIC void MTD(classname, base_init, /) {                            \
-        self->base.drop = MTDNAME(classname, v_drop);                          \
-        self->base.build_str = MTDNAME(classname, v_build_str);                \
-        self->base.get_def = MTDNAME(classname, v_get_def);                    \
-        self->base.get_use = MTDNAME(classname, v_get_use);                    \
+        static const IRStmtBaseVTable vtable = {                               \
+            .drop = MTDNAME(classname, v_drop),                                \
+            .build_str = MTDNAME(classname, v_build_str),                      \
+            .get_def = MTDNAME(classname, v_get_def),                          \
+            .get_use = MTDNAME(classname, v_get_use)};                         \
+        self->base.vtable = &vtable;                                           \
         self->base.kind = kindname;                                            \
         self->base.is_dead = false;                                            \
     }
@@ -162,4 +166,4 @@ typedef struct IRStmtWrite {
     DEFINE_IRSTMT_STRUCT(CONCATENATE(IRStmtKind, kind),                        \
                          CONCATENATE(IRStmt, kind))
 
-APPLY_IRSTMT_KIND(DEFINE_IRSTMT_STRUCT_AID)
+APPLY_IRSTMT_KIND(DEFINE_IRSTMT_STRUCT_AID);

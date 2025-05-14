@@ -1,4 +1,4 @@
-#include "ir.h"
+#include "ir_stmt.h"
 #include "str.h"
 #include "utils.h"
 
@@ -10,7 +10,7 @@ void MTD(IRStmtAssign, init, /, usize dst, usize src) {
 }
 DEFAULT_DROPER(IRStmtAssign);
 void MTD(IRStmtAssign, build_str, /, String *builder) {
-    CALL(String, *builder, pushf, /, "v%zu := v%zu", self->dst, self->src);
+    CALL(String, *builder, pushf, /, "v%zu := v%zu\n", self->dst, self->src);
 }
 usize MTD(IRStmtAssign, get_def, /) { return self->dst; }
 SliceUSize MTD(IRStmtAssign, get_use, /) {
@@ -28,7 +28,7 @@ void MTD(IRStmtLoad, init, /, usize dst, usize src_addr) {
 }
 DEFAULT_DROPER(IRStmtLoad);
 void MTD(IRStmtLoad, build_str, /, String *builder) {
-    CALL(String, *builder, pushf, /, "v%zu := *v%zu", self->dst,
+    CALL(String, *builder, pushf, /, "v%zu := *v%zu\n", self->dst,
          self->src_addr);
 }
 usize MTD(IRStmtLoad, get_def, /) { return self->dst; }
@@ -47,7 +47,7 @@ void MTD(IRStmtStore, init, /, usize dst_addr, usize src) {
 }
 DEFAULT_DROPER(IRStmtStore);
 void MTD(IRStmtStore, build_str, /, String *builder) {
-    CALL(String, *builder, pushf, /, "*v%zu := v%zu", self->dst_addr,
+    CALL(String, *builder, pushf, /, "*v%zu := v%zu\n", self->dst_addr,
          self->src);
 }
 usize MTD(IRStmtStore, get_def, /) { return (usize)-1; }
@@ -83,7 +83,7 @@ static const char *ArithopKind_to_str(ArithopKind aop) {
     }
 }
 void MTD(IRStmtArith, build_str, /, String *builder) {
-    CALL(String, *builder, pushf, /, "v%zu := v%zu %s v%zu", self->dst,
+    CALL(String, *builder, pushf, /, "v%zu := v%zu %s v%zu\n", self->dst,
          self->src1, ArithopKind_to_str(self->aop), self->src2);
 }
 usize MTD(IRStmtArith, get_def, /) { return self->dst; }
@@ -101,7 +101,7 @@ void MTD(IRStmtGoto, init, /, usize label) {
 }
 DEFAULT_DROPER(IRStmtGoto);
 void MTD(IRStmtGoto, build_str, /, String *builder) {
-    CALL(String, *builder, pushf, /, "GOTO L%zu", self->label);
+    CALL(String, *builder, pushf, /, "GOTO L%zu\n", self->label);
 }
 usize MTD(IRStmtGoto, get_def, /) { return (usize)-1; }
 SliceUSize MTD(IRStmtGoto, get_use, /) {
@@ -118,7 +118,8 @@ void MTD(IRStmtIf, init, /, usize src1, usize src2, RelopKind rop,
     self->src1 = src1;
     self->src2 = src2;
     self->rop = rop;
-    self->label = label;
+    self->true_label = label;
+    self->false_label = (usize)-1;
 }
 DEFAULT_DROPER(IRStmtIf);
 static const char *RelopKind_to_str(RelopKind rop) {
@@ -140,8 +141,11 @@ static const char *RelopKind_to_str(RelopKind rop) {
     }
 }
 void MTD(IRStmtIf, build_str, /, String *builder) {
-    CALL(String, *builder, pushf, /, "IF v%zu %s v%zu GOTO l%zu", self->src1,
-         RelopKind_to_str(self->rop), self->src2, self->label);
+    CALL(String, *builder, pushf, /, "IF v%zu %s v%zu GOTO l%zu\n", self->src1,
+         RelopKind_to_str(self->rop), self->src2, self->true_label);
+    if (self->false_label != (usize)-1) {
+        CALL(String, *builder, pushf, /, "GOTO l%zu\n", self->false_label);
+    }
 }
 usize MTD(IRStmtIf, get_def, /) { return (usize)-1; }
 SliceUSize MTD(IRStmtIf, get_use, /) {
@@ -163,8 +167,11 @@ void MTD(IRStmtCall, drop, /) {
     DROPOBJ(String, self->func_name);
 }
 void MTD(IRStmtCall, build_str, /, String *builder) {
+    for (usize i = 0; i < self->args.size; i++) {
+        CALL(String, *builder, pushf, /, "ARG v%zu\n", self->args.data[i]);
+    }
     const char *func_name = STRING_C_STR(self->func_name);
-    CALL(String, *builder, pushf, /, "v%zu := CALL %s", self->dst, func_name);
+    CALL(String, *builder, pushf, /, "v%zu := CALL %s\n", self->dst, func_name);
 }
 
 usize MTD(IRStmtCall, get_def, /) { return self->dst; }
@@ -182,7 +189,7 @@ void MTD(IRStmtReturn, init, /, usize src) {
 }
 DEFAULT_DROPER(IRStmtReturn);
 void MTD(IRStmtReturn, build_str, /, String *builder) {
-    CALL(String, *builder, pushf, /, "RETURN v%zu", self->src);
+    CALL(String, *builder, pushf, /, "RETURN v%zu\n", self->src);
 }
 usize MTD(IRStmtReturn, get_def, /) { return (usize)-1; }
 SliceUSize MTD(IRStmtReturn, get_use, /) {
@@ -199,7 +206,7 @@ void MTD(IRStmtRead, init, /, usize dst) {
 }
 DEFAULT_DROPER(IRStmtRead);
 void MTD(IRStmtRead, build_str, /, String *builder) {
-    CALL(String, *builder, pushf, /, "READ v%zu", self->dst);
+    CALL(String, *builder, pushf, /, "READ v%zu\n", self->dst);
 }
 usize MTD(IRStmtRead, get_def, /) { return self->dst; }
 SliceUSize MTD(IRStmtRead, get_use, /) {
@@ -216,7 +223,7 @@ void MTD(IRStmtWrite, init, /, usize src) {
 }
 DEFAULT_DROPER(IRStmtWrite);
 void MTD(IRStmtWrite, build_str, /, String *builder) {
-    CALL(String, *builder, pushf, /, "WRITE v%zu", self->src);
+    CALL(String, *builder, pushf, /, "WRITE v%zu\n", self->src);
 }
 usize MTD(IRStmtWrite, get_def, /) { return (usize)-1; }
 SliceUSize MTD(IRStmtWrite, get_use, /) {

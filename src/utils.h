@@ -159,7 +159,7 @@
     ({                                                                         \
         typeof(cls) *MPROT(temp) = (ptr);                                      \
         if (MPROT(temp)) {                                                     \
-            CALL(cls, *MPROT(temp), drop, /);                                  \
+            DROPOBJ(cls, *MPROT(temp));                                        \
             free(MPROT(temp));                                                 \
         }                                                                      \
     })
@@ -167,9 +167,31 @@
 /// virtual functions
 #undef BASETYPE
 #define BASETYPE(cls) typeof(((cls *)0)->base)
+
 #undef VMTD
 #define VMTD(cls, method, slash, ...)                                          \
     NSMTD(cls, method, slash, ATTR_UNUSED BASETYPE(cls) * self, ##__VA_ARGS__)
+
+#undef VCALL
+#define VCALL(cls, self, method, slash, ...)                                   \
+    ({                                                                         \
+        typeof(cls) *MPROT(vcall_temp) = &(self);                              \
+        MPROT(vcall_temp)->vtable->method(MPROT(vcall_temp), ##__VA_ARGS__);   \
+    })
+
+#undef VDROPOBJ
+#define VDROPOBJ(cls, expr) VCALL(cls, expr, drop, /)
+
+#undef VDROPOBJHEAP
+#define VDROPOBJHEAP(cls, ptr)                                                 \
+    ({                                                                         \
+        typeof(cls) *MPROT(temp) = (ptr);                                      \
+        if (MPROT(temp)) {                                                     \
+            VDROPOBJ(cls, *MPROT(temp));                                       \
+            free(MPROT(temp));                                                 \
+        }                                                                      \
+    })
+
 /// helper macros for defining default initializers and dropers
 #undef DEFAULT_INITIALIZER
 #define DEFAULT_INITIALIZER(cls)                                               \

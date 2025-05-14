@@ -4,7 +4,9 @@
 void MTD(TaskEngine, init, /, const char *input_ir_file, const char *output_ir_file) {
     self->input_ir_file = input_ir_file;
     self->output_ir_file = output_ir_file;
+    CALL(IRProgram, self->ir_program, init, /);
 }
 
 void MTD(TaskEngine, drop, /) {
+    DROPOBJ(IRProgram, self->ir_program);
 }
