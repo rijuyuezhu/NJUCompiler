@@ -143,7 +143,7 @@
 #define DEFINE_LIST_INNER(List, ListNode, T, STORAGE)                          \
     /* List.drop() */                                                          \
     STORAGE void MTD(List, drop, /) {                                          \
-        while (self->head != NULL) {                                           \
+        while (self->head) {                                           \
             ListNode *MPROT(now) = self->head;                                 \
             self->head = self->head->next;                                     \
             NSCALL(List, drop_value, /, &MPROT(now)->data);                    \
@@ -157,17 +157,17 @@
     /* List.clone_from(const List *other) */                                   \
     STORAGE void MTD(List, clone_from, /, const List *MPROT(other)) {          \
         DROPOBJ(List, *self);                                                  \
-        if (MPROT(other)->head == NULL) {                                      \
+        if (!MPROT(other)->head) {                                      \
             return;                                                            \
         }                                                                      \
         ListNode *MPROT(p) = NULL;                                             \
         ListNode *MPROT(now) = NULL;                                           \
         ListNode *MPROT(it) = MPROT(other)->head;                              \
-        while (MPROT(it) != NULL) {                                            \
+        while (MPROT(it)) {                                            \
             MPROT(p) = MPROT(now);                                             \
             MPROT(now) = CREOBJRAWHEAP(ListNode);                              \
             MPROT(now)->data = NSCALL(List, clone_value, /, &MPROT(it)->data); \
-            if (MPROT(p) != NULL) {                                            \
+            if (MPROT(p)) {                                            \
                 MPROT(p)->next = MPROT(now);                                   \
             } else {                                                           \
                 self->head = MPROT(now);                                       \
@@ -181,13 +181,13 @@
                                                                                \
     /* List.front() -> T* */                                                   \
     STORAGE T *MTD(List, front, /) {                                           \
-        ASSERT(self->head != NULL);                                            \
+        ASSERT(self->head);                                            \
         return &self->head->data;                                              \
     }                                                                          \
                                                                                \
     /* List.back() -> T*/                                                      \
     STORAGE T *MTD(List, back, /) {                                            \
-        ASSERT(self->tail != NULL);                                            \
+        ASSERT(self->tail);                                            \
         return &self->tail->data;                                              \
     }                                                                          \
                                                                                \
@@ -197,11 +197,11 @@
         MPROT(now)->data = MPROT(value);                                       \
         MPROT(now)->next = self->head;                                         \
         MPROT(now)->prev = NULL;                                               \
-        if (self->head != NULL) {                                              \
+        if (self->head) {                                              \
             self->head->prev = MPROT(now);                                     \
         }                                                                      \
         self->head = MPROT(now);                                               \
-        if (self->tail == NULL) {                                              \
+        if (!self->tail) {                                              \
             self->tail = MPROT(now);                                           \
         }                                                                      \
         self->size++;                                                          \
@@ -213,11 +213,11 @@
         MPROT(now)->data = MPROT(value);                                       \
         MPROT(now)->prev = self->tail;                                         \
         MPROT(now)->next = NULL;                                               \
-        if (self->tail != NULL) {                                              \
+        if (self->tail) {                                              \
             self->tail->next = MPROT(now);                                     \
         }                                                                      \
         self->tail = MPROT(now);                                               \
-        if (self->head == NULL) {                                              \
+        if (!self->head) {                                              \
             self->head = MPROT(now);                                           \
         }                                                                      \
         self->size++;                                                          \
@@ -225,11 +225,11 @@
                                                                                \
     /* List.pop_front() -> T */                                                \
     STORAGE T MTD(List, pop_front, /) {                                        \
-        ASSERT(self->head != NULL);                                            \
+        ASSERT(self->head);                                            \
         ListNode *MPROT(now) = self->head;                                     \
         T MPROT(value) = MPROT(now)->data;                                     \
         self->head = MPROT(now)->next;                                         \
-        if (self->head != NULL) {                                              \
+        if (self->head) {                                              \
             self->head->prev = NULL;                                           \
         } else {                                                               \
             self->tail = NULL;                                                 \
@@ -241,11 +241,11 @@
                                                                                \
     /* List.pop_back() -> T */                                                 \
     STORAGE T MTD(List, pop_back, /) {                                         \
-        ASSERT(self->tail != NULL);                                            \
+        ASSERT(self->tail);                                            \
         ListNode *MPROT(now) = self->tail;                                     \
         T MPROT(value) = MPROT(now)->data;                                     \
         self->tail = MPROT(now)->prev;                                         \
-        if (self->tail != NULL) {                                              \
+        if (self->tail) {                                              \
             self->tail->next = NULL;                                           \
         } else {                                                               \
             self->head = NULL;                                                 \
@@ -256,17 +256,17 @@
     }                                                                          \
     /* List.remove(ListNode *it) -> ListNode */                                \
     STORAGE ListNode *MTD(List, remove, /, ListNode * MPROT(it)) {             \
-        if (MPROT(it)->prev != NULL) {                                         \
+        if (MPROT(it)->prev) {                                         \
             MPROT(it)->prev->next = MPROT(it)->next;                           \
         } else {                                                               \
             self->head = MPROT(it)->next;                                      \
         }                                                                      \
-        if (MPROT(it)->next != NULL) {                                         \
+        if (MPROT(it)->next) {                                         \
             MPROT(it)->next->prev = MPROT(it)->prev;                           \
         } else {                                                               \
             self->tail = MPROT(it)->prev;                                      \
         }                                                                      \
-        ListNode *MPROT(ret) = MPROT(it)->next;                                       \
+        ListNode *MPROT(ret) = MPROT(it)->next;                                \
         NSCALL(List, drop_value, /, &MPROT(it)->data);                         \
         self->size--;                                                          \
         free(MPROT(it));                                                       \

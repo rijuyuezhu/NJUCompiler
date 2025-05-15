@@ -13,11 +13,8 @@ static void fork_to_run_test(const TestEntry *test, bool *shall_exit,
 
 int main(int argc, char *argv[]) {
     const TestEntry tests[] = {
-        TESTENTRY(plain_vec),
-        TESTENTRY(class_vec),
-        TESTENTRY(map),
-        TESTENTRY(hstr),
-        TESTENTRY(list),
+        TESTENTRY(plain_vec), TESTENTRY(class_vec), TESTENTRY(map),
+        TESTENTRY(hstr),      TESTENTRY(list),
     };
 
     const usize n_tests = LENGTH(tests);

@@ -12,6 +12,8 @@ typedef struct IRBasicBlock {
 void MTD(IRBasicBlock, init, /, usize label);
 void MTD(IRBasicBlock, add_stmt, /, IRStmtBase *stmt);
 void MTD(IRBasicBlock, drop, /);
+void MTD(IRBasicBlock, build_str, /, String *builder);
+
 DELETED_CLONER(IRBasicBlock, FUNC_STATIC);
 
 DECLARE_LIST(ListBasicBlock, IRBasicBlock, FUNC_EXTERN, GENERATOR_CLASS_VALUE);

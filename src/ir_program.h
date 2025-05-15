@@ -9,5 +9,8 @@ typedef struct IRProgram {
     IdxAllocator label_idx_allocator;
 } IRProgram;
 
+
 void MTD(IRProgram, init, /);
 void MTD(IRProgram, drop, /);
+void MTD(IRProgram, build_str, /, String *builder);
+void MTD(IRProgram, establish, /, struct TaskEngine *engine);

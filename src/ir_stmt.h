@@ -1,10 +1,14 @@
 #pragma once
 
-#include "general_container.h"
-#include "general_structure.h"
+#include "ir_value.h"
 #include "op.h"
 #include "str.h"
 #include "utils.h"
+
+typedef struct SliceIRValue {
+    IRValue *data;
+    usize size;
+} SliceIRValue;
 
 #define APPLY_IRSTMT_KIND(f)                                                   \
     f(Assign)     /* x := y */                                                 \
@@ -30,7 +34,7 @@ typedef struct IRStmtBaseVTable {
     void (*drop)(struct IRStmtBase *self);
     void (*build_str)(struct IRStmtBase *self, String *builder);
     usize (*get_def)(struct IRStmtBase *self);
-    SliceUSize (*get_use)(struct IRStmtBase *self);
+    SliceIRValue (*get_use)(struct IRStmtBase *self);
 } IRStmtBaseVTable;
 
 typedef struct IRStmtBase {
@@ -45,98 +49,110 @@ typedef struct IRStmtAssign {
     IRStmtBase base;
     usize dst;
     union {
-        usize use_repr[1];
-        usize src;
+        IRValue use_repr[1];
+        IRValue src;
     };
 } IRStmtAssign;
-void MTD(IRStmtAssign, init, /, usize dst, usize src);
+void MTD(IRStmtAssign, init, /, usize dst, IRValue src);
 
 typedef struct IRStmtLoad {
     IRStmtBase base;
     usize dst;
     union {
-        usize use_repr[1];
-        usize src_addr;
+        IRValue use_repr[1];
+        IRValue src_addr;
     };
 } IRStmtLoad;
+void MTD(IRStmtLoad, init, /, usize dst, IRValue src_addr);
 
 typedef struct IRStmtStore {
     IRStmtBase base;
     union {
-        usize use_repr[2];
+        IRValue use_repr[2];
         struct {
-            usize dst_addr;
-            usize src;
+            IRValue dst_addr;
+            IRValue src;
         };
     };
 } IRStmtStore;
+void MTD(IRStmtStore, init, /, IRValue dst_addr, IRValue src);
 
 typedef struct IRStmtArith {
     IRStmtBase base;
     usize dst;
     union {
-        usize use_repr[2];
+        IRValue use_repr[2];
         struct {
-            usize src1;
-            usize src2;
+            IRValue src1;
+            IRValue src2;
         };
     };
     ArithopKind aop;
 } IRStmtArith;
+void MTD(IRStmtArith, init, /, usize dst, IRValue src1, IRValue src2,
+         ArithopKind aop);
 
 typedef struct IRStmtGoto {
     IRStmtBase base;
     usize label;
 } IRStmtGoto;
+void MTD(IRStmtGoto, init, /, usize label);
 
 typedef struct IRStmtIf {
     IRStmtBase base;
     union {
-        usize use_repr[2];
+        IRValue use_repr[2];
         struct {
-            usize src1;
-            usize src2;
+            IRValue src1;
+            IRValue src2;
         };
     };
     RelopKind rop;
     usize true_label;
     usize false_label;
 } IRStmtIf;
+void MTD(IRStmtIf, init, /, IRValue src1, IRValue src2, RelopKind rop,
+         usize label);
+void MTD(IRStmtIf, flip, /);
 
 typedef struct IRStmtCall {
     IRStmtBase base;
     usize dst;
     String func_name;
-    VecUSize args;
+    VecIRValue args;
 } IRStmtCall;
+void MTD(IRStmtCall, init, /, usize dst, String func_name, VecIRValue args);
 
 typedef struct IRStmtReturn {
     IRStmtBase base;
     union {
-        usize use_repr[1];
-        usize src;
+        IRValue use_repr[1];
+        IRValue src;
     };
 } IRStmtReturn;
+void MTD(IRStmtReturn, init, /, IRValue src);
 
 typedef struct IRStmtRead {
     IRStmtBase base;
-    union {
-        usize use_repr[1];
-        usize dst;
-    };
+    usize dst;
 } IRStmtRead;
+void MTD(IRStmtRead, init, /, usize dst);
 
 typedef struct IRStmtWrite {
     IRStmtBase base;
-    usize src;
+    union {
+        IRValue use_repr[1];
+        IRValue src;
+    };
 } IRStmtWrite;
+void MTD(IRStmtWrite, init, /, IRValue src);
 
 #define DEFINE_IRSTMT_STRUCT(kindname, classname)                              \
     /* require define */                                                       \
     void MTD(classname, drop, /);                                              \
     void MTD(classname, build_str, /, String * builder);                       \
     usize MTD(classname, get_def, /);                                          \
-    SliceUSize MTD(classname, get_use, /);                                     \
+    SliceIRValue MTD(classname, get_use, /);                                   \
                                                                                \
     /* auto gen */                                                             \
     FUNC_STATIC void VMTD(classname, v_drop, /) {                              \
@@ -148,7 +164,7 @@ typedef struct IRStmtWrite {
     FUNC_STATIC usize VMTD(classname, v_get_def, /) {                          \
         return CALL(classname, *(classname *)self, get_def, /);                \
     }                                                                          \
-    FUNC_STATIC SliceUSize VMTD(classname, v_get_use, /) {                     \
+    FUNC_STATIC SliceIRValue VMTD(classname, v_get_use, /) {                   \
         return CALL(classname, *(classname *)self, get_use, /);                \
     }                                                                          \
     FUNC_STATIC void MTD(classname, base_init, /) {                            \

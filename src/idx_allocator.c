@@ -19,3 +19,5 @@ usize MTD(IdxAllocator, get, /, String str) {
     }
     return res.node->value;
 }
+
+usize MTD(IdxAllocator, allocate, /) { return self->avali_acc++; }

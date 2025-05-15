@@ -11,11 +11,21 @@ void MTD(IRBasicBlock, add_stmt, /, IRStmtBase *stmt) {
 }
 
 void MTD(IRBasicBlock, drop, /) {
-    for (ListPtrNode *it = self->stmts.head; it != NULL; it = it->next) {
+    for (ListPtrNode *it = self->stmts.head; it; it = it->next) {
         IRStmtBase *stmt = (IRStmtBase *)it->data;
-        VCALL(IRStmtBase, *stmt, drop, /);
+        VDROPOBJHEAP(IRStmtBase, stmt);
     }
     DROPOBJ(ListPtr, self->stmts);
+}
+
+void MTD(IRBasicBlock, build_str, /, String *builder) {
+    if (self->label != (usize)-1) {
+        CALL(String, *builder, pushf, /, "LABEL l%zu :\n", self->label);
+    }
+    for (ListPtrNode *it = self->stmts.head; it; it = it->next) {
+        IRStmtBase *stmt = (IRStmtBase *)it->data;
+        VCALL(IRStmtBase, *stmt, build_str, /, builder);
+    }
 }
 
 DEFINE_LIST(ListBasicBlock, IRBasicBlock, FUNC_EXTERN);

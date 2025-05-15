@@ -3,9 +3,11 @@
 #include "ir_basic_block.h"
 #include "str.h"
 
+struct TaskEngine;
+
 typedef struct DecInfo {
     usize addr;
-    usize size;
+    int size;
 } DecInfo;
 
 DECLARE_MAPPING(MapVarToDecInfo, usize, DecInfo, FUNC_EXTERN,
@@ -23,11 +25,18 @@ typedef struct IRFunction {
     MapLabelBB label_to_block;
     MapBBToListBB block_pred;
     MapBBToListBB block_succ;
+    struct IRProgram *program;
 } IRFunction;
 
-void MTD(IRFunction, init, /, String func_name);
+void MTD(IRFunction, init, /, String func_name, struct IRProgram *program);
 void MTD(IRFunction, drop, /);
-void MTD(IRFunction, establish, /);
-DELETED_CLONER(IRFunction, FUNC_STATIC)
+void MTD(IRFunction, add_stmt, /, IRStmtBase *stmt);
+void MTD(IRFunction, add_label, /, usize label);
+void MTD(IRFunction, establish, /, struct TaskEngine *engine);
+IRBasicBlock* MTD(IRFunction, label_to_bb, /, usize label);
+ListPtr *MTD(IRFunction, get_pred, /, IRBasicBlock *bb);
+ListPtr *MTD(IRFunction, get_succ, /, IRBasicBlock *bb);
+void MTD(IRFunction, build_str, /, String *builder);
 
+DELETED_CLONER(IRFunction, FUNC_STATIC);
 DECLARE_CLASS_VEC(VecIRFunction, IRFunction, FUNC_EXTERN);
