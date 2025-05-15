@@ -3,6 +3,8 @@
 
 struct IRProgram;
 struct IRFunction;
+struct IRBasicBlock;
+struct IRStmtBase;
 typedef struct IROptimizer {
     struct IRProgram *program;
 } IROptimizer;
@@ -12,3 +14,13 @@ FUNC_STATIC DEFAULT_DROPER(IROptimizer);
 void MTD(IROptimizer, optimize, /);
 void MTD(IROptimizer, optimize_func, /, struct IRFunction *func);
 void MTD(IROptimizer, optimize_func_constprop, /, struct IRFunction *func);
+void MTD(IROptimizer, optimize_func_simple_redundant_ops, /,
+         struct IRFunction *func);
+
+typedef void (*StmtIterCallback)(IROptimizer *optimizer,
+                                 struct IRFunction *func,
+                                 struct IRBasicBlock *bb,
+                                 struct IRStmtBase **stmt);
+
+void MTD(IROptimizer, iter_stmt, /, struct IRFunction *func,
+         StmtIterCallback callback);

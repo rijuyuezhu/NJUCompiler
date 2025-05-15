@@ -168,9 +168,19 @@ void MTD(ConstPropDA, transfer_stmt, /, IRStmtBase *stmt, Any fact) {
         } else {
             cpval2 = CALL(CPFact, *cpfact, get, /, src2.var);
         }
+
         if (arith->aop == ArithopDiv && cpval2.kind == CPValueKindConst &&
             cpval2.const_val == 0) {
             eval = NSCALL(CPValue, get_undef, /);
+        } else if (arith->aop == ArithopMul &&
+                   ((cpval1.kind == CPValueKindConst &&
+                     cpval1.const_val == 0) ||
+                    (cpval2.kind == CPValueKindConst &&
+                     cpval2.const_val == 0))) {
+            eval = NSCALL(CPValue, get_const, /, 0);
+        } else if (arith->aop == ArithopDiv &&
+                   cpval1.kind == CPValueKindConst && cpval1.const_val == 0) {
+            eval = NSCALL(CPValue, get_const, /, 0);
         } else if (cpval1.kind == CPValueKindConst &&
                    cpval2.kind == CPValueKindConst) {
             switch (arith->aop) {

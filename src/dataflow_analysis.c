@@ -33,9 +33,8 @@ bool MTD(DataflowAnalysisBase, transfer_bb, /, IRBasicBlock *bb, Any in_fact,
 void MTD(DataflowAnalysisBase, iter_bb, /, IRBasicBlock *bb,
          DAIterCallback callback) {
     bool is_forward = VCALL(DataflowAnalysisBase, *self, is_forward, /);
-    Any in_fact = VCALL(DataflowAnalysisBase, *self, get_in_fact, /, bb);
-    Any out_fact = VCALL(DataflowAnalysisBase, *self, get_out_fact, /, bb);
     if (is_forward) {
+        Any in_fact = VCALL(DataflowAnalysisBase, *self, get_in_fact, /, bb);
         Any new_fact = VCALL(DataflowAnalysisBase, *self, new_initial_fact, /);
         VCALL(DataflowAnalysisBase, *self, meet_into, /, in_fact, new_fact);
         for (ListDynIRStmtNode *it = bb->stmts.head; it; it = it->next) {
@@ -46,6 +45,7 @@ void MTD(DataflowAnalysisBase, iter_bb, /, IRBasicBlock *bb,
         }
         VCALL(DataflowAnalysisBase, *self, drop_fact, /, new_fact);
     } else {
+        Any out_fact = VCALL(DataflowAnalysisBase, *self, get_out_fact, /, bb);
         Any new_fact = VCALL(DataflowAnalysisBase, *self, new_initial_fact, /);
         VCALL(DataflowAnalysisBase, *self, meet_into, /, out_fact, new_fact);
         for (ListDynIRStmtNode *it = bb->stmts.tail; it; it = it->prev) {
