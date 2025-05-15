@@ -4,7 +4,7 @@
 
 // IRBasicBlock
 typedef struct IRBasicBlock {
-    ListPtr stmts; // NOTE: owned
+    ListDynIRStmt stmts;
     usize label;
     bool is_dead;
 } IRBasicBlock;

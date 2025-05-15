@@ -3,6 +3,8 @@
 #include "ir_value.h"
 #include "op.h"
 #include "str.h"
+#include "tem_list.h"
+#include "tem_memory_primitive.h"
 #include "utils.h"
 
 typedef struct SliceIRValue {
@@ -183,3 +185,12 @@ void MTD(IRStmtWrite, init, /, IRValue src);
                          CONCATENATE(IRStmt, kind))
 
 APPLY_IRSTMT_KIND(DEFINE_IRSTMT_STRUCT_AID);
+
+DECLARE_LIST(ListDynIRStmt, IRStmtBase *, FUNC_EXTERN, GENERATOR_CUSTOM_VALUE);
+FUNC_STATIC void NSMTD(ListDynIRStmt, drop_value, /, IRStmtBase **value) {
+    VDROPOBJHEAP(IRStmtBase, *value);
+}
+FUNC_STATIC IRStmtBase *NSMTD(ListDynIRStmt, clone_value, /,
+                              ATTR_UNUSED IRStmtBase *const *other) {
+    PANIC("disable clone");
+}

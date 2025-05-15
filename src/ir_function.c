@@ -59,7 +59,7 @@ void MTD(IRFunction, add_stmt, /, IRStmtBase *stmt) {
         }
     }
     // add the statement to the last block
-    CALL(ListPtr, last_bb->stmts, push_back, /, stmt);
+    CALL(ListDynIRStmt, last_bb->stmts, push_back, /, stmt);
 }
 
 static void try_strip_gotos(IRBasicBlock *bb, usize label) {
@@ -69,8 +69,7 @@ static void try_strip_gotos(IRBasicBlock *bb, usize label) {
             IRStmtGoto *goto_stmt = (IRStmtGoto *)stmt;
             if (goto_stmt->label == label) {
                 // remove the goto statement
-                VDROPOBJHEAP(IRStmtBase, stmt);
-                CALL(ListPtr, bb->stmts, pop_back, /);
+                CALL(ListDynIRStmt, bb->stmts, pop_back, /);
             } else {
                 break;
             }
@@ -80,8 +79,7 @@ static void try_strip_gotos(IRBasicBlock *bb, usize label) {
                 if (if_stmt->false_label == (usize)-1 ||
                     if_stmt->false_label == label) {
                     // remove the entire if statement
-                    VDROPOBJHEAP(IRStmtBase, stmt);
-                    CALL(ListPtr, bb->stmts, pop_back, /);
+                    CALL(ListDynIRStmt, bb->stmts, pop_back, /);
                 } else {
                     CALL(IRStmtIf, *if_stmt, flip, /);
                     ASSERT(if_stmt->false_label == label);

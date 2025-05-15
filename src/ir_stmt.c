@@ -278,3 +278,4 @@ SliceIRValue MTD(IRStmtWrite, get_use, /) {
 }
 
 DEFINE_PLAIN_VEC(VecIRValue, IRValue, FUNC_EXTERN)
+DEFINE_LIST(ListDynIRStmt, IRStmtBase *, FUNC_EXTERN);

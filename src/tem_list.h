@@ -6,6 +6,7 @@
 ///         value_gen: define the value generator.
 ///         - GENERATOR_PLAIN_VALUE: define a plain value generator.
 ///         - GENERATOR_CLASS_VALUE: define a class value generator.
+///         - GENERATOR_CUSTOM_VALUE: define a custom value generator.
 ///     DEFINE_LIST(List, T, STORAGE): define a list.
 ///
 ///     Here STORAGE is either `FUNC_STATIC` or `FUNC_EXTERN`

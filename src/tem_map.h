@@ -6,9 +6,11 @@
 ///         key_gen: define the key generator.
 ///         - GENERATOR_PLAIN_KEY: define a plain key generator.
 ///         - GENERATOR_CLASS_KEY: define a class key generator.
+///         - GENERATOR_CUSTOM_KEY: define a custom key generator.
 ///         value_gen: define the value generator.
 ///         - GENERATOR_PLAIN_VALUE: define a plain value generator.
 ///         - GENERATOR_CLASS_VALUE: define a class value generator.
+///         - GENERATOR_CUSTOM_VALUE: define a custom value generator.
 ///         com_gen: define the comparator generator.
 ///         - GENERATOR_PLAIN_COMPARATOR: define a plain comparator generator.
 ///         - GENERATOR_CLASS_COMPARATOR: define a class comparator generator.

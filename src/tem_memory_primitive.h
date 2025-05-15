@@ -1,6 +1,7 @@
 #pragma once
 
 #include "utils.h"
+
 #undef GENERATOR_PLAIN_COMPARATOR
 #define GENERATOR_PLAIN_COMPARATOR(Container, K)                               \
     FUNC_STATIC int NSMTD(Container, comparator, /, const typeof(K) *MPROT(a), \
@@ -37,6 +38,9 @@
         return CALL(K, *MPROT(other), clone, /);                               \
     }
 
+#undef GENERATOR_CUSTOM_KEY
+#define GENERATOR_CUSTOM_KEY(Container, K)
+
 #undef GENERATOR_PLAIN_VALUE
 #define GENERATOR_PLAIN_VALUE(Container, V)                                    \
     FUNC_STATIC void NSMTD(Container, drop_value, /,                           \
@@ -56,3 +60,6 @@
                                 const typeof(V) *MPROT(other)) {               \
         return CALL(V, *MPROT(other), clone, /);                               \
     }
+
+#undef GENERATOR_CUSTOM_VALUE
+#define GENERATOR_CUSTOM_VALUE(Container, V)
