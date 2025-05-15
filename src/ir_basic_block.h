@@ -13,6 +13,7 @@ void MTD(IRBasicBlock, init, /, usize label);
 void MTD(IRBasicBlock, add_stmt, /, IRStmtBase *stmt);
 void MTD(IRBasicBlock, drop, /);
 void MTD(IRBasicBlock, build_str, /, String *builder);
+void MTD(IRBasicBlock, debug_print, /);
 
 DELETED_CLONER(IRBasicBlock, FUNC_STATIC);
 

@@ -158,16 +158,16 @@ void MTD(IRStmtWrite, init, /, IRValue src);
                                                                                \
     /* auto gen */                                                             \
     FUNC_STATIC void VMTD(classname, v_drop, /) {                              \
-        CALL(classname, *(classname *)self, drop, /);                          \
+        CALL(classname, *(classname *)base_self, drop, /);                     \
     }                                                                          \
     FUNC_STATIC void VMTD(classname, v_build_str, /, String * builder) {       \
-        CALL(classname, *(classname *)self, build_str, /, builder);            \
+        CALL(classname, *(classname *)base_self, build_str, /, builder);       \
     }                                                                          \
     FUNC_STATIC usize VMTD(classname, v_get_def, /) {                          \
-        return CALL(classname, *(classname *)self, get_def, /);                \
+        return CALL(classname, *(classname *)base_self, get_def, /);           \
     }                                                                          \
     FUNC_STATIC SliceIRValue VMTD(classname, v_get_use, /) {                   \
-        return CALL(classname, *(classname *)self, get_use, /);                \
+        return CALL(classname, *(classname *)base_self, get_use, /);           \
     }                                                                          \
     FUNC_STATIC void MTD(classname, base_init, /) {                            \
         static const IRStmtBaseVTable vtable = {                               \
@@ -193,5 +193,5 @@ FUNC_STATIC void NSMTD(ListDynIRStmt, drop_value, /, IRStmtBase **value) {
 }
 FUNC_STATIC IRStmtBase *NSMTD(ListDynIRStmt, clone_value, /,
                               ATTR_UNUSED IRStmtBase *const *other) {
-    PANIC("disable clone");
+    PANIC("Disable clone");
 }

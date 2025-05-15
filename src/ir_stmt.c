@@ -250,7 +250,7 @@ DEFAULT_DROPER(IRStmtRead);
 void MTD(IRStmtRead, build_str, /, String *builder) {
     CALL(String, *builder, pushf, /, "READ v%zu\n", self->dst);
 }
-usize MTD(IRStmtRead, get_def, /) { return (usize)-1; }
+usize MTD(IRStmtRead, get_def, /) { return self->dst; }
 SliceIRValue MTD(IRStmtRead, get_use, /) {
     return (SliceIRValue){
         .data = NULL,

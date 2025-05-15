@@ -33,7 +33,7 @@ void MTD(IRFunction, drop, /);
 void MTD(IRFunction, add_stmt, /, IRStmtBase *stmt);
 void MTD(IRFunction, add_label, /, usize label);
 void MTD(IRFunction, establish, /, struct TaskEngine *engine);
-IRBasicBlock* MTD(IRFunction, label_to_bb, /, usize label);
+IRBasicBlock *MTD(IRFunction, label_to_bb, /, usize label);
 ListPtr *MTD(IRFunction, get_pred, /, IRBasicBlock *bb);
 ListPtr *MTD(IRFunction, get_succ, /, IRBasicBlock *bb);
 void MTD(IRFunction, build_str, /, String *builder);

@@ -48,14 +48,15 @@ static IRValue get_ir_value_from_addr(TaskEngine *engine, usize var) {
     MapVarToDecInfoIterator it =
         CALL(MapVarToDecInfo, *var_to_dec_info, find_owned, /, var);
     if (!it) {
-        // normal variable
-        usize addr = CALL(IdxAllocator, engine->ir_program.var_idx_allocator,
-                          allocate, /);
-        MapVarToDecInfoInsertResult res =
-            CALL(MapVarToDecInfo, *var_to_dec_info, insert, /, var,
-                 (DecInfo){.addr = addr, .size = 4});
-        ASSERT(res.inserted);
-        it = res.node;
+        // // normal variable
+        // usize addr = CALL(IdxAllocator, engine->ir_program.var_idx_allocator,
+        //                   allocate, /);
+        // MapVarToDecInfoInsertResult res =
+        //     CALL(MapVarToDecInfo, *var_to_dec_info, insert, /, var,
+        //          (DecInfo){.addr = addr, .size = 4});
+        // ASSERT(res.inserted);
+        // it = res.node;
+        PANIC("Not implemented");
     }
     return NSCALL(IRValue, from_var, /, it->value.addr);
 }

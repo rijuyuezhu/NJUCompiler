@@ -21,6 +21,22 @@ void MTD(IRBasicBlock, build_str, /, String *builder) {
         VCALL(IRStmtBase, *stmt, build_str, /, builder);
     }
 }
+void MTD(IRBasicBlock, debug_print, /) {
+    String builder = CREOBJ(String, /);
+    CALL(IRBasicBlock, *self, build_str, /, &builder);
+    if (builder.size != 0) {
+        printf("     ");
+    }
+    for (usize i = 0; i < builder.size; i++) {
+        char ch = builder.data[i];
+        if (ch == '\n' && i + 1 != builder.size) {
+            printf("\n     ");
+        } else {
+            putchar(ch);
+        }
+    }
+    DROPOBJ(String, builder);
+}
 
 DEFINE_LIST(ListBasicBlock, IRBasicBlock, FUNC_EXTERN);
 DEFINE_MAPPING(MapLabelBB, usize, IRBasicBlock *, FUNC_EXTERN);

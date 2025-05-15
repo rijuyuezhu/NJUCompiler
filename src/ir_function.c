@@ -157,9 +157,12 @@ static void MTD(IRFunction, build_graph, /, TaskEngine *engine) {
             }
             IRBasicBlock *false_target =
                 CALL(IRFunction, *self, label_to_bb, /, if_stmt->false_label);
-            if (false_target) {
-                CALL(IRFunction, *self, add_edge, /, bb, false_target);
+            if (!false_target) {
+                // if the false label is not defined, go to the next
+                // block
+                false_target = nxt_bb;
             }
+            CALL(IRFunction, *self, add_edge, /, bb, false_target);
         } else if (last_stmt->kind == IRStmtKindReturn) {
             CALL(IRFunction, *self, add_edge, /, bb, self->exit);
         } else {
@@ -235,8 +238,7 @@ void MTD(IRFunction, build_str, /, String *builder) {
         CALL(String, *builder, pushf, /, "v%zu := &v%zu\n", it->value.addr,
              it->key);
     }
-    for (ListBasicBlockNode *it = self->basic_blocks.head; it;
-         it = it->next) {
+    for (ListBasicBlockNode *it = self->basic_blocks.head; it; it = it->next) {
         CALL(IRBasicBlock, it->data, build_str, /, builder);
     }
 }
