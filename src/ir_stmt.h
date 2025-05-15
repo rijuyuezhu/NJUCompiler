@@ -30,22 +30,22 @@ typedef enum IRStmtKind {
     APPLY_IRSTMT_KIND(ENUM_IRSTMT_KIND_AID)
 } IRStmtKind;
 
-struct IRStmtBase;
+typedef struct IRStmtBase IRStmtBase;
 
 typedef struct IRStmtBaseVTable {
-    void (*drop)(struct IRStmtBase *self);
-    void (*build_str)(struct IRStmtBase *self, String *builder);
-    usize (*get_def)(struct IRStmtBase *self);
-    SliceIRValue (*get_use)(struct IRStmtBase *self);
+    void (*drop)(IRStmtBase *self);
+    void (*build_str)(IRStmtBase *self, String *builder);
+    usize (*get_def)(IRStmtBase *self);
+    SliceIRValue (*get_use)(IRStmtBase *self);
 } IRStmtBaseVTable;
 
-typedef struct IRStmtBase {
+struct IRStmtBase {
     const IRStmtBaseVTable *vtable;
 
     // other
     IRStmtKind kind;
     bool is_dead;
-} IRStmtBase;
+};
 
 typedef struct IRStmtAssign {
     IRStmtBase base;
@@ -174,7 +174,8 @@ void MTD(IRStmtWrite, init, /, IRValue src);
             .drop = MTDNAME(classname, v_drop),                                \
             .build_str = MTDNAME(classname, v_build_str),                      \
             .get_def = MTDNAME(classname, v_get_def),                          \
-            .get_use = MTDNAME(classname, v_get_use)};                         \
+            .get_use = MTDNAME(classname, v_get_use),                          \
+        };                                                                     \
         self->base.vtable = &vtable;                                           \
         self->base.kind = kindname;                                            \
         self->base.is_dead = false;                                            \
