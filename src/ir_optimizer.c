@@ -32,7 +32,6 @@ void MTD(IROptimizer, optimize_func, /, IRFunction *func) {
                        func) ||
                   updated;
     }
-    CALL(IROptimizer, *self, optimize_func_unuse_label_strip, /, func);
 }
 
 bool MTD(IROptimizer, optimize_func_const_prop, /, IRFunction *func) {

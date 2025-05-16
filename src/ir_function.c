@@ -69,7 +69,7 @@ static void try_strip_gotos(IRBasicBlock *bb, usize label) {
             IRStmtGoto *goto_stmt = (IRStmtGoto *)stmt;
             if (goto_stmt->label == label) {
                 // remove the goto statement
-                CALL(ListDynIRStmt, bb->stmts, pop_back, /);
+                CALL(ListDynIRStmt, bb->stmts, remove_back, /);
             } else {
                 break;
             }
@@ -79,7 +79,7 @@ static void try_strip_gotos(IRBasicBlock *bb, usize label) {
                 if (if_stmt->false_label == (usize)-1 ||
                     if_stmt->false_label == label) {
                     // remove the entire if statement
-                    CALL(ListDynIRStmt, bb->stmts, pop_back, /);
+                    CALL(ListDynIRStmt, bb->stmts, remove_back, /);
                 } else {
                     CALL(IRStmtIf, *if_stmt, flip, /);
                     ASSERT(if_stmt->false_label == label);
@@ -110,6 +110,7 @@ static void MTD(IRFunction, add_edge, /, IRBasicBlock *fr, IRBasicBlock *to) {
     CALL(ListPtr, *to_pred, push_back, /, fr);
 }
 
+// engine is nullable to ignore error
 static void MTD(IRFunction, build_graph, /, TaskEngine *engine) {
 
     // insert all labels into the label_to_block map
@@ -118,7 +119,7 @@ static void MTD(IRFunction, build_graph, /, TaskEngine *engine) {
         if (bb->label != (usize)-1) {
             MapLabelBBInsertResult res = CALL(MapLabelBB, self->label_to_block,
                                               insert, /, bb->label, bb);
-            if (!res.inserted) {
+            if (!res.inserted && engine) {
                 // already exists
                 engine->parse_err = true;
                 printf("Semantic error: Redefinition of label %zu\n",
@@ -173,11 +174,6 @@ static void MTD(IRFunction, build_graph, /, TaskEngine *engine) {
 
 void MTD(IRFunction, establish, /, TaskEngine *engine) {
     ASSERT(self->basic_blocks.tail);
-    IRBasicBlock *last_bb = self->basic_blocks.tail->data;
-    if (last_bb->label == (usize)-1 && last_bb->stmts.size == 0) {
-        // remove the last block
-        CALL(ListBoxBB, self->basic_blocks, pop_back, /);
-    }
     self->entry = CREOBJHEAP(IRBasicBlock, /, (usize)-1);
     CALL(ListBoxBB, self->basic_blocks, push_front, /, self->entry);
     self->exit = CREOBJHEAP(IRBasicBlock, /, (usize)-1);

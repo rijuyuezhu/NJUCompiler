@@ -17,11 +17,14 @@ static void dce_const_eval_add_worklist(ListPtr *work_list, IRFunction *func,
             } else if (const_eval == IRStmtIfConstEvalAlwaysFalse) {
                 choose_label = stmt_if->false_label;
             }
-            if (choose_label != (usize)-1) {
-                IRStmtBase *replace =
-                    (IRStmtBase *)CREOBJHEAP(IRStmtGoto, /, choose_label);
+            if (const_eval == IRStmtIfConstEvalAlwaysTrue ||
+                const_eval == IRStmtIfConstEvalAlwaysFalse) {
                 CALL(ListDynIRStmt, bb->stmts, remove_back, /);
-                CALL(ListDynIRStmt, bb->stmts, push_back, /, replace);
+                if (choose_label != (usize)-1) {
+                    IRStmtBase *replace =
+                        (IRStmtBase *)CREOBJHEAP(IRStmtGoto, /, choose_label);
+                    CALL(ListDynIRStmt, bb->stmts, push_back, /, replace);
+                }
             }
         }
     }
