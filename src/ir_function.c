@@ -3,6 +3,7 @@
 #include "ir_program.h"
 #include "ir_stmt.h"
 #include "task_engine.h"
+#include "utils.h"
 
 void MTD(IRFunction, init, /, String func_name, IRProgram *program) {
     self->func_name = func_name;
@@ -268,6 +269,49 @@ void MTD(IRFunction, iter_bb, /, IterBBCallback callback, void *extra_args) {
             nxt = bb_it->next;
         }
     }
+}
+
+static bool MTD(IRFunction, remove_dead_bb_link_callback, /,
+                ListBasicBlockNode *bb_it, ATTR_UNUSED void *extra_args) {
+    IRBasicBlock *bb = &bb_it->data;
+    if (!bb->is_dead) {
+        ListPtr *pred = CALL(IRFunction, *self, get_pred, /, bb);
+        for (ListPtrNode *it = pred->head, *nxt = NULL; it; it = nxt) {
+            nxt = it->next;
+            IRBasicBlock *pred_bb = it->data;
+            if (pred_bb->is_dead) {
+                CALL(ListPtr, *pred, remove, /, it);
+            }
+        }
+        ListPtr *succ = CALL(IRFunction, *self, get_succ, /, bb);
+        for (ListPtrNode *it = succ->head, *nxt = NULL; it; it = nxt) {
+            nxt = it->next;
+            IRBasicBlock *succ_bb = it->data;
+            if (succ_bb->is_dead) {
+                CALL(ListPtr, *succ, remove, /, it);
+            }
+        }
+    }
+    return false;
+}
+
+static bool MTD(IRFunction, remove_dead_bb_itself_callback, /,
+                ListBasicBlockNode *bb_it, void *extra_args) {
+    bool *updated = extra_args;
+    if (bb_it->data.is_dead) {
+        CALL(ListBasicBlock, self->basic_blocks, remove, /, bb_it);
+        *updated = true;
+    }
+    return false;
+}
+
+bool MTD(IRFunction, remove_dead_bb, /) {
+    bool updated = false;
+    CALL(IRFunction, *self, iter_bb, /,
+         MTDNAME(IRFunction, remove_dead_bb_link_callback), NULL);
+    CALL(IRFunction, *self, iter_bb, /,
+         MTDNAME(IRFunction, remove_dead_bb_itself_callback), &updated);
+    return updated;
 }
 
 static bool MTD(IRFunction, remove_dead_stmt_callback, /, IRBasicBlock *bb,

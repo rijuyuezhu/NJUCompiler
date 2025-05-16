@@ -49,6 +49,7 @@ typedef bool (*IterBBCallback)(IRFunction *self, ListBasicBlockNode *bb_it,
 
 void MTD(IRFunction, iter_bb, /, IterBBCallback callback, void *extra_args);
 
+bool MTD(IRFunction, remove_dead_bb, /);
 bool MTD(IRFunction, remove_dead_stmt, /);
 
 DELETED_CLONER(IRFunction, FUNC_STATIC);

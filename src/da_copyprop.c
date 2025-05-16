@@ -251,6 +251,7 @@ static void VMTD(CopyPropDA, copy_propagate_callback, /,
             updated_var = src;
         }
         if (use->var != updated_var) {
+            printf("%zu -> %zu\n", use->var, updated_var);
             use->var = updated_var;
             *updated = true;
         }

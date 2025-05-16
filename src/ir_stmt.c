@@ -192,6 +192,54 @@ void MTD(IRStmtIf, flip, /) {
     self->false_label = temp_label;
     self->rop = RelopKind_flip(self->rop);
 }
+IRStmtIfConstEval MTD(IRStmtIf, const_eval, /) {
+    IRValue src1 = self->src1;
+    IRValue src2 = self->src2;
+    RelopKind rop = self->rop;
+    if (src1.is_const && src2.is_const) {
+        int val1 = src1.const_val;
+        int val2 = src2.const_val;
+        bool eval_result;
+        switch (rop) {
+        case RelopEQ:
+            eval_result = val1 == val2;
+            break;
+        case RelopNE:
+            eval_result = val1 != val2;
+            break;
+        case RelopLT:
+            eval_result = val1 < val2;
+            break;
+        case RelopLE:
+            eval_result = val1 <= val2;
+            break;
+        case RelopGT:
+            eval_result = val1 > val2;
+            break;
+        case RelopGE:
+            eval_result = val1 >= val2;
+            break;
+        default:
+            PANIC("Should not reach here");
+        }
+        return eval_result ? IRStmtIfConstEvalAlwaysTrue
+                           : IRStmtIfConstEvalAlwaysFalse;
+    } else if (!src1.is_const && !src2.is_const && src1.var == src2.var) {
+        switch (rop) {
+        case RelopEQ:
+        case RelopLE:
+        case RelopGE:
+            return IRStmtIfConstEvalAlwaysTrue;
+        case RelopNE:
+        case RelopLT:
+        case RelopGT:
+            return IRStmtIfConstEvalAlwaysFalse;
+        default:
+            PANIC("Should not reach here");
+        }
+    }
+    return IRStmtIfConstEvalUncertain;
+}
 
 // IRStmtCall
 void MTD(IRStmtCall, init, /, usize dst, String func_name, VecIRValue args) {

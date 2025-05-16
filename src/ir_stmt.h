@@ -117,6 +117,13 @@ void MTD(IRStmtIf, init, /, IRValue src1, IRValue src2, RelopKind rop,
          usize label);
 void MTD(IRStmtIf, flip, /);
 
+typedef enum IRStmtIfConstEval {
+    IRStmtIfConstEvalAlwaysTrue,
+    IRStmtIfConstEvalAlwaysFalse,
+    IRStmtIfConstEvalUncertain,
+} IRStmtIfConstEval;
+IRStmtIfConstEval MTD(IRStmtIf, const_eval, /);
+
 typedef struct IRStmtCall {
     IRStmtBase base;
     usize dst;
