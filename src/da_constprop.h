@@ -2,7 +2,6 @@
 
 #include "dataflow_analysis.h"
 #include "ir_function.h"
-#include "ir_stmt.h"
 #include "tem_map.h"
 #include "utils.h"
 
@@ -53,8 +52,6 @@ typedef struct CPFact {
 
 void MTD(CPFact, init, /);
 void MTD(CPFact, drop, /);
-void MTD(CPFact, clone_from, /, const CPFact *other);
-FUNC_STATIC DEFAULT_DERIVE_CLONE(CPFact, /);
 CPValue MTD(CPFact, get, /, usize key);
 bool MTD(CPFact, update, /, usize key, CPValue value);
 void MTD(CPFact, debug_print, /);

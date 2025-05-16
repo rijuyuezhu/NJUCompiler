@@ -25,6 +25,7 @@
 ///     List.remove_front(): remove the front element of the list.
 ///     List.remove_back(): remove the back element of the list.
 ///     List.remove(ListNode *it) -> ListNode *: remove a node from the list, and return the next node.
+///     List.insert_after(ListNode *it, T value): insert a value after a node.
 ///     List.swap(List *other): swap the list with another list.
 ///     List.empty() -> bool: check if the list is empty.
 ///     List.clear(): clear the list.
@@ -96,6 +97,9 @@
                                                                                \
     /* List.remove(ListNode *it) -> ListNode */                                \
     STORAGE ListNode *MTD(List, remove, /, ListNode * it);                     \
+                                                                               \
+    /* List.insert_after(ListNode *it, T value) */                             \
+    STORAGE void MTD(List, insert_after, /, ListNode * it, T value);           \
                                                                                \
     /* NOTE: static methods that are not required to implement in .c */        \
                                                                                \
@@ -272,4 +276,21 @@
         self->size--;                                                          \
         free(MPROT(it));                                                       \
         return MPROT(ret);                                                     \
+    }                                                                          \
+    /* List.insert_after(ListNode *it, T value) */                             \
+    STORAGE void MTD(List, insert_after, /, ListNode * it, T value) {          \
+        if (!it) {                                                             \
+            CALL(List, *self, push_front, /, value);                           \
+        }                                                                      \
+        ListNode *MPROT(now) = CREOBJRAWHEAP(ListNode);                        \
+        MPROT(now)->data = value;                                              \
+        MPROT(now)->next = it->next;                                           \
+        MPROT(now)->prev = it;                                                 \
+        if (it->next) {                                                        \
+            it->next->prev = MPROT(now);                                       \
+        } else {                                                               \
+            self->tail = MPROT(now);                                           \
+        }                                                                      \
+        it->next = MPROT(now);                                                 \
+        self->size++;                                                          \
     }

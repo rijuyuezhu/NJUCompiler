@@ -1,10 +1,12 @@
 #include "ir_optimizer.h"
+#include "da_avaliexp.h"
 #include "da_constprop.h"
 #include "da_solver.h"
 #include "ir_basic_block.h"
 #include "ir_function.h"
 #include "ir_program.h"
 #include "ir_stmt.h"
+#include "utils.h"
 
 void MTD(IROptimizer, init, /, IRProgram *program) { self->program = program; }
 void MTD(IROptimizer, optimize, /) {
@@ -15,34 +17,24 @@ void MTD(IROptimizer, optimize, /) {
 }
 
 void MTD(IROptimizer, optimize_func, /, IRFunction *func) {
-    CALL(IROptimizer, *self, optimize_func_constprop, /, func);
+    CALL(IROptimizer, *self, optimize_func_const_prop, /, func);
     CALL(IROptimizer, *self, optimize_func_simple_redundant_ops, /, func);
+    CALL(IROptimizer, *self, optimize_func_avali_exp, /, func);
 }
 
-void MTD(IROptimizer, optimize_func_constprop, /, IRFunction *func) {
+void MTD(IROptimizer, optimize_func_const_prop, /, IRFunction *func) {
     ConstPropDA const_prop = CREOBJ(ConstPropDA, /);
     NSCALL(DAWorkListSolver, solve, /, TOBASE(&const_prop), func);
     CALL(ConstPropDA, const_prop, const_fold, /, func);
     DROPOBJ(ConstPropDA, const_prop);
 }
 
-void MTD(IROptimizer, iter_stmt, /, IRFunction *func,
-         StmtIterCallback callback) {
-    for (ListBasicBlockNode *bbit = func->basic_blocks.head; bbit;
-         bbit = bbit->next) {
-        IRBasicBlock *bb = &bbit->data;
-        for (ListDynIRStmtNode *stmtit = bb->stmts.head; stmtit;
-             stmtit = stmtit->next) {
-            callback(self, func, bb, &stmtit->data);
-        }
-    }
-}
-
-static void MTD(IROptimizer, optimize_func_simple_redundant_ops_callback, /,
-                ATTR_UNUSED IRFunction *func, ATTR_UNUSED IRBasicBlock *bb,
-                IRStmtBase **stmt) {
+static bool MTD(IRFunction, optimize_func_simple_redundant_ops_callback, /,
+                ATTR_UNUSED IRBasicBlock *bb, ListDynIRStmtNode *stmt_it,
+                ATTR_UNUSED void *extra_args) {
+    IRStmtBase **stmt = &stmt_it->data;
     if ((*stmt)->kind != IRStmtKindArith) {
-        return;
+        return false;
     }
     IRStmtArith *arith = (IRStmtArith *)*stmt;
     usize dst = arith->dst;
@@ -87,9 +79,20 @@ static void MTD(IROptimizer, optimize_func_simple_redundant_ops_callback, /,
     } else {
         PANIC("should not reach");
     }
+    return false;
 }
 
 void MTD(IROptimizer, optimize_func_simple_redundant_ops, /, IRFunction *func) {
-    CALL(IROptimizer, *self, iter_stmt, /, func,
-         MTDNAME(IROptimizer, optimize_func_simple_redundant_ops_callback));
+    CALL(IRFunction, *func, iter_stmt, /,
+         MTDNAME(IRFunction, optimize_func_simple_redundant_ops_callback),
+         NULL);
+}
+
+void MTD(IROptimizer, optimize_func_avali_exp, /, IRFunction *func) {
+    AvaliExpDA avali_exp = CREOBJ(AvaliExpDA, /);
+    CALL(AvaliExpDA, avali_exp, prepare, /, func);
+    NSCALL(DAWorkListSolver, solve, /, TOBASE(&avali_exp), func);
+    CALL(AvaliExpDA, avali_exp, clean_redundant_exp, /, func);
+    CALL(IRFunction, *func, remove_dead_stmt, /);
+    DROPOBJ(AvaliExpDA, avali_exp);
 }

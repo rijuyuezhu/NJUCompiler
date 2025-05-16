@@ -13,14 +13,7 @@ void MTD(IROptimizer, init, /, struct IRProgram *program);
 FUNC_STATIC DEFAULT_DROPER(IROptimizer);
 void MTD(IROptimizer, optimize, /);
 void MTD(IROptimizer, optimize_func, /, struct IRFunction *func);
-void MTD(IROptimizer, optimize_func_constprop, /, struct IRFunction *func);
+void MTD(IROptimizer, optimize_func_const_prop, /, struct IRFunction *func);
 void MTD(IROptimizer, optimize_func_simple_redundant_ops, /,
          struct IRFunction *func);
-
-typedef void (*StmtIterCallback)(IROptimizer *optimizer,
-                                 struct IRFunction *func,
-                                 struct IRBasicBlock *bb,
-                                 struct IRStmtBase **stmt);
-
-void MTD(IROptimizer, iter_stmt, /, struct IRFunction *func,
-         StmtIterCallback callback);
+void MTD(IROptimizer, optimize_func_avali_exp, /, struct IRFunction *func);

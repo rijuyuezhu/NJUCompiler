@@ -243,5 +243,45 @@ void MTD(IRFunction, build_str, /, String *builder) {
     }
 }
 
+void MTD(IRFunction, iter_stmt, /, IterStmtCallback callback,
+         void *extra_args) {
+    for (ListBasicBlockNode *bb_it = self->basic_blocks.head; bb_it;
+         bb_it = bb_it->next) {
+        IRBasicBlock *bb = &bb_it->data;
+        for (ListDynIRStmtNode *stmt_it = bb->stmts.head, *nxt = NULL; stmt_it;
+             stmt_it = nxt) {
+            nxt = stmt_it->next;
+            bool has_inserted = callback(self, bb, stmt_it, extra_args);
+            if (has_inserted) {
+                nxt = stmt_it->next;
+            }
+        }
+    }
+}
+
+void MTD(IRFunction, iter_bb, /, IterBBCallback callback, void *extra_args) {
+    for (ListBasicBlockNode *bb_it = self->basic_blocks.head, *nxt = NULL;
+         bb_it; bb_it = nxt) {
+        nxt = bb_it->next;
+        bool has_inserted = callback(self, bb_it, extra_args);
+        if (has_inserted) {
+            nxt = bb_it->next;
+        }
+    }
+}
+
+bool MTD(IRFunction, remove_dead_stmt_callback, /, IRBasicBlock *bb,
+         ListDynIRStmtNode *stmt_it, ATTR_UNUSED void *extra_args) {
+    if (stmt_it->data->is_dead) {
+        CALL(ListDynIRStmt, bb->stmts, remove, /, stmt_it);
+    }
+    return false;
+}
+
+void MTD(IRFunction, remove_dead_stmt, /) {
+    CALL(IRFunction, *self, iter_stmt, /,
+         MTDNAME(IRFunction, remove_dead_stmt_callback), NULL);
+}
+
 DEFINE_MAPPING(MapVarToDecInfo, usize, DecInfo, FUNC_EXTERN);
 DEFINE_CLASS_VEC(VecIRFunction, IRFunction, FUNC_EXTERN);

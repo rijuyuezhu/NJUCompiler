@@ -14,5 +14,6 @@ typedef struct IRValue {
 IRValue NSMTD(IRValue, from_const, /, int const_val);
 IRValue NSMTD(IRValue, from_var, /, usize var);
 void MTD(IRValue, build_str, /, struct String *builder);
+int NSMTD(IRValue, compare, /, const IRValue *a, const IRValue *b);
 
 DECLARE_PLAIN_VEC(VecIRValue, IRValue, FUNC_EXTERN)

@@ -155,5 +155,6 @@ void NSCALL(DAWorkListSolver, solve, /, DataflowAnalysisBase *analysis,
         initialize_backward(analysis, func);
         solve_backward(analysis, func);
     }
-    // VCALL(DataflowAnalysisBase, *analysis, debug_print, /, func);
+    VCALL(DataflowAnalysisBase, *analysis, debug_print, /, func);
+    printf("\n\n");
 }

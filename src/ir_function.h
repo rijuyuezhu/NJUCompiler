@@ -38,5 +38,18 @@ ListPtr *MTD(IRFunction, get_pred, /, IRBasicBlock *bb);
 ListPtr *MTD(IRFunction, get_succ, /, IRBasicBlock *bb);
 void MTD(IRFunction, build_str, /, String *builder);
 
+// return: whether or not insert after it
+typedef bool (*IterStmtCallback)(IRFunction *self, IRBasicBlock *bb,
+                                 ListDynIRStmtNode *stmt_it, void *extra_args);
+
+void MTD(IRFunction, iter_stmt, /, IterStmtCallback callback, void *extra_args);
+
+typedef bool (*IterBBCallback)(IRFunction *self, ListBasicBlockNode *bb_it,
+                               void *extra_args);
+
+void MTD(IRFunction, iter_bb, /, IterBBCallback callback, void *extra_args);
+
+void MTD(IRFunction, remove_dead_stmt, /);
+
 DELETED_CLONER(IRFunction, FUNC_STATIC);
 DECLARE_CLASS_VEC(VecIRFunction, IRFunction, FUNC_EXTERN);

@@ -61,6 +61,7 @@ static void naive() {
     ASSERT(CALL(ListI32, list, empty, /));
     DROPOBJ(ListI32, list);
 
+    list = CREOBJ(ListI32, /);
     CALL(ListI32, list, push_back, /, 1);
     CALL(ListI32, list, push_back, /, 4);
     CALL(ListI32, list, push_back, /, 9);
@@ -96,6 +97,26 @@ static void naive() {
     it = CALL(ListI32, list, remove, /, it);
     ASSERT(!it);
     ASSERT(list.size == 1);
+    DROPOBJ(ListI32, list);
+
+    list = CREOBJ(ListI32, /);
+    DROPOBJ(ListI32, list);
+    CALL(ListI32, list, push_back, /, 1);
+    CALL(ListI32, list, push_back, /, 2);
+    CALL(ListI32, list, insert_after, /, list.head, 3);
+    CALL(ListI32, list, insert_after, /, list.head->next, 4);
+    // 1 -> 3 -> 4 -> 2
+    ASSERT(list.size == 4);
+    i32 x = CALL(ListI32, list, pop_front, /);
+    ASSERT(x == 1);
+    x = CALL(ListI32, list, pop_front, /);
+    ASSERT(x == 3);
+    x = CALL(ListI32, list, pop_front, /);
+    ASSERT(x == 4);
+    x = CALL(ListI32, list, pop_front, /);
+    ASSERT(x == 2);
+    ASSERT(list.size == 0);
+    ASSERT(CALL(ListI32, list, empty, /));
     DROPOBJ(ListI32, list);
 }
 

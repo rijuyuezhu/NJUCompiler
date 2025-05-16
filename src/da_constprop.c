@@ -7,10 +7,6 @@ void MTD(CPFact, init, /) { CALL(MapVarToCPValue, self->mapping, init, /); }
 
 void MTD(CPFact, drop, /) { DROPOBJ(MapVarToCPValue, self->mapping); }
 
-void MTD(CPFact, clone_from, /, const CPFact *other) {
-    CALL(MapVarToCPValue, self->mapping, clone_from, /, &other->mapping);
-}
-
 CPValue MTD(CPFact, get, /, usize key) {
     MapVarToCPValueIterator it =
         CALL(MapVarToCPValue, self->mapping, find_owned, /, key);
@@ -82,12 +78,12 @@ Any MTD(ConstPropDA, new_boundary_fact, /, IRFunction *func) {
     return fact;
 }
 Any MTD(ConstPropDA, new_initial_fact, /) { return CREOBJHEAP(CPFact, /); }
-void MTD(ConstPropDA, set_in_fact, /, IRBasicBlock *bb, Any fact) {
-    CALL(MapBBToCPFact, self->in_facts, insert_or_assign, /, bb, fact);
-}
 void MTD(ConstPropDA, drop_fact, /, Any fact) {
     CPFact *f = fact;
     DROPOBJHEAP(CPFact, f);
+}
+void MTD(ConstPropDA, set_in_fact, /, IRBasicBlock *bb, Any fact) {
+    CALL(MapBBToCPFact, self->in_facts, insert_or_assign, /, bb, fact);
 }
 void MTD(ConstPropDA, set_out_fact, /, IRBasicBlock *bb, Any fact) {
     CALL(MapBBToCPFact, self->out_facts, insert_or_assign, /, bb, fact);
@@ -225,12 +221,12 @@ void MTD(ConstPropDA, debug_print, /, IRFunction *func) {
                : bb == func->exit ? " (exit)"
                                   : "",
                bb);
-        printf("  " COLOR_BLUE "->" COLOR_NORMAL " IRs:\n");
-        CALL(IRBasicBlock, *bb, debug_print, /);
         printf("  " COLOR_BLUE "->" COLOR_NORMAL " In facts: ");
         CPFact *in_facts = CALL(ConstPropDA, *self, get_in_fact, /, bb);
         CALL(CPFact, *in_facts, debug_print, /);
         printf("\n");
+        printf("  " COLOR_BLUE "->" COLOR_NORMAL " IRs:\n");
+        CALL(IRBasicBlock, *bb, debug_print, /);
         printf("  " COLOR_BLUE "->" COLOR_NORMAL " Out facts: ");
         CPFact *out_facts = CALL(ConstPropDA, *self, get_out_fact, /, bb);
         CALL(CPFact, *out_facts, debug_print, /);
