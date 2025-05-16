@@ -38,6 +38,6 @@ void MTD(IRBasicBlock, debug_print, /) {
     DROPOBJ(String, builder);
 }
 
-DEFINE_LIST(ListBasicBlock, IRBasicBlock, FUNC_EXTERN);
+DEFINE_LIST(ListBoxBB, IRBasicBlock *, FUNC_EXTERN);
 DEFINE_MAPPING(MapLabelBB, usize, IRBasicBlock *, FUNC_EXTERN);
 DEFINE_MAPPING(MapBBToListBB, IRBasicBlock *, ListPtr, FUNC_EXTERN);

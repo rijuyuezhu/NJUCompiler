@@ -27,11 +27,12 @@ void MTD(IROptimizer, optimize_func, /, IRFunction *func) {
     const usize MAX_TIMES = (usize)-1;
     bool updated = true;
     for (usize i = 0; i < MAX_TIMES && updated; i++) {
-        // clang-format off
         updated = false;
-        updated = CALL(IROptimizer, *self, optimize_func_dead_code_eliminate, /, func) || updated;
-        // clang-format on
+        updated = CALL(IROptimizer, *self, optimize_func_dead_code_eliminate, /,
+                       func) ||
+                  updated;
     }
+    CALL(IROptimizer, *self, optimize_func_unuse_label_strip, /, func);
 }
 
 bool MTD(IROptimizer, optimize_func_const_prop, /, IRFunction *func) {

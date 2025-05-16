@@ -211,8 +211,8 @@ FINISH_KILL:;
 void MTD(CopyPropDA, debug_print, /, IRFunction *func) {
     const char *func_name = STRING_C_STR(func->func_name);
     printf("[CopyPropDA result for function `%s`]\n", func_name);
-    for (ListBasicBlockNode *it = func->basic_blocks.head; it; it = it->next) {
-        IRBasicBlock *bb = &it->data;
+    for (ListBoxBBNode *it = func->basic_blocks.head; it; it = it->next) {
+        IRBasicBlock *bb = it->data;
         printf(COLOR_GREEN "==>" COLOR_NORMAL " BB%s [%p]:\n",
                bb == func->entry  ? " (entry)"
                : bb == func->exit ? " (exit)"
@@ -251,7 +251,6 @@ static void VMTD(CopyPropDA, copy_propagate_callback, /,
             updated_var = src;
         }
         if (use->var != updated_var) {
-            printf("%zu -> %zu\n", use->var, updated_var);
             use->var = updated_var;
             *updated = true;
         }

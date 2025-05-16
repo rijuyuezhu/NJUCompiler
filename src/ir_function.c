@@ -9,7 +9,7 @@ void MTD(IRFunction, init, /, String func_name, IRProgram *program) {
     self->func_name = func_name;
     CALL(VecUSize, self->params, init, /);
     CALL(MapVarToDecInfo, self->var_to_dec_info, init, /);
-    CALL(ListBasicBlock, self->basic_blocks, init, /);
+    CALL(ListBoxBB, self->basic_blocks, init, /);
     self->entry = NULL;
     self->exit = NULL;
     CALL(MapLabelBB, self->label_to_block, init, /);
@@ -18,15 +18,15 @@ void MTD(IRFunction, init, /, String func_name, IRProgram *program) {
     self->program = program;
 
     // add the first block
-    IRBasicBlock first_bb = CREOBJ(IRBasicBlock, /, (usize)-1);
-    CALL(ListBasicBlock, self->basic_blocks, push_back, /, first_bb);
+    IRBasicBlock *first_bb = CREOBJHEAP(IRBasicBlock, /, (usize)-1);
+    CALL(ListBoxBB, self->basic_blocks, push_back, /, first_bb);
 }
 
 void MTD(IRFunction, drop, /) {
     DROPOBJ(MapBBToListBB, self->block_succ);
     DROPOBJ(MapBBToListBB, self->block_pred);
     DROPOBJ(MapLabelBB, self->label_to_block);
-    DROPOBJ(ListBasicBlock, self->basic_blocks);
+    DROPOBJ(ListBoxBB, self->basic_blocks);
     DROPOBJ(MapVarToDecInfo, self->var_to_dec_info);
     DROPOBJ(VecUSize, self->params);
     DROPOBJ(String, self->func_name);
@@ -34,7 +34,7 @@ void MTD(IRFunction, drop, /) {
 
 void MTD(IRFunction, add_stmt, /, IRStmtBase *stmt) {
     ASSERT(self->basic_blocks.tail);
-    IRBasicBlock *last_bb = &self->basic_blocks.tail->data;
+    IRBasicBlock *last_bb = self->basic_blocks.tail->data;
     if (last_bb->stmts.size != 0) {
         IRStmtBase *last_stmt = last_bb->stmts.tail->data;
         if (last_stmt->kind == IRStmtKindGoto ||
@@ -54,9 +54,8 @@ void MTD(IRFunction, add_stmt, /, IRStmtBase *stmt) {
                 }
             }
             // create a new block
-            IRBasicBlock new_bb = CREOBJ(IRBasicBlock, /, (usize)-1);
-            CALL(ListBasicBlock, self->basic_blocks, push_back, /, new_bb);
-            last_bb = &self->basic_blocks.tail->data;
+            last_bb = CREOBJHEAP(IRBasicBlock, /, (usize)-1);
+            CALL(ListBoxBB, self->basic_blocks, push_back, /, last_bb);
         }
     }
     // add the statement to the last block
@@ -98,10 +97,10 @@ static void try_strip_gotos(IRBasicBlock *bb, usize label) {
 
 void MTD(IRFunction, add_label, /, usize label) {
     ASSERT(self->basic_blocks.tail);
-    IRBasicBlock *last_bb = &self->basic_blocks.tail->data;
+    IRBasicBlock *last_bb = self->basic_blocks.tail->data;
     try_strip_gotos(last_bb, label);
-    IRBasicBlock new_bb = CREOBJ(IRBasicBlock, /, label);
-    CALL(ListBasicBlock, self->basic_blocks, push_back, /, new_bb);
+    IRBasicBlock *new_bb = CREOBJHEAP(IRBasicBlock, /, label);
+    CALL(ListBoxBB, self->basic_blocks, push_back, /, new_bb);
 }
 
 static void MTD(IRFunction, add_edge, /, IRBasicBlock *fr, IRBasicBlock *to) {
@@ -114,8 +113,8 @@ static void MTD(IRFunction, add_edge, /, IRBasicBlock *fr, IRBasicBlock *to) {
 static void MTD(IRFunction, build_graph, /, TaskEngine *engine) {
 
     // insert all labels into the label_to_block map
-    for (ListBasicBlockNode *it = self->basic_blocks.head; it; it = it->next) {
-        IRBasicBlock *bb = &it->data;
+    for (ListBoxBBNode *it = self->basic_blocks.head; it; it = it->next) {
+        IRBasicBlock *bb = it->data;
         if (bb->label != (usize)-1) {
             MapLabelBBInsertResult res = CALL(MapLabelBB, self->label_to_block,
                                               insert, /, bb->label, bb);
@@ -129,13 +128,13 @@ static void MTD(IRFunction, build_graph, /, TaskEngine *engine) {
     }
 
     // build the graph
-    for (ListBasicBlockNode *it = self->basic_blocks.head; it; it = it->next) {
-        IRBasicBlock *bb = &it->data;
+    for (ListBoxBBNode *it = self->basic_blocks.head; it; it = it->next) {
+        IRBasicBlock *bb = it->data;
         if (bb == self->exit) {
             continue;
         }
         ASSERT(it->next);
-        IRBasicBlock *nxt_bb = &it->next->data;
+        IRBasicBlock *nxt_bb = it->next->data;
         if (bb->stmts.size == 0) {
             CALL(IRFunction, *self, add_edge, /, bb, nxt_bb);
             continue;
@@ -174,16 +173,15 @@ static void MTD(IRFunction, build_graph, /, TaskEngine *engine) {
 
 void MTD(IRFunction, establish, /, TaskEngine *engine) {
     ASSERT(self->basic_blocks.tail);
-    IRBasicBlock *last_bb = &self->basic_blocks.tail->data;
+    IRBasicBlock *last_bb = self->basic_blocks.tail->data;
     if (last_bb->label == (usize)-1 && last_bb->stmts.size == 0) {
         // remove the last block
-        CALL(ListBasicBlock, self->basic_blocks, pop_back, /);
+        CALL(ListBoxBB, self->basic_blocks, pop_back, /);
     }
-    IRBasicBlock new_bb = CREOBJ(IRBasicBlock, /, (usize)-1);
-    CALL(ListBasicBlock, self->basic_blocks, push_front, /, new_bb);
-    self->entry = CALL(ListBasicBlock, self->basic_blocks, front, /);
-    CALL(ListBasicBlock, self->basic_blocks, push_back, /, new_bb);
-    self->exit = CALL(ListBasicBlock, self->basic_blocks, back, /);
+    self->entry = CREOBJHEAP(IRBasicBlock, /, (usize)-1);
+    CALL(ListBoxBB, self->basic_blocks, push_front, /, self->entry);
+    self->exit = CREOBJHEAP(IRBasicBlock, /, (usize)-1);
+    CALL(ListBoxBB, self->basic_blocks, push_back, /, self->exit);
     CALL(IRFunction, *self, build_graph, /, engine);
 }
 
@@ -239,16 +237,16 @@ void MTD(IRFunction, build_str, /, String *builder) {
         CALL(String, *builder, pushf, /, "v%zu := &v%zu\n", it->value.addr,
              it->key);
     }
-    for (ListBasicBlockNode *it = self->basic_blocks.head; it; it = it->next) {
-        CALL(IRBasicBlock, it->data, build_str, /, builder);
+    for (ListBoxBBNode *it = self->basic_blocks.head; it; it = it->next) {
+        CALL(IRBasicBlock, *it->data, build_str, /, builder);
     }
 }
 
 void MTD(IRFunction, iter_stmt, /, IterStmtCallback callback,
          void *extra_args) {
-    for (ListBasicBlockNode *bb_it = self->basic_blocks.head; bb_it;
+    for (ListBoxBBNode *bb_it = self->basic_blocks.head; bb_it;
          bb_it = bb_it->next) {
-        IRBasicBlock *bb = &bb_it->data;
+        IRBasicBlock *bb = bb_it->data;
         for (ListDynIRStmtNode *stmt_it = bb->stmts.head, *nxt = NULL; stmt_it;
              stmt_it = nxt) {
             nxt = stmt_it->next;
@@ -261,8 +259,8 @@ void MTD(IRFunction, iter_stmt, /, IterStmtCallback callback,
 }
 
 void MTD(IRFunction, iter_bb, /, IterBBCallback callback, void *extra_args) {
-    for (ListBasicBlockNode *bb_it = self->basic_blocks.head, *nxt = NULL;
-         bb_it; bb_it = nxt) {
+    for (ListBoxBBNode *bb_it = self->basic_blocks.head, *nxt = NULL; bb_it;
+         bb_it = nxt) {
         nxt = bb_it->next;
         bool has_inserted = callback(self, bb_it, extra_args);
         if (has_inserted) {
@@ -272,8 +270,8 @@ void MTD(IRFunction, iter_bb, /, IterBBCallback callback, void *extra_args) {
 }
 
 static bool MTD(IRFunction, remove_dead_bb_link_callback, /,
-                ListBasicBlockNode *bb_it, ATTR_UNUSED void *extra_args) {
-    IRBasicBlock *bb = &bb_it->data;
+                ListBoxBBNode *bb_it, ATTR_UNUSED void *extra_args) {
+    IRBasicBlock *bb = bb_it->data;
     if (!bb->is_dead) {
         ListPtr *pred = CALL(IRFunction, *self, get_pred, /, bb);
         for (ListPtrNode *it = pred->head, *nxt = NULL; it; it = nxt) {
@@ -296,10 +294,10 @@ static bool MTD(IRFunction, remove_dead_bb_link_callback, /,
 }
 
 static bool MTD(IRFunction, remove_dead_bb_itself_callback, /,
-                ListBasicBlockNode *bb_it, void *extra_args) {
+                ListBoxBBNode *bb_it, void *extra_args) {
     bool *updated = extra_args;
-    if (bb_it->data.is_dead) {
-        CALL(ListBasicBlock, self->basic_blocks, remove, /, bb_it);
+    if (bb_it->data->is_dead) {
+        CALL(ListBoxBB, self->basic_blocks, remove, /, bb_it);
         *updated = true;
     }
     return false;

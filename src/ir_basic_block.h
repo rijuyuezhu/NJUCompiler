@@ -15,9 +15,15 @@ void MTD(IRBasicBlock, drop, /);
 void MTD(IRBasicBlock, build_str, /, String *builder);
 void MTD(IRBasicBlock, debug_print, /);
 
-DELETED_CLONER(IRBasicBlock, FUNC_STATIC);
+DECLARE_LIST(ListBoxBB, IRBasicBlock *, FUNC_EXTERN, GENERATOR_CUSTOM_VALUE);
+FUNC_STATIC void NSMTD(ListBoxBB, drop_value, /, IRBasicBlock **value) {
+    DROPOBJHEAP(IRBasicBlock, *value);
+}
+FUNC_STATIC IRBasicBlock *NSMTD(ListBoxBB, clone_value, /,
+                                ATTR_UNUSED IRBasicBlock *const *other) {
+    PANIC("Disable clone");
+}
 
-DECLARE_LIST(ListBasicBlock, IRBasicBlock, FUNC_EXTERN, GENERATOR_CLASS_VALUE);
 DECLARE_MAPPING(MapLabelBB, usize, IRBasicBlock *, FUNC_EXTERN,
                 GENERATOR_PLAIN_KEY, GENERATOR_PLAIN_VALUE,
                 GENERATOR_PLAIN_COMPARATOR);

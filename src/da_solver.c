@@ -5,8 +5,8 @@
 
 static void initialize_forward(DataflowAnalysisBase *analysis,
                                IRFunction *func) {
-    for (ListBasicBlockNode *it = func->basic_blocks.head; it; it = it->next) {
-        IRBasicBlock *bb = &it->data;
+    for (ListBoxBBNode *it = func->basic_blocks.head; it; it = it->next) {
+        IRBasicBlock *bb = it->data;
         Any in_fact =
             VCALL(DataflowAnalysisBase, *analysis, new_initial_fact, /);
         VCALL(DataflowAnalysisBase, *analysis, set_in_fact, /, bb, in_fact);
@@ -26,8 +26,8 @@ static void initialize_forward(DataflowAnalysisBase *analysis,
 static void solve_forward(DataflowAnalysisBase *analysis, IRFunction *func) {
     ListPtr work_list = CREOBJ(ListPtr, /);
     SetPtr in_que = CREOBJ(SetPtr, /);
-    for (ListBasicBlockNode *it = func->basic_blocks.head; it; it = it->next) {
-        IRBasicBlock *bb = &it->data;
+    for (ListBoxBBNode *it = func->basic_blocks.head; it; it = it->next) {
+        IRBasicBlock *bb = it->data;
         if (bb != func->entry) {
             CALL(ListPtr, work_list, push_back, /, bb);
             CALL(SetPtr, in_que, insert, /, bb, ZERO_SIZE);
@@ -76,8 +76,8 @@ static void solve_forward(DataflowAnalysisBase *analysis, IRFunction *func) {
 
 static void initialize_backward(DataflowAnalysisBase *analysis,
                                 IRFunction *func) {
-    for (ListBasicBlockNode *it = func->basic_blocks.head; it; it = it->next) {
-        IRBasicBlock *bb = &it->data;
+    for (ListBoxBBNode *it = func->basic_blocks.head; it; it = it->next) {
+        IRBasicBlock *bb = it->data;
         Any out_fact =
             VCALL(DataflowAnalysisBase, *analysis, new_initial_fact, /);
         VCALL(DataflowAnalysisBase, *analysis, set_out_fact, /, bb, out_fact);
@@ -97,8 +97,8 @@ static void initialize_backward(DataflowAnalysisBase *analysis,
 static void solve_backward(DataflowAnalysisBase *analysis, IRFunction *func) {
     ListPtr work_list = CREOBJ(ListPtr, /);
     SetPtr in_que = CREOBJ(SetPtr, /);
-    for (ListBasicBlockNode *it = func->basic_blocks.head; it; it = it->next) {
-        IRBasicBlock *bb = &it->data;
+    for (ListBoxBBNode *it = func->basic_blocks.head; it; it = it->next) {
+        IRBasicBlock *bb = it->data;
         if (bb != func->exit) {
             CALL(ListPtr, work_list, push_back, /, bb);
             CALL(SetPtr, in_que, insert, /, bb, ZERO_SIZE);

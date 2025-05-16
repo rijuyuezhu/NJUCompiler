@@ -59,8 +59,8 @@ void MTD(DataflowAnalysisBase, iter_bb, /, IRBasicBlock *bb,
 }
 void MTD(DataflowAnalysisBase, iter_func, /, IRFunction *func,
          DAIterCallback callback, void *extra_args) {
-    for (ListBasicBlockNode *it = func->basic_blocks.head; it; it = it->next) {
-        IRBasicBlock *bb = &it->data;
+    for (ListBoxBBNode *it = func->basic_blocks.head; it; it = it->next) {
+        IRBasicBlock *bb = it->data;
         CALL(DataflowAnalysisBase, *self, iter_bb, /, bb, callback, extra_args);
     }
 }

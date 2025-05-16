@@ -214,8 +214,8 @@ void MTD(ConstPropDA, transfer_stmt, /, IRStmtBase *stmt, Any fact) {
 void MTD(ConstPropDA, debug_print, /, IRFunction *func) {
     const char *func_name = STRING_C_STR(func->func_name);
     printf("[ConstPropDA result for function `%s`]\n", func_name);
-    for (ListBasicBlockNode *it = func->basic_blocks.head; it; it = it->next) {
-        IRBasicBlock *bb = &it->data;
+    for (ListBoxBBNode *it = func->basic_blocks.head; it; it = it->next) {
+        IRBasicBlock *bb = it->data;
         printf(COLOR_GREEN "==>" COLOR_NORMAL " BB%s [%p]:\n",
                bb == func->entry  ? " (entry)"
                : bb == func->exit ? " (exit)"

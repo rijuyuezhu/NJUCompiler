@@ -20,7 +20,7 @@ static void dce_const_eval_add_worklist(ListPtr *work_list, IRFunction *func,
             if (choose_label != (usize)-1) {
                 IRStmtBase *replace =
                     (IRStmtBase *)CREOBJHEAP(IRStmtGoto, /, choose_label);
-                CALL(ListDynIRStmt, bb->stmts, pop_back, /);
+                CALL(ListDynIRStmt, bb->stmts, remove_back, /);
                 CALL(ListDynIRStmt, bb->stmts, push_back, /, replace);
             }
         }
@@ -43,8 +43,8 @@ static void dce_const_eval_add_worklist(ListPtr *work_list, IRFunction *func,
     }
 }
 static void run_dce(LiveVarDA *live_var, struct IRFunction *func) {
-    for (ListBasicBlockNode *it = func->basic_blocks.head; it; it = it->next) {
-        IRBasicBlock *bb = &it->data;
+    for (ListBoxBBNode *it = func->basic_blocks.head; it; it = it->next) {
+        IRBasicBlock *bb = it->data;
         bb->is_dead = true;
     }
     ListPtr work_list = CREOBJ(ListPtr, /);

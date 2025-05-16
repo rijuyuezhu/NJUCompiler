@@ -19,7 +19,7 @@ typedef struct IRFunction {
     String func_name;
     VecUSize params;
     MapVarToDecInfo var_to_dec_info;
-    ListBasicBlock basic_blocks;
+    ListBoxBB basic_blocks;
     IRBasicBlock *entry;
     IRBasicBlock *exit;
     MapLabelBB label_to_block;
@@ -44,7 +44,7 @@ typedef bool (*IterStmtCallback)(IRFunction *self, IRBasicBlock *bb,
 
 void MTD(IRFunction, iter_stmt, /, IterStmtCallback callback, void *extra_args);
 
-typedef bool (*IterBBCallback)(IRFunction *self, ListBasicBlockNode *bb_it,
+typedef bool (*IterBBCallback)(IRFunction *self, ListBoxBBNode *bb_it,
                                void *extra_args);
 
 void MTD(IRFunction, iter_bb, /, IterBBCallback callback, void *extra_args);
