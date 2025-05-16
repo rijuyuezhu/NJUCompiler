@@ -2,12 +2,9 @@
 #include "da_avaliexp.h"
 #include "da_constprop.h"
 #include "da_copyprop.h"
-#include "da_livevar.h"
 #include "da_solver.h"
-#include "ir_basic_block.h"
 #include "ir_function.h"
 #include "ir_program.h"
-#include "ir_stmt.h"
 #include "utils.h"
 
 void MTD(IROptimizer, init, /, IRProgram *program) { self->program = program; }
@@ -19,19 +16,19 @@ void MTD(IROptimizer, optimize, /) {
 }
 
 void MTD(IROptimizer, optimize_func, /, IRFunction *func) {
-    CALL(IROptimizer, *self, optimize_func_const_prop, /, func);
-    CALL(IROptimizer, *self, optimize_func_simple_redundant_ops, /, func);
-    CALL(IROptimizer, *self, optimize_func_copy_prop, /, func);
-    CALL(IROptimizer, *self, optimize_func_avali_exp, /, func);
-    CALL(IROptimizer, *self, optimize_func_copy_prop, /, func);
-    const usize MAX_TIMES = (usize)-1;
-    bool updated = true;
-    for (usize i = 0; i < MAX_TIMES && updated; i++) {
-        updated = false;
-        updated = CALL(IROptimizer, *self, optimize_func_dead_code_eliminate, /,
-                       func) ||
-                  updated;
+    for (usize i = 0; i < 5; i++) {
+        CALL(IROptimizer, *self, optimize_func_const_prop, /, func);
+        CALL(IROptimizer, *self, optimize_func_simple_redundant_ops, /, func);
+        CALL(IROptimizer, *self, optimize_func_copy_prop, /, func);
+        CALL(IROptimizer, *self, optimize_func_avali_exp, /, func);
+        CALL(IROptimizer, *self, optimize_func_copy_prop, /, func);
+        CALL(IROptimizer, *self, optimize_func_dead_code_eliminate, /, func);
     }
+
+    while (CALL(IROptimizer, *self, optimize_func_dead_code_eliminate, /, func))
+        ;
+    CALL(IROptimizer, *self, optimize_func_useless_label_strip, /, func);
+    CALL(IROptimizer, *self, optimize_func_dead_code_eliminate, /, func);
 }
 
 bool MTD(IROptimizer, optimize_func_const_prop, /, IRFunction *func) {

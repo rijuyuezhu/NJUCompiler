@@ -6,6 +6,7 @@
 typedef struct IRBasicBlock {
     ListDynIRStmt stmts;
     usize label;
+    usize tag; // for special operations
     bool is_dead;
 } IRBasicBlock;
 

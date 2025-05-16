@@ -10,6 +10,11 @@ void MTD(IdxAllocator, drop, /) {
     CALL(MapStrUSize, self->str_to_idx, drop, /);
 }
 
+void MTD(IdxAllocator, clear, /) {
+    CALL(IdxAllocator, *self, drop, /);
+    CALL(IdxAllocator, *self, init, /);
+}
+
 usize MTD(IdxAllocator, get, /, String str) {
     HString hs = NSCALL(HString, from_inner, /, str);
     MapStrUSizeInsertResult res =

@@ -1,4 +1,6 @@
 #include "ir_program.h"
+#include "ir_basic_block.h"
+#include "ir_function.h"
 #include "utils.h"
 
 void MTD(IRProgram, init, /) {

@@ -8,5 +8,6 @@ typedef struct IdxAllocator {
 
 void MTD(IdxAllocator, init, /);
 void MTD(IdxAllocator, drop, /);
+void MTD(IdxAllocator, clear, /);
 usize MTD(IdxAllocator, get, /, String str);
 usize MTD(IdxAllocator, allocate, /);

@@ -62,12 +62,12 @@ void MTD(IRFunction, add_stmt, /, IRStmtBase *stmt) {
     CALL(ListDynIRStmt, last_bb->stmts, push_back, /, stmt);
 }
 
-static void try_strip_gotos(IRBasicBlock *bb, usize label) {
+void NSMTD(IRFunction, try_strip_gotos, /, IRBasicBlock *bb, usize next_label) {
     while (bb->stmts.tail) {
         IRStmtBase *stmt = bb->stmts.tail->data;
         if (stmt->kind == IRStmtKindGoto) {
             IRStmtGoto *goto_stmt = (IRStmtGoto *)stmt;
-            if (goto_stmt->label == label) {
+            if (goto_stmt->label == next_label) {
                 // remove the goto statement
                 CALL(ListDynIRStmt, bb->stmts, remove_back, /);
             } else {
@@ -75,17 +75,17 @@ static void try_strip_gotos(IRBasicBlock *bb, usize label) {
             }
         } else if (stmt->kind == IRStmtKindIf) {
             IRStmtIf *if_stmt = (IRStmtIf *)stmt;
-            if (if_stmt->true_label == label) {
+            if (if_stmt->true_label == next_label) {
                 if (if_stmt->false_label == (usize)-1 ||
-                    if_stmt->false_label == label) {
+                    if_stmt->false_label == next_label) {
                     // remove the entire if statement
                     CALL(ListDynIRStmt, bb->stmts, remove_back, /);
                 } else {
                     CALL(IRStmtIf, *if_stmt, flip, /);
-                    ASSERT(if_stmt->false_label == label);
+                    ASSERT(if_stmt->false_label == next_label);
                     if_stmt->false_label = (usize)-1;
                 }
-            } else if (if_stmt->false_label == label) {
+            } else if (if_stmt->false_label == next_label) {
                 if_stmt->false_label = (usize)-1;
             }
             break;
@@ -98,7 +98,7 @@ static void try_strip_gotos(IRBasicBlock *bb, usize label) {
 void MTD(IRFunction, add_label, /, usize label) {
     ASSERT(self->basic_blocks.tail);
     IRBasicBlock *last_bb = self->basic_blocks.tail->data;
-    try_strip_gotos(last_bb, label);
+    NSCALL(IRFunction, try_strip_gotos, /, last_bb, label);
     IRBasicBlock *new_bb = CREOBJHEAP(IRBasicBlock, /, label);
     CALL(ListBoxBB, self->basic_blocks, push_back, /, new_bb);
 }
@@ -179,6 +179,12 @@ void MTD(IRFunction, establish, /, TaskEngine *engine) {
     self->exit = CREOBJHEAP(IRBasicBlock, /, (usize)-1);
     CALL(ListBoxBB, self->basic_blocks, push_back, /, self->exit);
     CALL(IRFunction, *self, build_graph, /, engine);
+}
+
+void MTD(IRFunction, reestablish, /) {
+    CALL(MapBBToListBB, self->block_pred, clear, /);
+    CALL(MapBBToListBB, self->block_succ, clear, /);
+    CALL(IRFunction, *self, build_graph, /, NULL);
 }
 
 IRBasicBlock *MTD(IRFunction, label_to_bb, /, usize label) {
