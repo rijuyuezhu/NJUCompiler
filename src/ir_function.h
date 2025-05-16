@@ -49,7 +49,7 @@ typedef bool (*IterBBCallback)(IRFunction *self, ListBasicBlockNode *bb_it,
 
 void MTD(IRFunction, iter_bb, /, IterBBCallback callback, void *extra_args);
 
-void MTD(IRFunction, remove_dead_stmt, /);
+bool MTD(IRFunction, remove_dead_stmt, /);
 
 DELETED_CLONER(IRFunction, FUNC_STATIC);
 DECLARE_CLASS_VEC(VecIRFunction, IRFunction, FUNC_EXTERN);

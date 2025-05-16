@@ -14,7 +14,7 @@ DECLARE_MAPPING(MapAEExpToVar, AEExp, usize, FUNC_EXTERN, GENERATOR_PLAIN_KEY,
                 GENERATOR_PLAIN_VALUE, GENERATOR_CLASS_COMPARATOR);
 
 typedef struct AEFact {
-    bool is_univesal;
+    bool is_universal;
     SetUSize avaliset;
 } AEFact;
 

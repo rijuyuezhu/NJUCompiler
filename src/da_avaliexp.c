@@ -14,18 +14,18 @@ int NSMTD(AEExp, compare, /, const AEExp *a, const AEExp *b) {
 
 void MTD(AEFact, init, /) {
     CALL(SetUSize, self->avaliset, init, /);
-    self->is_univesal = false;
+    self->is_universal = false;
 }
 void MTD(AEFact, drop, /) { DROPOBJ(SetUSize, self->avaliset); }
 bool MTD(AEFact, get, /, usize key) {
-    if (self->is_univesal) {
+    if (self->is_universal) {
         return true;
     }
     SetUSizeIterator it = CALL(SetUSize, self->avaliset, find_owned, /, key);
     return it != NULL;
 }
 bool MTD(AEFact, set, /, usize key, bool value) {
-    if (self->is_univesal) {
+    if (self->is_universal) {
         if (value) {
             return false;
         } else {
@@ -50,7 +50,7 @@ bool MTD(AEFact, set, /, usize key, bool value) {
     }
 }
 void MTD(AEFact, debug_print, /) {
-    if (self->is_univesal) {
+    if (self->is_universal) {
         printf("[universal set]");
         return;
     }
@@ -81,7 +81,7 @@ Any MTD(AvaliExpDA, new_boundary_fact, /, ATTR_UNUSED IRFunction *func) {
 }
 Any MTD(AvaliExpDA, new_initial_fact, /) {
     AEFact *fact = CREOBJHEAP(AEFact, /);
-    fact->is_univesal = true;
+    fact->is_universal = true;
     return fact;
 }
 void MTD(AvaliExpDA, drop_fact, /, Any fact) { DROPOBJHEAP(AEFact, fact); }
@@ -108,11 +108,11 @@ bool MTD(AvaliExpDA, meet_into, /, Any fact, Any target) {
     // target = target sect fact
     AEFact *from = fact;
     AEFact *to = target;
-    if (from->is_univesal) {
+    if (from->is_universal) {
         return false;
     }
-    if (to->is_univesal) {
-        to->is_univesal = false;
+    if (to->is_universal) {
+        to->is_universal = false;
         // set to = from
         ASSERT(to->avaliset.size == 0);
         for (SetUSizeIterator it = CALL(SetUSize, from->avaliset, begin, /); it;
@@ -140,7 +140,7 @@ bool MTD(AvaliExpDA, meet_into, /, Any fact, Any target) {
 
 void MTD(AvaliExpDA, transfer_stmt, /, IRStmtBase *stmt, Any fact) {
     AEFact *ae_fact = fact;
-    if (ae_fact->is_univesal) {
+    if (ae_fact->is_universal) {
         // universal fact happens on the initialization;
         // it is not convenient to delete elements from it;
         // it the code is reachable, it will be not universal oneday;
@@ -258,8 +258,10 @@ void MTD(AvaliExpDA, prepare, /, IRFunction *func) {
     CALL(IRFunction, *func, iter_stmt, /,
          MTDNAME(IRFunction, avaliexp_prepare_callback), self);
 }
-void VMTD(AvaliExpDA, clean_redundant_exp_callback, /, ListDynIRStmtNode *iter,
-          Any fact) {
+
+static void VMTD(AvaliExpDA, clean_redundant_exp_callback, /,
+                 ListDynIRStmtNode *iter, Any fact,
+                 ATTR_UNUSED void *extra_args) {
     IRStmtBase *stmt = iter->data;
     AEFact *aefact = fact;
     if (stmt->kind != IRStmtKindArith) {
@@ -275,7 +277,7 @@ void VMTD(AvaliExpDA, clean_redundant_exp_callback, /, ListDynIRStmtNode *iter,
 
 void MTD(AvaliExpDA, clean_redundant_exp, /, IRFunction *func) {
     CALL(DataflowAnalysisBase, *TOBASE(self), iter_func, /, func,
-         MTDNAME(AvaliExpDA, clean_redundant_exp_callback));
+         MTDNAME(AvaliExpDA, clean_redundant_exp_callback), NULL);
 }
 
 DEFINE_MAPPING(MapAEExpToVar, AEExp, usize, FUNC_EXTERN);

@@ -29,11 +29,12 @@ bool MTD(DataflowAnalysisBase, transfer_bb, /, IRBasicBlock *bb, Any in_fact,
          Any out_fact);
 
 typedef void (*DAIterCallback)(DataflowAnalysisBase *analysis,
-                               ListDynIRStmtNode *iter, Any fact);
+                               ListDynIRStmtNode *iter, Any fact,
+                               void *extra_args);
 void MTD(DataflowAnalysisBase, iter_bb, /, IRBasicBlock *bb,
-         DAIterCallback callback);
+         DAIterCallback callback, void *extra_args);
 void MTD(DataflowAnalysisBase, iter_func, /, IRFunction *func,
-         DAIterCallback callback);
+         DAIterCallback callback, void *extra_args);
 
 #define DEFINE_DATAFLOW_ANALYSIS_STRUCT(classname)                             \
     /* require define */                                                       \

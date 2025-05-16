@@ -13,7 +13,8 @@ void MTD(IROptimizer, init, /, struct IRProgram *program);
 FUNC_STATIC DEFAULT_DROPER(IROptimizer);
 void MTD(IROptimizer, optimize, /);
 void MTD(IROptimizer, optimize_func, /, struct IRFunction *func);
-void MTD(IROptimizer, optimize_func_const_prop, /, struct IRFunction *func);
-void MTD(IROptimizer, optimize_func_simple_redundant_ops, /,
+bool MTD(IROptimizer, optimize_func_const_prop, /, struct IRFunction *func);
+bool MTD(IROptimizer, optimize_func_simple_redundant_ops, /,
          struct IRFunction *func);
-void MTD(IROptimizer, optimize_func_avali_exp, /, struct IRFunction *func);
+bool MTD(IROptimizer, optimize_func_avali_exp, /, struct IRFunction *func);
+bool MTD(IROptimizer, optimize_func_copy_prop, /, struct IRFunction *func);

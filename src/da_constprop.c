@@ -101,7 +101,7 @@ Any MTD(ConstPropDA, get_out_fact, /, IRBasicBlock *bb) {
     return it->value;
 }
 
-CPValue meet_value(CPValue v1, CPValue v2) {
+static CPValue meet_value(CPValue v1, CPValue v2) {
     if (v1.kind == CPValueKindNAC || v2.kind == CPValueKindNAC) {
         return NSCALL(CPValue, get_nac, /);
     } else if (v1.kind == CPValueKindUndef) {
@@ -234,10 +234,11 @@ void MTD(ConstPropDA, debug_print, /, IRFunction *func) {
     }
 }
 
-void VMTD(ConstPropDA, const_fold_callback, /, ListDynIRStmtNode *iter,
-          Any fact) {
+static void VMTD(ConstPropDA, const_fold_callback, /, ListDynIRStmtNode *iter,
+                 Any fact, void *extra_args) {
     IRStmtBase *stmt = iter->data;
-    CPFact *cpfact = fact;
+    CPFact *cp_fact = fact;
+    bool *updated = extra_args;
     SliceIRValue uses = VCALL(IRStmtBase, *stmt, get_use, /);
     for (usize i = 0; i < uses.size; i++) {
         IRValue use = uses.data[i];
@@ -245,16 +246,19 @@ void VMTD(ConstPropDA, const_fold_callback, /, ListDynIRStmtNode *iter,
             continue;
         }
         usize var = use.var;
-        CPValue cp_value = CALL(CPFact, *cpfact, get, /, var);
+        CPValue cp_value = CALL(CPFact, *cp_fact, get, /, var);
         if (cp_value.kind == CPValueKindConst) {
             uses.data[i] = NSCALL(IRValue, from_const, /, cp_value.const_val);
+            *updated = true;
         }
     }
 }
 
-void MTD(ConstPropDA, const_fold, /, IRFunction *func) {
+bool MTD(ConstPropDA, const_fold, /, IRFunction *func) {
+    bool updated = false;
     CALL(DataflowAnalysisBase, *TOBASE(self), iter_func, /, func,
-         MTDNAME(ConstPropDA, const_fold_callback));
+         MTDNAME(ConstPropDA, const_fold_callback), &updated);
+    return updated;
 }
 
 DEFINE_MAPPING(MapVarToCPValue, usize, CPValue, FUNC_EXTERN);

@@ -74,6 +74,6 @@ typedef struct ConstPropDA {
     MapBBToCPFact out_facts;
 } ConstPropDA;
 void MTD(ConstPropDA, init, /);
-void MTD(ConstPropDA, const_fold, /, IRFunction *func);
+bool MTD(ConstPropDA, const_fold, /, IRFunction *func);
 
 DEFINE_DATAFLOW_ANALYSIS_STRUCT(ConstPropDA);

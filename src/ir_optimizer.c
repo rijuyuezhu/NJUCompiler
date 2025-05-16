@@ -1,6 +1,7 @@
 #include "ir_optimizer.h"
 #include "da_avaliexp.h"
 #include "da_constprop.h"
+#include "da_copyprop.h"
 #include "da_solver.h"
 #include "ir_basic_block.h"
 #include "ir_function.h"
@@ -19,80 +20,113 @@ void MTD(IROptimizer, optimize, /) {
 void MTD(IROptimizer, optimize_func, /, IRFunction *func) {
     CALL(IROptimizer, *self, optimize_func_const_prop, /, func);
     CALL(IROptimizer, *self, optimize_func_simple_redundant_ops, /, func);
+    CALL(IROptimizer, *self, optimize_func_copy_prop, /, func);
     CALL(IROptimizer, *self, optimize_func_avali_exp, /, func);
+    CALL(IROptimizer, *self, optimize_func_copy_prop, /, func);
 }
 
-void MTD(IROptimizer, optimize_func_const_prop, /, IRFunction *func) {
+bool MTD(IROptimizer, optimize_func_const_prop, /, IRFunction *func) {
     ConstPropDA const_prop = CREOBJ(ConstPropDA, /);
     NSCALL(DAWorkListSolver, solve, /, TOBASE(&const_prop), func);
-    CALL(ConstPropDA, const_prop, const_fold, /, func);
+    bool updated = CALL(ConstPropDA, const_prop, const_fold, /, func);
     DROPOBJ(ConstPropDA, const_prop);
+    return updated;
 }
 
 static bool MTD(IRFunction, optimize_func_simple_redundant_ops_callback, /,
                 ATTR_UNUSED IRBasicBlock *bb, ListDynIRStmtNode *stmt_it,
-                ATTR_UNUSED void *extra_args) {
+                void *extra_args) {
     IRStmtBase **stmt = &stmt_it->data;
-    if ((*stmt)->kind != IRStmtKindArith) {
-        return false;
-    }
-    IRStmtArith *arith = (IRStmtArith *)*stmt;
-    usize dst = arith->dst;
-    ArithopKind aop = arith->aop;
-    IRValue src1 = arith->src1;
-    IRValue src2 = arith->src2;
+    bool *updated = extra_args;
+    if ((*stmt)->kind == IRStmtKindArith) {
+        IRStmtArith *arith = (IRStmtArith *)*stmt;
+        usize dst = arith->dst;
+        ArithopKind aop = arith->aop;
+        IRValue src1 = arith->src1;
+        IRValue src2 = arith->src2;
 
-    if (aop == ArithopAdd) {
-        if (src1.is_const && src1.const_val == 0) {
-            *stmt = (IRStmtBase *)CREOBJHEAP(IRStmtAssign, /, dst, src2);
-            DROPOBJHEAP(IRStmtArith, arith);
-        } else if (src2.is_const && src2.const_val == 0) {
-            *stmt = (IRStmtBase *)CREOBJHEAP(IRStmtAssign, /, dst, src1);
-            DROPOBJHEAP(IRStmtArith, arith);
+        if (aop == ArithopAdd) {
+            if (src1.is_const && src1.const_val == 0) {
+                *stmt = (IRStmtBase *)CREOBJHEAP(IRStmtAssign, /, dst, src2);
+                DROPOBJHEAP(IRStmtArith, arith);
+                *updated = true;
+            } else if (src2.is_const && src2.const_val == 0) {
+                *stmt = (IRStmtBase *)CREOBJHEAP(IRStmtAssign, /, dst, src1);
+                DROPOBJHEAP(IRStmtArith, arith);
+                *updated = true;
+            }
+        } else if (aop == ArithopSub) {
+            if (src2.is_const && src2.const_val == 0) {
+                *stmt = (IRStmtBase *)CREOBJHEAP(IRStmtAssign, /, dst, src1);
+                DROPOBJHEAP(IRStmtArith, arith);
+                *updated = true;
+            } else if (!src1.is_const && !src2.is_const &&
+                       src1.var == src2.var) {
+                IRValue zero = NSCALL(IRValue, from_const, /, 0);
+                *stmt = (IRStmtBase *)CREOBJHEAP(IRStmtAssign, /, dst, zero);
+                DROPOBJHEAP(IRStmtArith, arith);
+                *updated = true;
+            }
+        } else if (aop == ArithopMul) {
+            if (src1.is_const && src1.const_val == 1) {
+                *stmt = (IRStmtBase *)CREOBJHEAP(IRStmtAssign, /, dst, src2);
+                DROPOBJHEAP(IRStmtArith, arith);
+                *updated = true;
+            } else if (src2.is_const && src2.const_val == 1) {
+                *stmt = (IRStmtBase *)CREOBJHEAP(IRStmtAssign, /, dst, src1);
+                DROPOBJHEAP(IRStmtArith, arith);
+                *updated = true;
+            }
+        } else if (aop == ArithopDiv) {
+            if (src2.is_const && src2.const_val == 1) {
+                *stmt = (IRStmtBase *)CREOBJHEAP(IRStmtAssign, /, dst, src1);
+                DROPOBJHEAP(IRStmtArith, arith);
+                *updated = true;
+            } else if (!src1.is_const && !src2.is_const &&
+                       src1.var == src2.var) {
+                IRValue one = NSCALL(IRValue, from_const, /, 1);
+                *stmt = (IRStmtBase *)CREOBJHEAP(IRStmtAssign, /, dst, one);
+                DROPOBJHEAP(IRStmtArith, arith);
+                *updated = true;
+            }
+        } else {
+            PANIC("should not reach");
         }
-    } else if (aop == ArithopSub) {
-        if (src2.is_const && src2.const_val == 0) {
-            *stmt = (IRStmtBase *)CREOBJHEAP(IRStmtAssign, /, dst, src1);
-            DROPOBJHEAP(IRStmtArith, arith);
-        } else if (!src1.is_const && !src2.is_const && src1.var == src2.var) {
-            IRValue zero = NSCALL(IRValue, from_const, /, 0);
-            *stmt = (IRStmtBase *)CREOBJHEAP(IRStmtAssign, /, dst, zero);
-            DROPOBJHEAP(IRStmtArith, arith);
+    } else if ((*stmt)->kind == IRStmtKindAssign) {
+        IRStmtAssign *assign = (IRStmtAssign *)*stmt;
+        if (!assign->src.is_const) {
+            usize dst = assign->dst;
+            usize src = assign->src.var;
+            if (dst == src) {
+                CALL(ListDynIRStmt, bb->stmts, remove, /, stmt_it);
+                *updated = true;
+            }
         }
-    } else if (aop == ArithopMul) {
-        if (src1.is_const && src1.const_val == 1) {
-            *stmt = (IRStmtBase *)CREOBJHEAP(IRStmtAssign, /, dst, src2);
-            DROPOBJHEAP(IRStmtArith, arith);
-        } else if (src2.is_const && src2.const_val == 1) {
-            *stmt = (IRStmtBase *)CREOBJHEAP(IRStmtAssign, /, dst, src1);
-            DROPOBJHEAP(IRStmtArith, arith);
-        }
-    } else if (aop == ArithopDiv) {
-        if (src2.is_const && src2.const_val == 1) {
-            *stmt = (IRStmtBase *)CREOBJHEAP(IRStmtAssign, /, dst, src1);
-            DROPOBJHEAP(IRStmtArith, arith);
-        } else if (!src1.is_const && !src2.is_const && src1.var == src2.var) {
-            IRValue one = NSCALL(IRValue, from_const, /, 1);
-            *stmt = (IRStmtBase *)CREOBJHEAP(IRStmtAssign, /, dst, one);
-            DROPOBJHEAP(IRStmtArith, arith);
-        }
-    } else {
-        PANIC("should not reach");
     }
     return false;
 }
 
-void MTD(IROptimizer, optimize_func_simple_redundant_ops, /, IRFunction *func) {
+bool MTD(IROptimizer, optimize_func_simple_redundant_ops, /, IRFunction *func) {
+    bool updated = false;
     CALL(IRFunction, *func, iter_stmt, /,
          MTDNAME(IRFunction, optimize_func_simple_redundant_ops_callback),
-         NULL);
+         &updated);
+    return updated;
 }
 
-void MTD(IROptimizer, optimize_func_avali_exp, /, IRFunction *func) {
+bool MTD(IROptimizer, optimize_func_avali_exp, /, IRFunction *func) {
     AvaliExpDA avali_exp = CREOBJ(AvaliExpDA, /);
     CALL(AvaliExpDA, avali_exp, prepare, /, func);
     NSCALL(DAWorkListSolver, solve, /, TOBASE(&avali_exp), func);
     CALL(AvaliExpDA, avali_exp, clean_redundant_exp, /, func);
-    CALL(IRFunction, *func, remove_dead_stmt, /);
     DROPOBJ(AvaliExpDA, avali_exp);
+    return CALL(IRFunction, *func, remove_dead_stmt, /);
+}
+
+bool MTD(IROptimizer, optimize_func_copy_prop, /, struct IRFunction *func) {
+    CopyPropDA copy_prop = CREOBJ(CopyPropDA, /);
+    NSCALL(DAWorkListSolver, solve, /, TOBASE(&copy_prop), func);
+    bool updated = CALL(CopyPropDA, copy_prop, copy_propagate, /, func);
+    DROPOBJ(CopyPropDA, copy_prop);
+    return updated;
 }

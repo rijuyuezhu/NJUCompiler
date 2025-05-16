@@ -270,17 +270,21 @@ void MTD(IRFunction, iter_bb, /, IterBBCallback callback, void *extra_args) {
     }
 }
 
-bool MTD(IRFunction, remove_dead_stmt_callback, /, IRBasicBlock *bb,
-         ListDynIRStmtNode *stmt_it, ATTR_UNUSED void *extra_args) {
+static bool MTD(IRFunction, remove_dead_stmt_callback, /, IRBasicBlock *bb,
+                ListDynIRStmtNode *stmt_it, void *extra_args) {
+    bool *updated = extra_args;
     if (stmt_it->data->is_dead) {
         CALL(ListDynIRStmt, bb->stmts, remove, /, stmt_it);
+        *updated = true;
     }
     return false;
 }
 
-void MTD(IRFunction, remove_dead_stmt, /) {
+bool MTD(IRFunction, remove_dead_stmt, /) {
+    bool updated = false;
     CALL(IRFunction, *self, iter_stmt, /,
-         MTDNAME(IRFunction, remove_dead_stmt_callback), NULL);
+         MTDNAME(IRFunction, remove_dead_stmt_callback), &updated);
+    return updated;
 }
 
 DEFINE_MAPPING(MapVarToDecInfo, usize, DecInfo, FUNC_EXTERN);
