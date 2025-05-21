@@ -4,7 +4,6 @@
 #define ASSIGNMENT 4
 
 #if ASSIGNMENT <= 2
-
 static void run_task(TaskEngine *engine) {
     /*
      * lexical & syntax analysis
@@ -35,7 +34,6 @@ int main(int argc, char *argv[]) {
     DROPOBJHEAP(TaskEngine, engine);
     return 0;
 }
-
 #elif ASSIGNMENT == 3
 
 static void run_task(TaskEngine *engine) {

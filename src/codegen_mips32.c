@@ -115,8 +115,6 @@ static AddrDesc *get_addr(FuncInfo *info, usize var_idx) {
     return &iter->value;
 }
 
-#define MAX_REG_IN_IR 3
-
 static void writeback_reg(FuncInfo *info, usize reg) {
     RegDesc *reg_desc = &info->regs[reg];
     AddrDesc *addr_desc = reg_desc->corr_addr;
@@ -138,7 +136,6 @@ static void clear_reg(FuncInfo *info, usize reg) {
     }
     // clear reg
     reg_desc->corr_addr = NULL;
-    reg_desc->dirty = false;
 }
 
 static void writeback_regs(FuncInfo *info) {
@@ -154,6 +151,8 @@ static void clear_regs(FuncInfo *info) {
     }
     info->candidate_evict_reg = 0;
 }
+
+#define MAX_REG_IN_IR 3
 
 static void get_reg(FuncInfo *info, usize num, usize var_idxs[],
                     usize reg_idxs[], bool has_ret) {
@@ -183,6 +182,17 @@ static void get_reg(FuncInfo *info, usize num, usize var_idxs[],
             continue;
         }
 
+        AddrDesc *addr_desc = addr_descs[i];
+
+        if (addr_desc && addr_desc->corr_reg_idx != (usize)-1) {
+            // the addr is already in reg, since loaded by the same addr in
+            // another operand. Notice that "ret" judgment happens
+            // in the end of iteration, and thus we will not miss any
+            // necessary load
+            reg_idxs[i] = addr_desc->corr_reg_idx;
+            continue;
+        }
+
         // find a proper reg
         usize candidate;
         while (true) {
@@ -190,10 +200,6 @@ static void get_reg(FuncInfo *info, usize num, usize var_idxs[],
             info->candidate_evict_reg += 1;
             if (info->candidate_evict_reg == LENGTH(USABLE_REGS)) {
                 info->candidate_evict_reg = 0;
-            }
-
-            if (!info->regs[candidate].corr_addr) {
-                break;
             }
 
             bool can_use = true;
@@ -215,11 +221,10 @@ static void get_reg(FuncInfo *info, usize num, usize var_idxs[],
         reg_desc->was_used = true;
 
         // assign reg if not temp
-        AddrDesc *addr_desc = addr_descs[i];
         if (addr_desc) {
             reg_desc->corr_addr = addr_desc;
             addr_desc->corr_reg_idx = candidate;
-            if (!(i == 0 && has_ret)) {
+            if (!(i + 1 == num && has_ret)) {
                 // the ret var need not to be loaded
                 CALL(String, info->body_asm, pushf, /, "  lw %s, %zd($fp)\n",
                      REG_TO_NAME[candidate], addr_desc->offset);
@@ -291,7 +296,7 @@ static const CodeGeneratorFunc CODE_GENERATOR_DISPATCH_BY_IRKIND[] = {
 
 };
 
-static void get_func_info_from_dec(FuncInfo *info, IR *ir) {
+static void get_func_info_from_fundec(FuncInfo *info, IR *ir) {
     ASSERT(ir->kind == IRFunction);
     IREntity *ent = &ir->e1;
     ASSERT(ent->kind == IREntityFun);
@@ -326,7 +331,7 @@ void MTD(CodegenMips32, generate_func, /, usize start, usize end) {
     VecPtr *irs = &self->ir_manager->irs;
 
     FuncInfo *info = CREOBJHEAP(FuncInfo, /);
-    get_func_info_from_dec(info, irs->data[start]);
+    get_func_info_from_fundec(info, irs->data[start]);
 
     // handle the function body
     for (usize i = start + 1; i < end; i++) {
@@ -437,14 +442,14 @@ CODE_GENERATOR(Assign) {
         }
         info->regs[ret_reg].dirty = true;
     } else {
-        usize var_idxs[2] = {ret->var_idx, e1->var_idx};
+        usize var_idxs[2] = {e1->var_idx, ret->var_idx};
         usize reg_idxs[2];
         // NOTE: for <ret:deref> = <e1:var>, we need to get the actual value;
         // thus has_ret shall be false
         bool has_ret = ret->kind == IREntityVar;
         get_reg(info, 2, var_idxs, reg_idxs, has_ret);
-        usize ret_reg = reg_idxs[0];
-        usize e1_reg = reg_idxs[1];
+        usize e1_reg = reg_idxs[0];
+        usize ret_reg = reg_idxs[1];
         if (ret->kind == IREntityVar) {
             if (e1->kind == IREntityVar) {
                 // <ret:var> = <e1:var>
@@ -464,7 +469,7 @@ CODE_GENERATOR(Assign) {
             CALL(String, info->body_asm, pushf, /, "  sw %s, 0(%s)\n",
                  REG_TO_NAME[e1_reg], REG_TO_NAME[ret_reg]);
         } else {
-            PANIC("Should not be called");
+            PANIC("Should not reach here");
         }
     }
 }
@@ -474,14 +479,14 @@ CODE_GENERATOR(ArithAssign) {
     IREntity *ret = &ir->ret;
     ArithopKind aop = ir->arithop_val;
 
-    usize var_idxs[3] = {ret->var_idx,
-                         e1->kind == IREntityVar ? e1->var_idx : (usize)-1,
-                         e2->kind == IREntityVar ? e2->var_idx : (usize)-1};
+    usize var_idxs[3] = {e1->kind == IREntityVar ? e1->var_idx : (usize)-1,
+                         e2->kind == IREntityVar ? e2->var_idx : (usize)-1,
+                         ret->var_idx};
     usize reg_idxs[3];
     get_reg(info, 3, var_idxs, reg_idxs, true);
-    usize ret_reg = reg_idxs[0];
-    usize e1_reg = reg_idxs[1];
-    usize e2_reg = reg_idxs[2];
+    usize e1_reg = reg_idxs[0];
+    usize e2_reg = reg_idxs[1];
+    usize ret_reg = reg_idxs[2];
     if (e1->kind == IREntityImmInt) {
         CALL(String, info->body_asm, pushf, /, "  li %s, %d\n",
              REG_TO_NAME[e1_reg], e1->imm_int);
