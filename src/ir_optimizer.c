@@ -13,6 +13,7 @@ void MTD(IROptimizer, optimize, /) {
         IRFunction *func = &self->program->functions.data[i];
         CALL(IROptimizer, *self, optimize_func, /, func);
     }
+    CALL(IRProgram, *self->program, rename_var_labels, /);
 }
 
 void MTD(IROptimizer, optimize_func, /, IRFunction *func) {

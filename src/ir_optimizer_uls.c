@@ -25,7 +25,9 @@ static void relabel_func(IRFunction *func) {
         ListBoxBBNode *nxt = it->next;
         if (nxt) {
             IRBasicBlock *nxt_bb = nxt->data;
-            bb->tag = nxt_bb->tag;
+            if (nxt_bb->tag != (usize)-1) {
+                bb->tag = nxt_bb->tag;
+            }
         }
     }
 
@@ -74,16 +76,13 @@ static void strip_unused_label(IRFunction *func) {
             }
         }
     }
+
     for (ListBoxBBNode *it = func->basic_blocks.head; it; it = it->next) {
         IRBasicBlock *bb = it->data;
         if (bb->label == (usize)-1) {
             continue;
         }
-        if (CALL(SetUSize, used_labels, find_owned, /, bb->label) == NULL) {
-            MapLabelBBIterator it2 = CALL(MapLabelBB, func->label_to_block,
-                                          find_owned, /, bb->label);
-            ASSERT(it2);
-            CALL(MapLabelBB, func->label_to_block, erase, /, it2);
+        if (!CALL(SetUSize, used_labels, find_owned, /, bb->label)) {
             bb->label = (usize)-1;
         }
     }
@@ -105,6 +104,8 @@ bool MTD(IROptimizer, optimize_func_useless_label_strip, /, IRFunction *func) {
     relabel_func(func);
     strip_unused_label(func);
     strip_gotos(func);
+    // reestablish is necessary because we have changed the labels and
+    // statements
     CALL(IRFunction, *func, reestablish, /);
     return true;
 }

@@ -39,3 +39,9 @@ int NSMTD(IRValue, compare, /, const IRValue *a, const IRValue *b) {
         }
     }
 }
+
+void MTD(IRValue, rename, /, Renamer *renamer) {
+    if (!self->is_const) {
+        CALL(Renamer, *renamer, rename, /, &self->var);
+    }
+}

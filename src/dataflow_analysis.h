@@ -1,6 +1,5 @@
 #pragma once
-#include "ir_basic_block.h"
-#include "ir_program.h"
+#include "ir_function.h"
 
 typedef struct DataflowAnalysisBase DataflowAnalysisBase;
 

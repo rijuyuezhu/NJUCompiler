@@ -1,5 +1,6 @@
 #include "da_avaliexp.h"
 #include "general_container.h"
+#include "ir_program.h"
 
 int NSMTD(AEExp, compare, /, const AEExp *a, const AEExp *b) {
     if (a->op != b->op) {
@@ -114,12 +115,7 @@ bool MTD(AvaliExpDA, meet_into, /, Any fact, Any target) {
     if (to->is_universal) {
         to->is_universal = false;
         // set to = from
-        ASSERT(to->avaliset.size == 0);
-        for (SetUSizeIterator it = CALL(SetUSize, from->avaliset, begin, /); it;
-             it = CALL(SetUSize, from->avaliset, next, /, it)) {
-            usize var = it->key;
-            CALL(AEFact, *to, set, /, var, true);
-        }
+        CALL(SetUSize, to->avaliset, clone_from, /, &from->avaliset);
         return true;
     } else {
         bool updated = false;
@@ -143,29 +139,30 @@ void MTD(AvaliExpDA, transfer_stmt, /, IRStmtBase *stmt, Any fact) {
     if (ae_fact->is_universal) {
         // universal fact happens on the initialization;
         // it is not convenient to delete elements from it;
-        // it the code is reachable, it will be not universal oneday;
+        // if the code is reachable, it will be not universal oneday;
         // so we wait until then
         return;
     }
+
+    if (stmt->kind == IRStmtKindArith) {
+        // add gen before remove kills in avaliexp
+        IRStmtArith *arith = (IRStmtArith *)stmt;
+        CALL(AEFact, *ae_fact, set, /, arith->dst, true);
+    }
+
     usize def = VCALL(IRStmtBase, *stmt, get_def, /);
     if (def == (usize)-1) {
-        goto FINISH_KILL;
+        return;
     }
     MapUSizeToVecUSizeIterator it =
         CALL(MapUSizeToVecUSize, self->var_to_kills, find_owned, /, def);
     if (it == NULL) {
-        goto FINISH_KILL;
+        return;
     }
     VecUSize *kills = &it->value;
     for (usize i = 0; i < kills->size; i++) {
         usize kill = kills->data[i];
         CALL(AEFact, *ae_fact, set, /, kill, false);
-    }
-
-FINISH_KILL:;
-    if (stmt->kind == IRStmtKindArith) {
-        IRStmtArith *arith = (IRStmtArith *)stmt;
-        CALL(AEFact, *ae_fact, set, /, arith->dst, true);
     }
 }
 
@@ -264,6 +261,13 @@ static void VMTD(AvaliExpDA, clean_redundant_exp_callback, /,
                  ATTR_UNUSED void *extra_args) {
     IRStmtBase *stmt = iter->data;
     AEFact *aefact = fact;
+    if (aefact->is_universal) {
+        // universal fact happens on the initialization;
+        // it is not convenient to delete elements from it;
+        // if the code is reachable, it will be not universal oneday;
+        // so we wait until then
+        return;
+    }
     if (stmt->kind != IRStmtKindArith) {
         return;
     }

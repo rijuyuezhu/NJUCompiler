@@ -183,7 +183,7 @@ void MTD(CopyPropDA, transfer_stmt, /, IRStmtBase *stmt, Any fact) {
     if (cyp_fact->is_universal) {
         // universal fact happens on the initialization;
         // it is not convenient to delete elements from it;
-        // it the code is reachable, it will be not universal oneday;
+        // if the code is reachable, it will be not universal oneday;
         // so we wait until then
         return;
     }
@@ -202,6 +202,7 @@ FINISH_KILL:;
             usize src = assign->src.var;
             if (dst != src) {
                 // here dst must have been killed above
+                // also, we prevent self-assignments
                 CALL(CYPFact, *cyp_fact, add_assign, /, dst, src);
             }
         }
@@ -236,6 +237,9 @@ static void VMTD(CopyPropDA, copy_propagate_callback, /,
     IRStmtBase *stmt = iter->data;
     CYPFact *cyp_fact = fact;
     bool *updated = extra_args;
+    if (cyp_fact->is_universal) {
+        return;
+    }
     SliceIRValue uses = VCALL(IRStmtBase, *stmt, get_use, /);
     for (usize i = 0; i < uses.size; i++) {
         IRValue *use = &uses.data[i];

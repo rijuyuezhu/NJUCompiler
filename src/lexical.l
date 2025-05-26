@@ -17,7 +17,7 @@ static int parse_to_int(const char *str) {
     char *endptr;
     long ret = strtol(str, &endptr, 10);
     if (*endptr != '\0') {
-        printf("Error type A at Line %d: \"%s\" is not a valid integer.\n",
+        printf("Lexical error at Line %d: \"%s\" is not a valid integer.\n",
                yylineno, str);
         has_lexical_err = true;
         return 0;

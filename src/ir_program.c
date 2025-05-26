@@ -1,5 +1,4 @@
 #include "ir_program.h"
-#include "ir_basic_block.h"
 #include "ir_function.h"
 #include "utils.h"
 
@@ -24,4 +23,24 @@ void MTD(IRProgram, establish, /, struct TaskEngine *engine) {
         IRFunction *func = &self->functions.data[i];
         CALL(IRFunction, *func, establish, /, engine);
     }
+}
+
+void MTD(IRProgram, rename_var_labels, /) {
+    CALL(IdxAllocator, self->var_idx_allocator, clear, /);
+    CALL(IdxAllocator, self->label_idx_allocator, clear, /);
+    MapUSizeUSize var_map = CREOBJ(MapUSizeUSize, /);
+    MapUSizeUSize label_map = CREOBJ(MapUSizeUSize, /);
+    Renamer var_renamer =
+        CREOBJ(Renamer, /, &var_map, &self->var_idx_allocator);
+    Renamer label_renamer =
+        CREOBJ(Renamer, /, &label_map, &self->label_idx_allocator);
+
+    for (usize i = 0; i < self->functions.size; i++) {
+        IRFunction *func = &self->functions.data[i];
+        CALL(IRFunction, *func, rename, /, &var_renamer, &label_renamer);
+    }
+    DROPOBJ(Renamer, label_renamer);
+    DROPOBJ(Renamer, var_renamer);
+    DROPOBJ(MapUSizeUSize, label_map);
+    DROPOBJ(MapUSizeUSize, var_map);
 }

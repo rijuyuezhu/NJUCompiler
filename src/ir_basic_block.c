@@ -3,14 +3,15 @@
 void MTD(IRBasicBlock, init, /, usize label) {
     CALL(ListDynIRStmt, self->stmts, init, /);
     self->label = label;
+    self->tag = 0;
     self->is_dead = false;
 }
+
+void MTD(IRBasicBlock, drop, /) { DROPOBJ(ListDynIRStmt, self->stmts); }
 
 void MTD(IRBasicBlock, add_stmt, /, IRStmtBase *stmt) {
     CALL(ListDynIRStmt, self->stmts, push_back, /, stmt);
 }
-
-void MTD(IRBasicBlock, drop, /) { DROPOBJ(ListDynIRStmt, self->stmts); }
 
 void MTD(IRBasicBlock, build_str, /, String *builder) {
     if (self->label != (usize)-1) {
@@ -21,6 +22,7 @@ void MTD(IRBasicBlock, build_str, /, String *builder) {
         VCALL(IRStmtBase, *stmt, build_str, /, builder);
     }
 }
+
 void MTD(IRBasicBlock, debug_print, /) {
     String builder = CREOBJ(String, /);
     CALL(IRBasicBlock, *self, build_str, /, &builder);

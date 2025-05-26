@@ -149,13 +149,13 @@ static void MTD(IRFunction, build_graph, /, TaskEngine *engine) {
             if (target) {
                 CALL(IRFunction, *self, add_edge, /, bb, target);
             }
+            // notice: no edge from bb to nxt_bb
         } else if (last_stmt->kind == IRStmtKindIf) {
             IRStmtIf *if_stmt = (IRStmtIf *)last_stmt;
             IRBasicBlock *true_target =
                 CALL(IRFunction, *self, label_to_bb, /, if_stmt->true_label);
-            if (true_target) {
-                CALL(IRFunction, *self, add_edge, /, bb, true_target);
-            }
+            ASSERT(true_target);
+            CALL(IRFunction, *self, add_edge, /, bb, true_target);
             IRBasicBlock *false_target =
                 CALL(IRFunction, *self, label_to_bb, /, if_stmt->false_label);
             if (!false_target) {
@@ -182,6 +182,7 @@ void MTD(IRFunction, establish, /, TaskEngine *engine) {
 }
 
 void MTD(IRFunction, reestablish, /) {
+    CALL(MapLabelBB, self->label_to_block, clear, /);
     CALL(MapBBToListBB, self->block_pred, clear, /);
     CALL(MapBBToListBB, self->block_succ, clear, /);
     CALL(IRFunction, *self, build_graph, /, NULL);
@@ -329,6 +330,40 @@ bool MTD(IRFunction, remove_dead_stmt, /) {
     CALL(IRFunction, *self, iter_stmt, /,
          MTDNAME(IRFunction, remove_dead_stmt_callback), &updated);
     return updated;
+}
+
+void MTD(IRFunction, rename, /, Renamer *var_renamer, Renamer *label_renamer) {
+    // rename parameters
+    for (usize i = 0; i < self->params.size; i++) {
+        CALL(Renamer, *var_renamer, rename, /, &self->params.data[i]);
+    }
+
+    // rename var_to_dec_infos
+    MapVarToDecInfo tmp_map = CREOBJ(MapVarToDecInfo, /);
+    for (MapVarToDecInfoIterator it =
+             CALL(MapVarToDecInfo, self->var_to_dec_info, begin, /);
+         it; it = CALL(MapVarToDecInfo, self->var_to_dec_info, next, /, it)) {
+        usize var = it->key;
+        DecInfo dec_info = it->value;
+        CALL(Renamer, *var_renamer, rename, /, &var);
+        CALL(Renamer, *var_renamer, rename, /, &dec_info.addr);
+        MapVarToDecInfoInsertResult res =
+            CALL(MapVarToDecInfo, tmp_map, insert, /, var, dec_info);
+        ASSERT(res.inserted);
+    }
+    CALL(MapVarToDecInfo, self->var_to_dec_info, swap, /, &tmp_map);
+    DROPOBJ(MapVarToDecInfo, tmp_map);
+
+    // rename basic blocks
+    for (ListBoxBBNode *it = self->basic_blocks.head; it; it = it->next) {
+        IRBasicBlock *bb = it->data;
+        CALL(Renamer, *label_renamer, rename, /, &bb->label);
+        for (ListDynIRStmtNode *stmt_it = bb->stmts.head; stmt_it;
+             stmt_it = stmt_it->next) {
+            IRStmtBase *stmt = stmt_it->data;
+            VCALL(IRStmtBase, *stmt, rename, /, var_renamer, label_renamer);
+        }
+    }
 }
 
 DEFINE_MAPPING(MapVarToDecInfo, usize, DecInfo, FUNC_EXTERN);

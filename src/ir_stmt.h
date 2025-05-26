@@ -2,9 +2,9 @@
 
 #include "ir_value.h"
 #include "op.h"
+#include "renamer.h"
 #include "str.h"
 #include "tem_list.h"
-#include "tem_memory_primitive.h"
 #include "utils.h"
 
 typedef struct SliceIRValue {
@@ -37,12 +37,14 @@ typedef struct IRStmtBaseVTable {
     void (*build_str)(IRStmtBase *self, String *builder);
     usize (*get_def)(IRStmtBase *self);
     SliceIRValue (*get_use)(IRStmtBase *self);
+    void (*rename)(IRStmtBase *self, Renamer *var_renamer,
+                   Renamer *label_renamer);
 } IRStmtBaseVTable;
 
 struct IRStmtBase {
     const IRStmtBaseVTable *vtable;
 
-    // other
+    // other members
     IRStmtKind kind;
     bool is_dead;
 };
@@ -162,6 +164,8 @@ void MTD(IRStmtWrite, init, /, IRValue src);
     void MTD(classname, build_str, /, String * builder);                       \
     usize MTD(classname, get_def, /);                                          \
     SliceIRValue MTD(classname, get_use, /);                                   \
+    void MTD(classname, rename, /, Renamer * var_renamer,                      \
+             Renamer * label_renamer);                                         \
                                                                                \
     /* auto gen */                                                             \
     FUNC_STATIC void VMTD(classname, v_drop, /) {                              \
@@ -176,12 +180,18 @@ void MTD(IRStmtWrite, init, /, IRValue src);
     FUNC_STATIC SliceIRValue VMTD(classname, v_get_use, /) {                   \
         return CALL(classname, *(classname *)base_self, get_use, /);           \
     }                                                                          \
+    FUNC_STATIC void VMTD(classname, v_rename, /, Renamer * var_renamer,       \
+                          Renamer * label_renamer) {                           \
+        CALL(classname, *(classname *)base_self, rename, /, var_renamer,       \
+             label_renamer);                                                   \
+    }                                                                          \
     FUNC_STATIC void MTD(classname, base_init, /) {                            \
         static const IRStmtBaseVTable vtable = {                               \
             .drop = MTDNAME(classname, v_drop),                                \
             .build_str = MTDNAME(classname, v_build_str),                      \
             .get_def = MTDNAME(classname, v_get_def),                          \
             .get_use = MTDNAME(classname, v_get_use),                          \
+            .rename = MTDNAME(classname, v_rename),                            \
         };                                                                     \
         self->base.vtable = &vtable;                                           \
         self->base.kind = kindname;                                            \

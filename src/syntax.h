@@ -48,15 +48,12 @@ static IRValue get_ir_value_from_addr(TaskEngine *engine, usize var) {
     MapVarToDecInfoIterator it =
         CALL(MapVarToDecInfo, *var_to_dec_info, find_owned, /, var);
     if (!it) {
-        // // normal variable
-        // usize addr = CALL(IdxAllocator, engine->ir_program.var_idx_allocator,
-        //                   allocate, /);
-        // MapVarToDecInfoInsertResult res =
-        //     CALL(MapVarToDecInfo, *var_to_dec_info, insert, /, var,
-        //          (DecInfo){.addr = addr, .size = 4});
-        // ASSERT(res.inserted);
-        // it = res.node;
-        PANIC("Not implemented");
+        // already exists
+        engine->parse_err = true;
+        printf("Semantic error: do not support get the address of normal "
+               "variable %zu\n",
+               var);
+        return NSCALL(IRValue, from_const, /, 0);
     }
     return NSCALL(IRValue, from_var, /, it->value.addr);
 }
@@ -69,6 +66,7 @@ static VecIRValue take_arglist(TaskEngine *engine) {
     engine->parse_helper.arglist = CREOBJ(VecIRValue, /);
     return arglist;
 }
+
 static void add_dec(TaskEngine *engine, usize var, int size) {
     MapVarToDecInfo *var_to_dec_info =
         &engine->parse_helper.now_func->var_to_dec_info;

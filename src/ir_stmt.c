@@ -23,8 +23,13 @@ SliceIRValue MTD(IRStmtAssign, get_use, /) {
         .size = LENGTH(self->use_repr),
     };
 }
+void MTD(IRStmtAssign, rename, /, Renamer *var_renamer,
+         ATTR_UNUSED Renamer *idx_renamer) {
+    CALL(Renamer, *var_renamer, rename, /, &self->dst);
+    CALL(IRValue, self->src, rename, /, var_renamer);
+}
 
-// IRStmtArith
+// IRStmtLoad
 void MTD(IRStmtLoad, init, /, usize dst, IRValue src_addr) {
     CALL(IRStmtLoad, *self, base_init, /);
     self->dst = dst;
@@ -42,6 +47,11 @@ SliceIRValue MTD(IRStmtLoad, get_use, /) {
         .data = self->use_repr,
         .size = LENGTH(self->use_repr),
     };
+}
+void MTD(IRStmtLoad, rename, /, Renamer *var_renamer,
+         ATTR_UNUSED Renamer *idx_renamer) {
+    CALL(Renamer, *var_renamer, rename, /, &self->dst);
+    CALL(IRValue, self->src_addr, rename, /, var_renamer);
 }
 
 // IRStmtStore
@@ -64,6 +74,11 @@ SliceIRValue MTD(IRStmtStore, get_use, /) {
         .data = self->use_repr,
         .size = LENGTH(self->use_repr),
     };
+}
+void MTD(IRStmtStore, rename, /, Renamer *var_renamer,
+         ATTR_UNUSED Renamer *idx_renamer) {
+    CALL(IRValue, self->dst_addr, rename, /, var_renamer);
+    CALL(IRValue, self->src, rename, /, var_renamer);
 }
 
 // IRStmtArith
@@ -104,6 +119,12 @@ SliceIRValue MTD(IRStmtArith, get_use, /) {
         .size = LENGTH(self->use_repr),
     };
 }
+void MTD(IRStmtArith, rename, /, Renamer *var_renamer,
+         ATTR_UNUSED Renamer *idx_renamer) {
+    CALL(Renamer, *var_renamer, rename, /, &self->dst);
+    CALL(IRValue, self->src1, rename, /, var_renamer);
+    CALL(IRValue, self->src2, rename, /, var_renamer);
+}
 
 // IRStmtGoto
 void MTD(IRStmtGoto, init, /, usize label) {
@@ -120,6 +141,10 @@ SliceIRValue MTD(IRStmtGoto, get_use, /) {
         .data = NULL,
         .size = 0,
     };
+}
+void MTD(IRStmtGoto, rename, /, ATTR_UNUSED Renamer *var_renamer,
+         Renamer *idx_renamer) {
+    CALL(Renamer, *idx_renamer, rename, /, &self->label);
 }
 
 // IRStmtIf
@@ -167,6 +192,12 @@ SliceIRValue MTD(IRStmtIf, get_use, /) {
         .data = self->use_repr,
         .size = LENGTH(self->use_repr),
     };
+}
+void MTD(IRStmtIf, rename, /, Renamer *var_renamer, Renamer *idx_renamer) {
+    CALL(IRValue, self->src1, rename, /, var_renamer);
+    CALL(IRValue, self->src2, rename, /, var_renamer);
+    CALL(Renamer, *idx_renamer, rename, /, &self->true_label);
+    CALL(Renamer, *idx_renamer, rename, /, &self->false_label);
 }
 static RelopKind RelopKind_flip(RelopKind rop) {
     switch (rop) {
@@ -261,13 +292,19 @@ void MTD(IRStmtCall, build_str, /, String *builder) {
     const char *func_name = STRING_C_STR(self->func_name);
     CALL(String, *builder, pushf, /, "v%zu := CALL %s\n", self->dst, func_name);
 }
-
 usize MTD(IRStmtCall, get_def, /) { return self->dst; }
 SliceIRValue MTD(IRStmtCall, get_use, /) {
     return (SliceIRValue){
         .data = self->args.data,
         .size = self->args.size,
     };
+}
+void MTD(IRStmtCall, rename, /, Renamer *var_renamer,
+         ATTR_UNUSED Renamer *idx_renamer) {
+    CALL(Renamer, *var_renamer, rename, /, &self->dst);
+    for (usize i = 0; i < self->args.size; i++) {
+        CALL(IRValue, self->args.data[i], rename, /, var_renamer);
+    }
 }
 
 // IRStmtReturn
@@ -288,6 +325,10 @@ SliceIRValue MTD(IRStmtReturn, get_use, /) {
         .size = LENGTH(self->use_repr),
     };
 }
+void MTD(IRStmtReturn, rename, /, Renamer *var_renamer,
+         ATTR_UNUSED Renamer *idx_renamer) {
+    CALL(IRValue, self->src, rename, /, var_renamer);
+}
 
 // IRStmtRead
 void MTD(IRStmtRead, init, /, usize dst) {
@@ -304,6 +345,10 @@ SliceIRValue MTD(IRStmtRead, get_use, /) {
         .data = NULL,
         .size = 0,
     };
+}
+void MTD(IRStmtRead, rename, /, Renamer *var_renamer,
+         ATTR_UNUSED Renamer *idx_renamer) {
+    CALL(Renamer, *var_renamer, rename, /, &self->dst);
 }
 
 // IRStmtWrite
@@ -323,6 +368,10 @@ SliceIRValue MTD(IRStmtWrite, get_use, /) {
         .data = self->use_repr,
         .size = LENGTH(self->use_repr),
     };
+}
+void MTD(IRStmtWrite, rename, /, Renamer *var_renamer,
+         ATTR_UNUSED Renamer *idx_renamer) {
+    CALL(IRValue, self->src, rename, /, var_renamer);
 }
 
 DEFINE_PLAIN_VEC(VecIRValue, IRValue, FUNC_EXTERN)
