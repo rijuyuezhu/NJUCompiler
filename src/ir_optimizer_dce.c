@@ -3,6 +3,7 @@
 #include "ir_basic_block.h"
 #include "ir_optimizer.h"
 
+// call reestablish after this function
 static void dce_const_eval_add_worklist(ListPtr *work_list, IRFunction *func,
                                         IRBasicBlock *bb) {
     usize choose_label = (usize)-1;
@@ -45,6 +46,7 @@ static void dce_const_eval_add_worklist(ListPtr *work_list, IRFunction *func,
         CALL(ListPtr, *work_list, push_back, /, succ);
     }
 }
+
 static void run_dce(LiveVarDA *live_var, struct IRFunction *func) {
     for (ListBoxBBNode *it = func->basic_blocks.head; it; it = it->next) {
         IRBasicBlock *bb = it->data;
@@ -72,5 +74,7 @@ bool MTD(IROptimizer, optimize_func_dead_code_eliminate, /,
     run_dce(&live_var, func);
     DROPOBJ(LiveVarDA, live_var);
     bool updated = CALL(IRFunction, *func, remove_dead_bb, /);
-    return CALL(IRFunction, *func, remove_dead_stmt, /) || updated;
+    updated = CALL(IRFunction, *func, remove_dead_stmt, /) || updated;
+    CALL(IRFunction, *func, reestablish, /);
+    return updated;
 }

@@ -31,6 +31,8 @@ typedef struct IRFunction {
 void MTD(IRFunction, init, /, String func_name, struct IRProgram *program);
 void MTD(IRFunction, drop, /);
 void MTD(IRFunction, add_stmt, /, IRStmtBase *stmt);
+
+// call reestablish after this function
 void NSMTD(IRFunction, try_strip_gotos, /, IRBasicBlock *bb, usize next_label);
 void MTD(IRFunction, add_label, /, usize label);
 void MTD(IRFunction, establish, /, struct TaskEngine *engine);
@@ -51,7 +53,9 @@ typedef bool (*IterBBCallback)(IRFunction *self, ListBoxBBNode *bb_it,
 
 void MTD(IRFunction, iter_bb, /, IterBBCallback callback, void *extra_args);
 
+// call reestablish after this function
 bool MTD(IRFunction, remove_dead_bb, /);
+// call reestablish after this function, if change any of the goto/if stmts
 bool MTD(IRFunction, remove_dead_stmt, /);
 
 void MTD(IRFunction, rename, /, Renamer *var_renamer, Renamer *label_renamer);

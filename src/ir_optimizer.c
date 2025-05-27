@@ -28,8 +28,10 @@ void MTD(IROptimizer, optimize_func, /, IRFunction *func) {
 
     while (CALL(IROptimizer, *self, optimize_func_dead_code_eliminate, /, func))
         ;
-    CALL(IROptimizer, *self, optimize_func_useless_label_strip, /, func);
-    CALL(IROptimizer, *self, optimize_func_dead_code_eliminate, /, func);
+    for (usize i = 0; i < 5; i++) {
+        CALL(IROptimizer, *self, optimize_func_useless_label_strip, /, func);
+        CALL(IROptimizer, *self, optimize_func_dead_code_eliminate, /, func);
+    }
 }
 
 bool MTD(IROptimizer, optimize_func_const_prop, /, IRFunction *func) {

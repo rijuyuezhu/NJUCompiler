@@ -272,32 +272,8 @@ void MTD(IRFunction, iter_bb, /, IterBBCallback callback, void *extra_args) {
     }
 }
 
-static bool MTD(IRFunction, remove_dead_bb_link_callback, /,
-                ListBoxBBNode *bb_it, ATTR_UNUSED void *extra_args) {
-    IRBasicBlock *bb = bb_it->data;
-    if (!bb->is_dead) {
-        ListPtr *pred = CALL(IRFunction, *self, get_pred, /, bb);
-        for (ListPtrNode *it = pred->head, *nxt = NULL; it; it = nxt) {
-            nxt = it->next;
-            IRBasicBlock *pred_bb = it->data;
-            if (pred_bb->is_dead) {
-                CALL(ListPtr, *pred, remove, /, it);
-            }
-        }
-        ListPtr *succ = CALL(IRFunction, *self, get_succ, /, bb);
-        for (ListPtrNode *it = succ->head, *nxt = NULL; it; it = nxt) {
-            nxt = it->next;
-            IRBasicBlock *succ_bb = it->data;
-            if (succ_bb->is_dead) {
-                CALL(ListPtr, *succ, remove, /, it);
-            }
-        }
-    }
-    return false;
-}
-
-static bool MTD(IRFunction, remove_dead_bb_itself_callback, /,
-                ListBoxBBNode *bb_it, void *extra_args) {
+static bool MTD(IRFunction, remove_dead_bb_callback, /, ListBoxBBNode *bb_it,
+                void *extra_args) {
     bool *updated = extra_args;
     if (bb_it->data->is_dead) {
         CALL(ListBoxBB, self->basic_blocks, remove, /, bb_it);
@@ -309,9 +285,7 @@ static bool MTD(IRFunction, remove_dead_bb_itself_callback, /,
 bool MTD(IRFunction, remove_dead_bb, /) {
     bool updated = false;
     CALL(IRFunction, *self, iter_bb, /,
-         MTDNAME(IRFunction, remove_dead_bb_link_callback), NULL);
-    CALL(IRFunction, *self, iter_bb, /,
-         MTDNAME(IRFunction, remove_dead_bb_itself_callback), &updated);
+         MTDNAME(IRFunction, remove_dead_bb_callback), &updated);
     return updated;
 }
 
@@ -364,6 +338,7 @@ void MTD(IRFunction, rename, /, Renamer *var_renamer, Renamer *label_renamer) {
             VCALL(IRStmtBase, *stmt, rename, /, var_renamer, label_renamer);
         }
     }
+    CALL(IRFunction, *self, reestablish, /);
 }
 
 DEFINE_MAPPING(MapVarToDecInfo, usize, DecInfo, FUNC_EXTERN);

@@ -15,7 +15,8 @@ static usize get_relabel(IRFunction *func, usize label) {
 }
 
 static void relabel_func(IRFunction *func) {
-    // give relabel to all BBs
+
+    // give relabel to all BBs (inherit from the next BB, backward)
     for (ListBoxBBNode *it = func->basic_blocks.tail; it; it = it->prev) {
         IRBasicBlock *bb = it->data;
         bb->tag = bb->label;
@@ -28,6 +29,23 @@ static void relabel_func(IRFunction *func) {
             if (nxt_bb->tag != (usize)-1) {
                 bb->tag = nxt_bb->tag;
             }
+        }
+    }
+
+    // forward the labels of empty BBs
+    for (ListBoxBBNode *it = func->basic_blocks.head; it; it = it->next) {
+        IRBasicBlock *bb = it->data;
+        if (bb->stmts.size != 0 || bb->tag == (usize)-1 ||
+            bb->label != bb->tag) {
+            continue;
+        }
+        ListBoxBBNode *nxt = it->next;
+        if (nxt) {
+            IRBasicBlock *nxt_bb = nxt->data;
+            ASSERT(nxt_bb->tag == (usize)-1);
+            nxt_bb->tag = bb->tag;
+            nxt_bb->label = bb->label;
+            bb->label = (usize)-1;
         }
     }
 
@@ -79,33 +97,40 @@ static void strip_unused_label(IRFunction *func) {
 
     for (ListBoxBBNode *it = func->basic_blocks.head; it; it = it->next) {
         IRBasicBlock *bb = it->data;
-        if (bb->label == (usize)-1) {
-            continue;
-        }
-        if (!CALL(SetUSize, used_labels, find_owned, /, bb->label)) {
+
+        // if the label is not used, set it to -1
+        if (bb->label != (usize)-1 &&
+            !CALL(SetUSize, used_labels, find_owned, /, bb->label)) {
             bb->label = (usize)-1;
+        }
+
+        // delete empty BBs that are not entry or exit
+        if (bb->stmts.size == 0 && bb != func->entry && bb != func->exit) {
+            ASSERT(bb->label == (usize)-1);
+            bb->is_dead = true;
         }
     }
     DROPOBJ(SetUSize, used_labels);
 }
 
 static void strip_gotos(IRFunction *func) {
+    IRBasicBlock *last_logical_bb = NULL;
     for (ListBoxBBNode *it = func->basic_blocks.head; it; it = it->next) {
         IRBasicBlock *bb = it->data;
-        if (bb->label == (usize)-1 || !it->prev) {
-            continue;
+        if (bb->label != (usize)-1 && last_logical_bb) {
+            NSCALL(IRFunction, try_strip_gotos, /, last_logical_bb, bb->label);
         }
-        IRBasicBlock *prev_bb = it->prev->data;
-        NSCALL(IRFunction, try_strip_gotos, /, prev_bb, bb->label);
+        if (bb->stmts.size != 0) {
+            last_logical_bb = bb;
+        }
     }
 }
 
 bool MTD(IROptimizer, optimize_func_useless_label_strip, /, IRFunction *func) {
+    strip_gotos(func);
     relabel_func(func);
     strip_unused_label(func);
-    strip_gotos(func);
-    // reestablish is necessary because we have changed the labels and
-    // statements
+    CALL(IRFunction, *func, remove_dead_bb, /);
     CALL(IRFunction, *func, reestablish, /);
     return true;
 }
