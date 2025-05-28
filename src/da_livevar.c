@@ -139,12 +139,12 @@ static void VMTD(LiveVarDA, dead_code_eliminate_bb_callback, /,
     }
 }
 
-void MTD(LiveVarDA, dead_code_eliminate_bb, /, IRBasicBlock *bb) {
-    CALL(DataflowAnalysisBase, *TOBASE(self), iter_bb, /, bb,
+bool MTD(LiveVarDA, dead_code_eliminate, /, IRFunction *func) {
+    CALL(DataflowAnalysisBase, *TOBASE(self), iter_func, /, func,
          MTDNAME(LiveVarDA, dead_code_eliminate_bb_callback), NULL);
-}
 
-void MTD(LiveVarDA, dead_code_eliminate_func_meta, /, IRFunction *func) {
+    // func meta elimination
+    bool updated = false;
     LVFact *lv_fact = CALL(LiveVarDA, *self, get_in_fact, /, func->entry);
 
     for (MapVarToDecInfoIterator
@@ -156,8 +156,10 @@ void MTD(LiveVarDA, dead_code_eliminate_func_meta, /, IRFunction *func) {
         if (!CALL(LVFact, *lv_fact, get, /, addr_var)) {
             // remove var from function
             CALL(MapVarToDecInfo, func->var_to_dec_info, erase, /, it);
+            updated = true;
         }
     }
+    return updated;
 }
 
 DEFINE_MAPPING(MapBBToLVFact, IRBasicBlock *, LVFact *, FUNC_EXTERN);

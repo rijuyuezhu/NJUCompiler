@@ -139,7 +139,7 @@ void MTD(AvaliExpDA, transfer_stmt, /, IRStmtBase *stmt, Any fact) {
     if (ae_fact->is_universal) {
         // universal fact happens on the initialization;
         // it is not convenient to delete elements from it;
-        // if the code is reachable, it will be not universal oneday;
+        // if the code is reachable, it will be not universal one day;
         // so we wait until then
         return;
     }
@@ -264,7 +264,7 @@ static void VMTD(AvaliExpDA, clean_redundant_exp_callback, /,
     if (aefact->is_universal) {
         // universal fact happens on the initialization;
         // it is not convenient to delete elements from it;
-        // if the code is reachable, it will be not universal oneday;
+        // if the code is reachable, it will be not universal one day;
         // so we wait until then
         return;
     }

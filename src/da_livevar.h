@@ -33,6 +33,5 @@ typedef struct LiveVarDA {
 } LiveVarDA;
 
 void MTD(LiveVarDA, init, /);
-void MTD(LiveVarDA, dead_code_eliminate_bb, /, IRBasicBlock *bb);
-void MTD(LiveVarDA, dead_code_eliminate_func_meta, /, IRFunction *func);
+bool MTD(LiveVarDA, dead_code_eliminate, /, IRFunction *func);
 DEFINE_DATAFLOW_ANALYSIS_STRUCT(LiveVarDA);

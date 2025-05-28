@@ -1,10 +1,10 @@
-#include "da_livevar.h"
 #include "da_solver.h"
 #include "ir_basic_block.h"
+#include "ir_function.h"
 #include "ir_optimizer.h"
 
 // call reestablish after this function
-static void dce_const_eval_add_worklist(ListPtr *work_list, IRFunction *func,
+static void cfo_const_eval_add_worklist(ListPtr *work_list, IRFunction *func,
                                         IRBasicBlock *bb) {
     usize choose_label = (usize)-1;
     if (bb->stmts.tail) {
@@ -47,7 +47,7 @@ static void dce_const_eval_add_worklist(ListPtr *work_list, IRFunction *func,
     }
 }
 
-static void run_dce(LiveVarDA *live_var, struct IRFunction *func) {
+static void run_cfo(struct IRFunction *func) {
     for (ListBoxBBNode *it = func->basic_blocks.head; it; it = it->next) {
         IRBasicBlock *bb = it->data;
         bb->is_dead = true;
@@ -60,22 +60,16 @@ static void run_dce(LiveVarDA *live_var, struct IRFunction *func) {
             continue;
         }
         bb->is_dead = false;
-        CALL(LiveVarDA, *live_var, dead_code_eliminate_bb, /, bb);
-        dce_const_eval_add_worklist(&work_list, func, bb);
+        cfo_const_eval_add_worklist(&work_list, func, bb);
     }
-    CALL(LiveVarDA, *live_var, dead_code_eliminate_func_meta, /, func);
     func->entry->is_dead = false;
     func->exit->is_dead = false;
 }
 
-bool MTD(IROptimizer, optimize_func_dead_code_eliminate, /,
+bool MTD(IROptimizer, optimize_func_control_flow_opt, /,
          struct IRFunction *func) {
-    LiveVarDA live_var = CREOBJ(LiveVarDA, /);
-    NSCALL(DAWorkListSolver, solve, /, TOBASE(&live_var), func);
-    run_dce(&live_var, func);
-    DROPOBJ(LiveVarDA, live_var);
+    run_cfo(func);
     bool updated = CALL(IRFunction, *func, remove_dead_bb, /);
-    updated = CALL(IRFunction, *func, remove_dead_stmt, /) || updated;
     CALL(IRFunction, *func, reestablish, /);
     return updated;
 }
