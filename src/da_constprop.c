@@ -165,20 +165,8 @@ void MTD(ConstPropDA, transfer_stmt, /, IRStmtBase *stmt, Any fact) {
             cpval2 = CALL(CPFact, *cpfact, get, /, src2.var);
         }
 
-        if (arith->aop == ArithopDiv && cpval2.kind == CPValueKindConst &&
-            cpval2.const_val == 0) {
-            eval = NSCALL(CPValue, get_undef, /);
-        } else if (arith->aop == ArithopMul &&
-                   ((cpval1.kind == CPValueKindConst &&
-                     cpval1.const_val == 0) ||
-                    (cpval2.kind == CPValueKindConst &&
-                     cpval2.const_val == 0))) {
-            eval = NSCALL(CPValue, get_const, /, 0);
-        } else if (arith->aop == ArithopDiv &&
-                   cpval1.kind == CPValueKindConst && cpval1.const_val == 0) {
-            eval = NSCALL(CPValue, get_const, /, 0);
-        } else if (cpval1.kind == CPValueKindConst &&
-                   cpval2.kind == CPValueKindConst) {
+        if (cpval1.kind == CPValueKindConst &&
+            cpval2.kind == CPValueKindConst) {
             switch (arith->aop) {
             case ArithopAdd:
                 eval = NSCALL(CPValue, get_const, /,
@@ -193,11 +181,17 @@ void MTD(ConstPropDA, transfer_stmt, /, IRStmtBase *stmt, Any fact) {
                               cpval1.const_val * cpval2.const_val);
                 break;
             case ArithopDiv:
-                eval = NSCALL(CPValue, get_const, /,
-                              cpval1.const_val / cpval2.const_val);
+                if (cpval2.const_val == 0) {
+                    // treat division by zero as 0; we do not use UNDEF
+                    // considering the monotonicity of the analysis
+                    eval = NSCALL(CPValue, get_const, /, 0);
+                } else {
+                    eval = NSCALL(CPValue, get_const, /,
+                                  cpval1.const_val / cpval2.const_val);
+                }
                 break;
             default:
-                ASSERT(false);
+                PANIC("Unsupported arith op %d", arith->aop);
             }
         } else if (cpval1.kind == CPValueKindNAC ||
                    cpval2.kind == CPValueKindNAC) {

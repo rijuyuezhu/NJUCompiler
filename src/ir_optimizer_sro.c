@@ -44,6 +44,12 @@ static bool MTD(IRFunction, optimize_func_simple_redundant_ops_callback, /,
                 *stmt = (IRStmtBase *)CREOBJHEAP(IRStmtAssign, /, dst, src1);
                 DROPOBJHEAP(IRStmtArith, arith);
                 *updated = true;
+            } else if ((src1.is_const && src1.const_val == 0) ||
+                       (src2.is_const && src2.const_val == 0)) {
+                IRValue zero = NSCALL(IRValue, from_const, /, 0);
+                *stmt = (IRStmtBase *)CREOBJHEAP(IRStmtAssign, /, dst, zero);
+                DROPOBJHEAP(IRStmtArith, arith);
+                *updated = true;
             }
         } else if (aop == ArithopDiv) {
             if (src2.is_const && src2.const_val == 1) {
@@ -54,6 +60,17 @@ static bool MTD(IRFunction, optimize_func_simple_redundant_ops_callback, /,
                        src1.var == src2.var) {
                 IRValue one = NSCALL(IRValue, from_const, /, 1);
                 *stmt = (IRStmtBase *)CREOBJHEAP(IRStmtAssign, /, dst, one);
+                DROPOBJHEAP(IRStmtArith, arith);
+                *updated = true;
+            } else if (src2.is_const && src2.const_val == 0) {
+                // treat division by zero as 0.
+                IRValue zero = NSCALL(IRValue, from_const, /, 0);
+                *stmt = (IRStmtBase *)CREOBJHEAP(IRStmtAssign, /, dst, zero);
+                DROPOBJHEAP(IRStmtArith, arith);
+                *updated = true;
+            } else if (src1.is_const && src1.const_val == 0) {
+                IRValue zero = NSCALL(IRValue, from_const, /, 0);
+                *stmt = (IRStmtBase *)CREOBJHEAP(IRStmtAssign, /, dst, zero);
                 DROPOBJHEAP(IRStmtArith, arith);
                 *updated = true;
             }

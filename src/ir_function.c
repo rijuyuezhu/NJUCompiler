@@ -250,24 +250,24 @@ void MTD(IRFunction, iter_stmt, /, IterStmtCallback callback,
     for (ListBoxBBNode *bb_it = self->basic_blocks.head; bb_it;
          bb_it = bb_it->next) {
         IRBasicBlock *bb = bb_it->data;
-        for (ListDynIRStmtNode *stmt_it = bb->stmts.head, *nxt = NULL; stmt_it;
-             stmt_it = nxt) {
-            nxt = stmt_it->next;
+        for (ListDynIRStmtNode *stmt_it = bb->stmts.head, *nxt_it = NULL;
+             stmt_it; stmt_it = nxt_it) {
+            nxt_it = stmt_it->next;
             bool has_inserted = callback(self, bb, stmt_it, extra_args);
             if (has_inserted) {
-                nxt = stmt_it->next;
+                nxt_it = stmt_it->next;
             }
         }
     }
 }
 
 void MTD(IRFunction, iter_bb, /, IterBBCallback callback, void *extra_args) {
-    for (ListBoxBBNode *bb_it = self->basic_blocks.head, *nxt = NULL; bb_it;
-         bb_it = nxt) {
-        nxt = bb_it->next;
+    for (ListBoxBBNode *bb_it = self->basic_blocks.head, *nxt_it = NULL; bb_it;
+         bb_it = nxt_it) {
+        nxt_it = bb_it->next;
         bool has_inserted = callback(self, bb_it, extra_args);
         if (has_inserted) {
-            nxt = bb_it->next;
+            nxt_it = bb_it->next;
         }
     }
 }

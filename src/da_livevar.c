@@ -144,4 +144,20 @@ void MTD(LiveVarDA, dead_code_eliminate_bb, /, IRBasicBlock *bb) {
          MTDNAME(LiveVarDA, dead_code_eliminate_bb_callback), NULL);
 }
 
+void MTD(LiveVarDA, dead_code_eliminate_func_meta, /, IRFunction *func) {
+    LVFact *lv_fact = CALL(LiveVarDA, *self, get_in_fact, /, func->entry);
+
+    for (MapVarToDecInfoIterator
+             it = CALL(MapVarToDecInfo, func->var_to_dec_info, begin, /),
+             nxt_it = NULL;
+         it; it = nxt_it) {
+        nxt_it = CALL(MapVarToDecInfo, func->var_to_dec_info, next, /, it);
+        usize addr_var = it->value.addr;
+        if (!CALL(LVFact, *lv_fact, get, /, addr_var)) {
+            // remove var from function
+            CALL(MapVarToDecInfo, func->var_to_dec_info, erase, /, it);
+        }
+    }
+}
+
 DEFINE_MAPPING(MapBBToLVFact, IRBasicBlock *, LVFact *, FUNC_EXTERN);

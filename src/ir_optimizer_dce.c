@@ -63,6 +63,7 @@ static void run_dce(LiveVarDA *live_var, struct IRFunction *func) {
         CALL(LiveVarDA, *live_var, dead_code_eliminate_bb, /, bb);
         dce_const_eval_add_worklist(&work_list, func, bb);
     }
+    CALL(LiveVarDA, *live_var, dead_code_eliminate_func_meta, /, func);
     func->entry->is_dead = false;
     func->exit->is_dead = false;
 }
