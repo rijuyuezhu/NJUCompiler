@@ -27,7 +27,8 @@ typedef struct LoopOpt {
     IRFunction *func;
 
     // some data structures
-    MapPtrPtr stmt_to_bb;
+    usize bb_info_acc;
+    MapStmtToBBInfo stmt_to_bb_info;
     MapUSizeToDynIRStmt param_to_stmt;
 
     // analysis
@@ -43,6 +44,7 @@ void MTD(LoopOpt, drop, /);
 
 // utils
 bool MTD(LoopOpt, is_dom_bb, /, IRBasicBlock *a, IRBasicBlock *b);
+bool MTD(LoopOpt, is_dom_stmt, /, IRStmtBase *a, IRStmtBase *b);
 IRBasicBlock *MTD(LoopOpt, get_bb, /, IRStmtBase *stmt);
 
 // prepare

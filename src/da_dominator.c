@@ -50,9 +50,9 @@ void MTD(DomFact, debug_print, /) {
     }
 }
 
-void MTD(DominatorDA, init, /, MapPtrPtr *stmt_to_bb) {
+void MTD(DominatorDA, init, /, MapStmtToBBInfo *stmt_to_bb_info) {
     CALL(DominatorDA, *self, base_init, /);
-    self->stmt_to_bb = stmt_to_bb;
+    self->stmt_to_bb_info = stmt_to_bb_info;
     CALL(MapBBToDomFact, self->in_facts, init, /);
     CALL(MapBBToDomFact, self->out_facts, init, /);
 }
@@ -132,10 +132,10 @@ void MTD(DominatorDA, transfer_stmt, /, IRStmtBase *stmt, Any fact) {
         // so we wait until then
         return;
     }
-    MapPtrPtrIterator it =
-        CALL(MapPtrPtr, *self->stmt_to_bb, find_owned, /, stmt);
+    MapStmtToBBInfoIterator it =
+        CALL(MapStmtToBBInfo, *self->stmt_to_bb_info, find_owned, /, stmt);
     ASSERT(it);
-    IRBasicBlock *bb = it->value;
+    IRBasicBlock *bb = it->value.bb;
     ASSERT(bb->stmts.head);
     if (bb->stmts.head->data == stmt) {
         CALL(SetPtr, dom_fact->doms, insert, /, bb, ZERO_SIZE);
@@ -166,3 +166,4 @@ void MTD(DominatorDA, debug_print, /, IRFunction *func) {
 }
 
 DEFINE_MAPPING(MapBBToDomFact, IRBasicBlock *, DomFact *, FUNC_EXTERN);
+DEFINE_MAPPING(MapStmtToBBInfo, IRStmtBase *, BBInfo, FUNC_EXTERN);

@@ -27,13 +27,22 @@ FUNC_STATIC DomFact *NSMTD(MapBBToDomFact, clone_value, /,
     PANIC("Disable clone");
 }
 
+typedef struct BBInfo {
+    IRBasicBlock *bb;
+    usize idx;
+} BBInfo;
+
+DECLARE_MAPPING(MapStmtToBBInfo, IRStmtBase *, BBInfo, FUNC_EXTERN,
+                GENERATOR_PLAIN_KEY, GENERATOR_PLAIN_VALUE,
+                GENERATOR_PLAIN_COMPARATOR);
+
 typedef struct DominatorDA {
     DataflowAnalysisBase base;
 
-    MapPtrPtr *stmt_to_bb;
+    MapStmtToBBInfo *stmt_to_bb_info;
     MapBBToDomFact in_facts;
     MapBBToDomFact out_facts;
 } DominatorDA;
-void MTD(DominatorDA, init, /, MapPtrPtr *stmt_to_bb);
+void MTD(DominatorDA, init, /, MapStmtToBBInfo *stmt_to_bb_info);
 void MTD(DominatorDA, prepare, /, IRFunction *func);
 DEFINE_DATAFLOW_ANALYSIS_STRUCT(DominatorDA);

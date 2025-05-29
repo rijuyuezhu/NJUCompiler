@@ -1,3 +1,4 @@
+#include "da_dominator.h"
 #include "da_reachdef.h"
 #include "general_container.h"
 #include "ir_basic_block.h"
@@ -8,6 +9,11 @@ typedef struct LICMEngine {
     LoopOpt *loop_opt;
     LoopInfo *loop_info;
 
+    // in-loop information
+    MapUSizeToSetPtr var_to_defs;
+    MapUSizeToSetPtr var_to_uses;
+    DomFact *dom_all_exit;
+
     // temps used to find invariants
     // invariant transition graph:
     // (a -> b): a is invaraint => b (possibly) is invariant
@@ -16,33 +22,95 @@ typedef struct LICMEngine {
     VecPtr itg_worklist;
 
     VecPtr invariants; //  of IRStmtBase *
+    VecPtr motions;    //  of IRStmtBase *
 
-    // in-loop information
-    MapUSizeToSetPtr var_to_defs;
-    MapUSizeToSetPtr var_to_uses;
 } LICMEngine;
 
 static void MTD(LICMEngine, init, /, LoopOpt *loop_opt, LoopInfo *loop_info) {
     self->loop_opt = loop_opt;
     self->loop_info = loop_info;
+    CALL(MapUSizeToSetPtr, self->var_to_defs, init, /);
+    CALL(MapUSizeToSetPtr, self->var_to_uses, init, /);
+    self->dom_all_exit = NULL;
     CALL(MapPtrToVecPtr, self->itg_succ, init, /);
     CALL(MapPtrUSize, self->itg_indeg, init, /);
     CALL(VecPtr, self->itg_worklist, init, /);
     CALL(VecPtr, self->invariants, init, /);
-    CALL(MapUSizeToSetPtr, self->var_to_defs, init, /);
-    CALL(MapUSizeToSetPtr, self->var_to_uses, init, /);
+    CALL(VecPtr, self->motions, init, /);
 }
 
 static void MTD(LICMEngine, drop, /) {
-    DROPOBJ(MapUSizeToSetPtr, self->var_to_uses);
-    DROPOBJ(MapUSizeToSetPtr, self->var_to_defs);
+    DROPOBJ(VecPtr, self->motions);
     DROPOBJ(VecPtr, self->invariants);
     DROPOBJ(VecPtr, self->itg_worklist);
     DROPOBJ(MapPtrUSize, self->itg_indeg);
     DROPOBJ(MapPtrToVecPtr, self->itg_succ);
+    DROPOBJHEAP(DomFact, self->dom_all_exit);
+    DROPOBJ(MapUSizeToSetPtr, self->var_to_uses);
+    DROPOBJ(MapUSizeToSetPtr, self->var_to_defs);
 }
 
-static void VMTD(ReachDefDA, find_invariant_callback, /,
+static void MTD(LICMEngine, add_info, /, IRStmtBase *stmt) {
+    usize def = VCALL(IRStmtBase, *stmt, get_def, /);
+    if (def != (usize)-1) {
+        MapUSizeToSetPtrIterator defstmts_iter =
+            CALL(MapUSizeToSetPtr, self->var_to_defs, find_owned, /, def);
+        if (!defstmts_iter) {
+            SetPtr empty_defstmts = CREOBJ(SetPtr, /);
+            MapUSizeToSetPtrInsertResult res =
+                CALL(MapUSizeToSetPtr, self->var_to_defs, insert, /, def,
+                     empty_defstmts);
+            ASSERT(res.inserted);
+            defstmts_iter = res.node;
+        }
+        SetPtr *defstmts = &defstmts_iter->value;
+        CALL(SetPtr, *defstmts, insert, /, stmt, ZERO_SIZE);
+    }
+
+    SliceIRValue uses = VCALL(IRStmtBase, *stmt, get_use, /);
+    for (usize i = 0; i < uses.size; i++) {
+        usize use = uses.data[i].var;
+        MapUSizeToSetPtrIterator usestmts_iter =
+            CALL(MapUSizeToSetPtr, self->var_to_uses, find_owned, /, use);
+        if (!usestmts_iter) {
+            SetPtr empty_usestmts = CREOBJ(SetPtr, /);
+            MapUSizeToSetPtrInsertResult res =
+                CALL(MapUSizeToSetPtr, self->var_to_uses, insert, /, use,
+                     empty_usestmts);
+            ASSERT(res.inserted);
+            usestmts_iter = res.node;
+        }
+        SetPtr *usestmts = &usestmts_iter->value;
+        CALL(SetPtr, *usestmts, insert, /, stmt, ZERO_SIZE);
+    }
+}
+
+static void MTD(LICMEngine, collect_info, /) {
+    // var_to_defs, var_to_uses
+    LoopInfo *loop_info = self->loop_info;
+    for (SetPtrIterator it = CALL(SetPtr, loop_info->nodes, begin, /); it;
+         it = CALL(SetPtr, loop_info->nodes, next, /, it)) {
+        IRBasicBlock *bb = it->key;
+        for (ListDynIRStmtNode *it_stmt = bb->stmts.head; it_stmt;
+             it_stmt = it_stmt->next) {
+            IRStmtBase *stmt = it_stmt->data;
+            CALL(LICMEngine, *self, add_info, /, stmt);
+        }
+    }
+
+    LoopOpt *loop_opt = self->loop_opt;
+    DominatorDA *dom_da = &loop_opt->dom_da;
+
+    self->dom_all_exit = CALL(DominatorDA, *dom_da, new_initial_fact, /);
+
+    for (usize i = 0; i < loop_info->exits.size; i++) {
+        IRBasicBlock *exit = loop_info->exits.data[i];
+        DomFact *exit_fact = CALL(DominatorDA, *dom_da, get_out_fact, /, exit);
+        CALL(DominatorDA, *dom_da, meet_into, /, exit_fact, self->dom_all_exit);
+    }
+}
+
+static void VMTD(ReachDefDA, find_invariants_callback, /,
                  ListDynIRStmtNode *iter, Any fact, void *extra_args) {
     LICMEngine *engine = extra_args;
     LoopInfo *loop_info = engine->loop_info;
@@ -120,7 +188,7 @@ static void VMTD(ReachDefDA, find_invariant_callback, /,
     }
 }
 
-static void MTD(LICMEngine, prepare_invariants, /) {
+static void MTD(LICMEngine, find_invariants, /) {
     ReachDefDA *reach_def_da = &self->loop_opt->reach_def_da;
     LoopInfo *loop_info = self->loop_info;
 
@@ -129,7 +197,7 @@ static void MTD(LICMEngine, prepare_invariants, /) {
          it = CALL(SetPtr, loop_info->nodes, next, /, it)) {
         IRBasicBlock *bb = it->key;
         CALL(DataflowAnalysisBase, *TOBASE(reach_def_da), iter_bb, /, bb,
-             MTDNAME(ReachDefDA, find_invariant_callback), self);
+             MTDNAME(ReachDefDA, find_invariants_callback), self);
     }
 
     // then topologically sort the invariants
@@ -155,24 +223,86 @@ static void MTD(LICMEngine, prepare_invariants, /) {
             }
         }
     }
-    // // debug output:
-    // printf("LICM invariants:\n");
-    // for (usize i = 0; i < self->invariants.size; i++) {
-    //     IRStmtBase *stmt = self->invariants.data[i];
-    //     String s = CREOBJ(String, /);
-    //     VCALL(IRStmtBase, *stmt, build_str, /, &s);
-    //     const char *str = STRING_C_STR(s);
-    //     printf("%s", str);
-    //     DROPOBJ(String, s);
-    // }
-    // printf("\n");
+    // debug output:
+    printf("LICM invariants:\n");
+    for (usize i = 0; i < self->invariants.size; i++) {
+        IRStmtBase *stmt = self->invariants.data[i];
+        String s = CREOBJ(String, /);
+        VCALL(IRStmtBase, *stmt, build_str, /, &s);
+        const char *str = STRING_C_STR(s);
+        printf("%s", str);
+        DROPOBJ(String, s);
+    }
+    printf("\n");
 }
 
-static void MTD(LICMEngine, prepare, /) {
-    CALL(LICMEngine, *self, prepare_invariants, /);
+static bool MTD(LICMEngine, check_motion, /, IRStmtBase *stmt) {
+    LoopOpt *loop_opt = self->loop_opt;
+
+    // check 1: stmt in blocks that dominates all the exits of the loop
+    IRBasicBlock *bb = CALL(LoopOpt, *loop_opt, get_bb, /, stmt);
+    if (!CALL(DomFact, *self->dom_all_exit, get, /, bb)) {
+        return false;
+    }
+
+    // check2: the def is not assigned to elsewhere in the loop
+    usize def = VCALL(IRStmtBase, *stmt, get_def, /);
+    ASSERT(def != (usize)-1, "def == -1 should not happen: the invariant "
+                             "should be an assign or arith stmt");
+    MapUSizeToSetPtrIterator defstmts_it =
+        CALL(MapUSizeToSetPtr, self->var_to_defs, find_owned, /, def);
+    ASSERT(defstmts_it);
+    SetPtr *defstmts = &defstmts_it->value;
+    if (defstmts->size > 1) {
+        return false;
+    }
+
+    // check3: dominates all use of def in the loop
+    MapUSizeToSetPtrIterator usestmts_it =
+        CALL(MapUSizeToSetPtr, self->var_to_uses, find_owned, /, def);
+    if (!usestmts_it) {
+        // no use, so it is ok
+        return true;
+    }
+    SetPtr *uses = &usestmts_it->value;
+    for (SetPtrIterator it = CALL(SetPtr, *uses, begin, /); it;
+         it = CALL(SetPtr, *uses, next, /, it)) {
+        IRStmtBase *use_stmt = it->key;
+        if (!CALL(LoopOpt, *loop_opt, is_dom_stmt, /, stmt, use_stmt) ||
+            stmt == use_stmt) {
+            return false;
+        }
+    }
+    return true;
 }
 
-static bool MTD(LICMEngine, optimize, /) { return false; }
+static void MTD(LICMEngine, find_motions, /) {
+    for (usize i = 0; i < self->invariants.size; i++) {
+        IRStmtBase *invariant = self->invariants.data[i];
+        if (CALL(LICMEngine, *self, check_motion, /, invariant)) {
+            CALL(VecPtr, self->motions, push_back, /, invariant);
+        }
+    }
+
+    // debug output:
+    printf("LICM motions:\n");
+    for (usize i = 0; i < self->motions.size; i++) {
+        IRStmtBase *stmt = self->motions.data[i];
+        String s = CREOBJ(String, /);
+        VCALL(IRStmtBase, *stmt, build_str, /, &s);
+        const char *str = STRING_C_STR(s);
+        printf("%s", str);
+        DROPOBJ(String, s);
+    }
+    printf("\n");
+}
+
+static bool MTD(LICMEngine, optimize, /) {
+    CALL(LICMEngine, *self, collect_info, /);
+    CALL(LICMEngine, *self, find_invariants, /);
+    CALL(LICMEngine, *self, find_motions, /);
+    return false;
+}
 
 bool MTD(LoopOpt, invariant_compute_motion, /) {
     bool updated = false;
@@ -181,7 +311,6 @@ bool MTD(LoopOpt, invariant_compute_motion, /) {
          it; it = CALL(MapHeaderToLoopInfo, self->loop_infos, next, /, it)) {
         LoopInfo *loop_info = &it->value;
         LICMEngine engine = CREOBJ(LICMEngine, /, self, loop_info);
-        CALL(LICMEngine, engine, prepare, /);
         updated = CALL(LICMEngine, engine, optimize, /) || updated;
         DROPOBJ(LICMEngine, engine);
     }

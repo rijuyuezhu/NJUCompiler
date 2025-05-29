@@ -3,15 +3,21 @@
 
 static bool MTD(IRFunction, prepare_stmt_to_bb_callback, /, IRBasicBlock *bb,
                 ListDynIRStmtNode *iter, void *extra_args) {
-    MapPtrPtr *stmt_to_bb = extra_args;
+    LoopOpt *loop_opt = extra_args;
+    MapStmtToBBInfo *stmt_to_bb_info = &loop_opt->stmt_to_bb_info;
+    usize bb_info_idx = loop_opt->bb_info_acc++;
     IRStmtBase *stmt = iter->data;
-    CALL(MapPtrPtr, *stmt_to_bb, insert, /, stmt, bb);
+    CALL(MapStmtToBBInfo, *stmt_to_bb_info, insert, /, stmt,
+         (BBInfo){
+             .bb = bb,
+             .idx = bb_info_idx,
+         });
     return false;
 }
 
 static void MTD(LoopOpt, prepare_stmt_to_bb, /) {
     CALL(IRFunction, *self->func, iter_stmt, /,
-         MTDNAME(IRFunction, prepare_stmt_to_bb_callback), &self->stmt_to_bb);
+         MTDNAME(IRFunction, prepare_stmt_to_bb_callback), self);
 }
 
 static void MTD(LoopOpt, prepare_param_to_stmt, /) {
@@ -22,7 +28,9 @@ static void MTD(LoopOpt, prepare_param_to_stmt, /) {
         IRStmtBase *stmt = (IRStmtBase *)CREOBJHEAP(IRStmtCall, /, param,
                                                     func_name, empty_args);
         CALL(MapUSizeToDynIRStmt, self->param_to_stmt, insert, /, param, stmt);
-        CALL(MapPtrPtr, self->stmt_to_bb, insert, /, stmt, self->func->entry);
+        usize bb_info_idx = self->bb_info_acc++;
+        CALL(MapStmtToBBInfo, self->stmt_to_bb_info, insert, /, stmt,
+             (BBInfo){.bb = self->func->entry, .idx = bb_info_idx});
     }
 }
 
@@ -105,26 +113,26 @@ static void MTD(LoopOpt, prepare_find_loop_nodes, /, IRBasicBlock *header,
             IRBasicBlock *succ_bb = it_succ->data;
             if (succ_bb->tag != col) {
                 // this is an exit
-                CALL(VecPtr, loop_info->exits, push_back, /, succ_bb);
+                CALL(VecPtr, loop_info->exits, push_back, /, bb);
             }
         }
     }
 
-    // // (debug)
-    // printf("Loop [%p]:\n", header);
-    // printf("  Body: ");
-    // for (SetPtrIterator it = CALL(SetPtr, loop_info->nodes, begin, /); it;
-    //      it = CALL(SetPtr, loop_info->nodes, next, /, it)) {
-    //     IRBasicBlock *bb = it->key;
-    //     printf("%p ", bb);
-    // }
-    // printf("\n");
-    // printf("  Exits: ");
-    // for (usize i = 0; i < loop_info->exits.size; i++) {
-    //     IRBasicBlock *bb = loop_info->exits.data[i];
-    //     printf("%p ", bb);
-    // }
-    // printf("\n");
+    // (debug)
+    printf("Loop [%p]:\n", header);
+    printf("  Body: ");
+    for (SetPtrIterator it = CALL(SetPtr, loop_info->nodes, begin, /); it;
+         it = CALL(SetPtr, loop_info->nodes, next, /, it)) {
+        IRBasicBlock *bb = it->key;
+        printf("%p ", bb);
+    }
+    printf("\n");
+    printf("  Exits: ");
+    for (usize i = 0; i < loop_info->exits.size; i++) {
+        IRBasicBlock *bb = loop_info->exits.data[i];
+        printf("%p ", bb);
+    }
+    printf("\n");
 }
 
 static void MTD(LoopOpt, prepare_loop_infos, /) {
@@ -178,7 +186,7 @@ void MTD(LoopOpt, prepare, /) {
 
     // analysis
     NSCALL(DAWorkListSolver, solve, /, TOBASE(&self->dom_da), self->func);
-    // CALL(DominatorDA, self->dom_da, debug_print, /, self->func);
+    CALL(DominatorDA, self->dom_da, debug_print, /, self->func);
     NSCALL(DAWorkListSolver, solve, /, TOBASE(&self->reach_def_da), self->func);
     // CALL(ReachDefDA, self->reach_def_da, debug_print, /, self->func);
 
