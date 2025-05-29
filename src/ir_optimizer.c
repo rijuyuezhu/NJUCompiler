@@ -36,6 +36,9 @@ void MTD(IROptimizer, optimize_func, /, IRFunction *func) {
     //     CALL(IROptimizer, *self, optimize_func_useless_label_strip, /, func);
     //     CALL(IROptimizer, *self, optimize_func_dead_code_eliminate, /, func);
     // }
+    // CALL(IROptimizer, *self, optimize_func_control_flow_opt, /, func);
+    // CALL(IROptimizer, *self, optimize_func_useless_label_strip, /, func);
+    // CALL(IROptimizer, *self, optimize_func_dead_code_eliminate, /, func);
     CALL(IROptimizer, *self, optimize_loop, /, func);
 }
 
