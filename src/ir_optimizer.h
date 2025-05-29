@@ -24,3 +24,4 @@ bool MTD(IROptimizer, optimize_func_useless_label_strip, /,
          struct IRFunction *func);
 bool MTD(IROptimizer, optimize_func_dead_code_eliminate, /,
          struct IRFunction *func);
+bool MTD(IROptimizer, optimize_loop, /, struct IRFunction *func);

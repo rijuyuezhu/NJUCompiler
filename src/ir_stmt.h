@@ -5,6 +5,7 @@
 #include "renamer.h"
 #include "str.h"
 #include "tem_list.h"
+#include "tem_map.h"
 #include "utils.h"
 
 typedef struct SliceIRValue {
@@ -209,6 +210,18 @@ FUNC_STATIC void NSMTD(ListDynIRStmt, drop_value, /, IRStmtBase **value) {
     VDROPOBJHEAP(IRStmtBase, *value);
 }
 FUNC_STATIC IRStmtBase *NSMTD(ListDynIRStmt, clone_value, /,
+                              ATTR_UNUSED IRStmtBase *const *other) {
+    PANIC("Disable clone");
+}
+
+DECLARE_MAPPING(MapUSizeToDynIRStmt, usize, IRStmtBase *, FUNC_EXTERN,
+                GENERATOR_PLAIN_KEY, GENERATOR_CUSTOM_VALUE,
+                GENERATOR_PLAIN_COMPARATOR);
+
+FUNC_STATIC void NSMTD(MapUSizeToDynIRStmt, drop_value, /, IRStmtBase **value) {
+    VDROPOBJHEAP(IRStmtBase, *value);
+}
+FUNC_STATIC IRStmtBase *NSMTD(MapUSizeToDynIRStmt, clone_value, /,
                               ATTR_UNUSED IRStmtBase *const *other) {
     PANIC("Disable clone");
 }

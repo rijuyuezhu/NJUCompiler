@@ -1,6 +1,7 @@
 #pragma once
 #include "general_container.h"
 #include "ir_stmt.h"
+#include "tem_memory_primitive.h"
 
 // IRBasicBlock
 typedef struct IRBasicBlock {

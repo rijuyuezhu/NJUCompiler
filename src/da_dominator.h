@@ -30,10 +30,10 @@ FUNC_STATIC DomFact *NSMTD(MapBBToDomFact, clone_value, /,
 typedef struct DominatorDA {
     DataflowAnalysisBase base;
 
-    MapPtrPtr stmt_to_bb;
+    MapPtrPtr *stmt_to_bb;
     MapBBToDomFact in_facts;
     MapBBToDomFact out_facts;
 } DominatorDA;
-void MTD(DominatorDA, init, /);
+void MTD(DominatorDA, init, /, MapPtrPtr *stmt_to_bb);
 void MTD(DominatorDA, prepare, /, IRFunction *func);
 DEFINE_DATAFLOW_ANALYSIS_STRUCT(DominatorDA);

@@ -139,14 +139,14 @@ void MTD(ConstPropDA, transfer_stmt, /, IRStmtBase *stmt, Any fact) {
     if (def == (usize)-1) {
         return;
     }
-    CPFact *cpfact = fact;
+    CPFact *cp_fact = fact;
     CPValue eval;
     if (stmt->kind == IRStmtKindAssign) {
         IRValue src = ((IRStmtAssign *)stmt)->src;
         if (src.is_const) {
             eval = NSCALL(CPValue, get_const, /, src.const_val);
         } else {
-            eval = CALL(CPFact, *cpfact, get, /, src.var);
+            eval = CALL(CPFact, *cp_fact, get, /, src.var);
         }
     } else if (stmt->kind == IRStmtKindArith) {
         IRStmtArith *arith = (IRStmtArith *)stmt;
@@ -157,12 +157,12 @@ void MTD(ConstPropDA, transfer_stmt, /, IRStmtBase *stmt, Any fact) {
         if (src1.is_const) {
             cpval1 = NSCALL(CPValue, get_const, /, src1.const_val);
         } else {
-            cpval1 = CALL(CPFact, *cpfact, get, /, src1.var);
+            cpval1 = CALL(CPFact, *cp_fact, get, /, src1.var);
         }
         if (src2.is_const) {
             cpval2 = NSCALL(CPValue, get_const, /, src2.const_val);
         } else {
-            cpval2 = CALL(CPFact, *cpfact, get, /, src2.var);
+            cpval2 = CALL(CPFact, *cp_fact, get, /, src2.var);
         }
 
         if (cpval1.kind == CPValueKindConst &&
@@ -202,7 +202,7 @@ void MTD(ConstPropDA, transfer_stmt, /, IRStmtBase *stmt, Any fact) {
     } else {
         eval = NSCALL(CPValue, get_nac, /);
     }
-    CALL(CPFact, *cpfact, update, /, def, eval);
+    CALL(CPFact, *cp_fact, update, /, def, eval);
 }
 
 void MTD(ConstPropDA, debug_print, /, IRFunction *func) {

@@ -2,11 +2,11 @@
 #include "da_avaliexp.h"
 #include "da_constprop.h"
 #include "da_copyprop.h"
-#include "da_dominator.h"
 #include "da_livevar.h"
 #include "da_solver.h"
 #include "ir_function.h"
 #include "ir_program.h"
+#include "loop_opt.h"
 #include "utils.h"
 
 void MTD(IROptimizer, init, /, IRProgram *program) { self->program = program; }
@@ -36,12 +36,7 @@ void MTD(IROptimizer, optimize_func, /, IRFunction *func) {
     //     CALL(IROptimizer, *self, optimize_func_useless_label_strip, /, func);
     //     CALL(IROptimizer, *self, optimize_func_dead_code_eliminate, /, func);
     // }
-
-    DominatorDA dom_da = CREOBJ(DominatorDA, /);
-    CALL(DominatorDA, dom_da, prepare, /, func);
-    NSCALL(DAWorkListSolver, solve, /, TOBASE(&dom_da), func);
-    // CALL(DominatorDA, dom_da, debug_print, /, func);
-    DROPOBJ(DominatorDA, dom_da);
+    CALL(IROptimizer, *self, optimize_loop, /, func);
 }
 
 bool MTD(IROptimizer, optimize_func_const_prop, /, IRFunction *func) {
@@ -76,5 +71,14 @@ bool MTD(IROptimizer, optimize_func_dead_code_eliminate, /,
     bool updated = CALL(LiveVarDA, live_var, dead_code_eliminate, /, func);
     updated = CALL(IRFunction, *func, remove_dead_stmt, /) || updated;
     DROPOBJ(LiveVarDA, live_var);
+    return updated;
+}
+
+bool MTD(IROptimizer, optimize_loop, /, IRFunction *func) {
+    LoopOpt loop_opt = CREOBJ(LoopOpt, /, func);
+    CALL(LoopOpt, loop_opt, prepare, /);
+    bool updated = CALL(LoopOpt, loop_opt, invariant_compute_motion, /);
+    updated = CALL(LoopOpt, loop_opt, induction_var_optimize, /) || updated;
+    DROPOBJ(LoopOpt, loop_opt);
     return updated;
 }

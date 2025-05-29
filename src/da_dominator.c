@@ -50,9 +50,9 @@ void MTD(DomFact, debug_print, /) {
     }
 }
 
-void MTD(DominatorDA, init, /) {
+void MTD(DominatorDA, init, /, MapPtrPtr *stmt_to_bb) {
     CALL(DominatorDA, *self, base_init, /);
-    CALL(MapPtrPtr, self->stmt_to_bb, init, /);
+    self->stmt_to_bb = stmt_to_bb;
     CALL(MapBBToDomFact, self->in_facts, init, /);
     CALL(MapBBToDomFact, self->out_facts, init, /);
 }
@@ -60,7 +60,6 @@ void MTD(DominatorDA, init, /) {
 void MTD(DominatorDA, drop, /) {
     DROPOBJ(MapBBToDomFact, self->out_facts);
     DROPOBJ(MapBBToDomFact, self->in_facts);
-    DROPOBJ(MapPtrPtr, self->stmt_to_bb);
 }
 
 bool MTD(DominatorDA, is_forward, /) { return true; }
@@ -134,7 +133,7 @@ void MTD(DominatorDA, transfer_stmt, /, IRStmtBase *stmt, Any fact) {
         return;
     }
     MapPtrPtrIterator it =
-        CALL(MapPtrPtr, self->stmt_to_bb, find_owned, /, stmt);
+        CALL(MapPtrPtr, *self->stmt_to_bb, find_owned, /, stmt);
     ASSERT(it);
     IRBasicBlock *bb = it->value;
     ASSERT(bb->stmts.head);
@@ -164,19 +163,6 @@ void MTD(DominatorDA, debug_print, /, IRFunction *func) {
         CALL(DomFact, *out_facts, debug_print, /);
         printf("\n");
     }
-}
-
-static bool MTD(IRFunction, prepare_stmt_to_bb_callback, /, IRBasicBlock *bb,
-                ListDynIRStmtNode *iter, void *extra_args) {
-    MapPtrPtr *stmt_to_bb = extra_args;
-    IRStmtBase *stmt = iter->data;
-    CALL(MapPtrPtr, *stmt_to_bb, insert, /, stmt, bb);
-    return false;
-}
-
-void MTD(DominatorDA, prepare, /, IRFunction *func) {
-    CALL(IRFunction, *func, iter_stmt, /,
-         MTDNAME(IRFunction, prepare_stmt_to_bb_callback), &self->stmt_to_bb);
 }
 
 DEFINE_MAPPING(MapBBToDomFact, IRBasicBlock *, DomFact *, FUNC_EXTERN);

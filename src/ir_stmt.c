@@ -376,3 +376,4 @@ void MTD(IRStmtWrite, rename, /, Renamer *var_renamer,
 
 DEFINE_PLAIN_VEC(VecIRValue, IRValue, FUNC_EXTERN)
 DEFINE_LIST(ListDynIRStmt, IRStmtBase *, FUNC_EXTERN);
+DEFINE_MAPPING(MapUSizeToDynIRStmt, usize, IRStmtBase *, FUNC_EXTERN);
