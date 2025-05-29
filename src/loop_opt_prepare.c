@@ -22,6 +22,7 @@ static void MTD(LoopOpt, prepare_param_to_stmt, /) {
         IRStmtBase *stmt = (IRStmtBase *)CREOBJHEAP(IRStmtCall, /, param,
                                                     func_name, empty_args);
         CALL(MapUSizeToDynIRStmt, self->param_to_stmt, insert, /, param, stmt);
+        CALL(MapPtrPtr, self->stmt_to_bb, insert, /, stmt, self->func->entry);
     }
 }
 
@@ -61,12 +62,11 @@ static void MTD(LoopOpt, loop_infos_try_find_backedge, /, IRBasicBlock *fr,
     }
     LoopInfo *loop_info = &it->value;
     CALL(VecPtr, loop_info->backedge_starts, push_back, /, fr);
-    printf("be [%p -> %p]\n", fr, to);
 }
 
 static void MTD(LoopOpt, prepare_find_loop_nodes, /, IRBasicBlock *header,
                 LoopInfo *loop_info, usize col) {
-    CALL(VecPtr, loop_info->nodes, push_back, /, header);
+    CALL(SetPtr, loop_info->nodes, insert, /, header, ZERO_SIZE);
     header->tag = col;
 
     VecPtr work_stack = CREOBJ(VecPtr, /);
@@ -83,7 +83,7 @@ static void MTD(LoopOpt, prepare_find_loop_nodes, /, IRBasicBlock *header,
             continue;
         }
         now->tag = col;
-        CALL(VecPtr, loop_info->nodes, push_back, /, now);
+        CALL(SetPtr, loop_info->nodes, insert, /, now, ZERO_SIZE);
         ListPtr *pred = CALL(IRFunction, *self->func, get_pred, /, now);
         for (ListPtrNode *it = pred->head; it; it = it->next) {
             IRBasicBlock *pred_bb = it->data;
@@ -96,11 +96,13 @@ static void MTD(LoopOpt, prepare_find_loop_nodes, /, IRBasicBlock *header,
     }
 
     // find exits by the way
-    for (usize i = 0; i < loop_info->nodes.size; i++) {
-        IRBasicBlock *bb = loop_info->nodes.data[i];
+    for (SetPtrIterator it = CALL(SetPtr, loop_info->nodes, begin, /); it;
+         it = CALL(SetPtr, loop_info->nodes, next, /, it)) {
+        IRBasicBlock *bb = it->key;
         ListPtr *succ = CALL(IRFunction, *self->func, get_succ, /, bb);
-        for (ListPtrNode *it = succ->head; it; it = it->next) {
-            IRBasicBlock *succ_bb = it->data;
+        for (ListPtrNode *it_succ = succ->head; it_succ;
+             it_succ = it_succ->next) {
+            IRBasicBlock *succ_bb = it_succ->data;
             if (succ_bb->tag != col) {
                 // this is an exit
                 CALL(VecPtr, loop_info->exits, push_back, /, succ_bb);
@@ -108,20 +110,21 @@ static void MTD(LoopOpt, prepare_find_loop_nodes, /, IRBasicBlock *header,
         }
     }
 
-    // (debug)
-    printf("Loop [%p]:\n", header);
-    printf("  Body: ");
-    for (usize i = 0; i < loop_info->nodes.size; i++) {
-        IRBasicBlock *bb = loop_info->nodes.data[i];
-        printf("%p ", bb);
-    }
-    printf("\n");
-    printf("  Exits: ");
-    for (usize i = 0; i < loop_info->exits.size; i++) {
-        IRBasicBlock *bb = loop_info->exits.data[i];
-        printf("%p ", bb);
-    }
-    printf("\n");
+    // // (debug)
+    // printf("Loop [%p]:\n", header);
+    // printf("  Body: ");
+    // for (SetPtrIterator it = CALL(SetPtr, loop_info->nodes, begin, /); it;
+    //      it = CALL(SetPtr, loop_info->nodes, next, /, it)) {
+    //     IRBasicBlock *bb = it->key;
+    //     printf("%p ", bb);
+    // }
+    // printf("\n");
+    // printf("  Exits: ");
+    // for (usize i = 0; i < loop_info->exits.size; i++) {
+    //     IRBasicBlock *bb = loop_info->exits.data[i];
+    //     printf("%p ", bb);
+    // }
+    // printf("\n");
 }
 
 static void MTD(LoopOpt, prepare_loop_infos, /) {
@@ -175,8 +178,9 @@ void MTD(LoopOpt, prepare, /) {
 
     // analysis
     NSCALL(DAWorkListSolver, solve, /, TOBASE(&self->dom_da), self->func);
+    // CALL(DominatorDA, self->dom_da, debug_print, /, self->func);
     NSCALL(DAWorkListSolver, solve, /, TOBASE(&self->reach_def_da), self->func);
-    CALL(ReachDefDA, self->reach_def_da, debug_print, /, self->func);
+    // CALL(ReachDefDA, self->reach_def_da, debug_print, /, self->func);
 
     // find loops
     CALL(LoopOpt, *self, prepare_loop_infos, /);

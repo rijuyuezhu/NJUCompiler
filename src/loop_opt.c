@@ -4,12 +4,12 @@ void MTD(LoopInfo, init, /, IRFunction *func, IRBasicBlock *header) {
     self->func = func;
     self->header = header;
     CALL(VecPtr, self->backedge_starts, init, /);
-    CALL(VecPtr, self->nodes, init, /);
+    CALL(SetPtr, self->nodes, init, /);
     CALL(VecPtr, self->exits, init, /);
 }
 void MTD(LoopInfo, drop, /) {
     DROPOBJ(VecPtr, self->exits);
-    DROPOBJ(VecPtr, self->nodes);
+    DROPOBJ(SetPtr, self->nodes);
     DROPOBJ(VecPtr, self->backedge_starts);
 }
 

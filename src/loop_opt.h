@@ -11,7 +11,7 @@ typedef struct LoopInfo {
     IRFunction *func;
     IRBasicBlock *header;
     VecPtr backedge_starts;
-    VecPtr nodes;
+    SetPtr nodes;
     VecPtr exits;
 } LoopInfo;
 
@@ -43,6 +43,7 @@ void MTD(LoopOpt, drop, /);
 
 // utils
 bool MTD(LoopOpt, is_dom_bb, /, IRBasicBlock *a, IRBasicBlock *b);
+IRBasicBlock *MTD(LoopOpt, get_bb, /, IRStmtBase *stmt);
 
 // prepare
 void MTD(LoopOpt, prepare, /);

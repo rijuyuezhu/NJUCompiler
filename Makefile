@@ -1,6 +1,6 @@
 export WORK_DIR = $(shell pwd)
 export BUILD_DIR = $(WORK_DIR)/build
-export CFLAGS = -I$(WORK_DIR)/src -Wall -Wextra -g -std=c99
+export CFLAGS = -I$(WORK_DIR)/src -Wall -Wextra -g -ggdb -std=c99
 export VALGRIND_ARGS = --leak-check=yes --show-leak-kinds=all --errors-for-leak-kinds=all --exit-on-first-error=yes --error-exitcode=1 -q
 export ARGS
 
