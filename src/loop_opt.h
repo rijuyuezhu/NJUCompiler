@@ -10,13 +10,19 @@
 typedef struct LoopInfo {
     IRFunction *func;
     IRBasicBlock *header;
+    IRBasicBlock *preheader;
     VecPtr backedge_starts;
     SetPtr nodes;
     VecPtr exits;
+
+    // temp data used for LICM
+    ListPtr licm_motions;
 } LoopInfo;
 
 void MTD(LoopInfo, init, /, IRFunction *func, IRBasicBlock *header);
 void MTD(LoopInfo, drop, /);
+void MTD(LoopInfo, ensure_preheader, /);
+
 DELETED_CLONER(LoopInfo, FUNC_STATIC);
 
 DECLARE_MAPPING(MapHeaderToLoopInfo, IRBasicBlock *, LoopInfo, FUNC_EXTERN,
@@ -37,6 +43,7 @@ typedef struct LoopOpt {
 
     // loop infos
     MapHeaderToLoopInfo loop_infos;
+    VecPtr loop_infos_ordered; // Ordered by increasing nodes size
 } LoopOpt;
 
 void MTD(LoopOpt, init, /, IRFunction *func);
@@ -50,6 +57,7 @@ IRBasicBlock *MTD(LoopOpt, get_bb, /, IRStmtBase *stmt);
 // prepare
 void MTD(LoopOpt, prepare, /);
 
-// optimize
+// optimize; must call fix_preheader after these optimizations;
 bool MTD(LoopOpt, invariant_compute_motion, /);
 bool MTD(LoopOpt, induction_var_optimize, /);
+void MTD(LoopOpt, fix_preheader, /);

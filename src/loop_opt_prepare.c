@@ -1,5 +1,6 @@
 #include "da_solver.h"
 #include "loop_opt.h"
+#include "stdlib.h"
 
 static bool MTD(IRFunction, prepare_stmt_to_bb_callback, /, IRBasicBlock *bb,
                 ListDynIRStmtNode *iter, void *extra_args) {
@@ -14,7 +15,6 @@ static bool MTD(IRFunction, prepare_stmt_to_bb_callback, /, IRBasicBlock *bb,
          });
     return false;
 }
-
 static void MTD(LoopOpt, prepare_stmt_to_bb, /) {
     CALL(IRFunction, *self->func, iter_stmt, /,
          MTDNAME(IRFunction, prepare_stmt_to_bb_callback), self);
@@ -102,6 +102,7 @@ static void MTD(LoopOpt, prepare_find_loop_nodes, /, IRBasicBlock *header,
             CALL(VecPtr, work_stack, push_back, /, pred_bb);
         }
     }
+    DROPOBJ(VecPtr, work_stack);
 
     // find exits by the way
     for (SetPtrIterator it = CALL(SetPtr, loop_info->nodes, begin, /); it;
@@ -117,22 +118,6 @@ static void MTD(LoopOpt, prepare_find_loop_nodes, /, IRBasicBlock *header,
             }
         }
     }
-
-    // (debug)
-    printf("Loop [%p]:\n", header);
-    printf("  Body: ");
-    for (SetPtrIterator it = CALL(SetPtr, loop_info->nodes, begin, /); it;
-         it = CALL(SetPtr, loop_info->nodes, next, /, it)) {
-        IRBasicBlock *bb = it->key;
-        printf("%p ", bb);
-    }
-    printf("\n");
-    printf("  Exits: ");
-    for (usize i = 0; i < loop_info->exits.size; i++) {
-        IRBasicBlock *bb = loop_info->exits.data[i];
-        printf("%p ", bb);
-    }
-    printf("\n");
 }
 
 static void MTD(LoopOpt, prepare_loop_infos, /) {
@@ -179,6 +164,24 @@ static void MTD(LoopOpt, prepare_loop_infos, /) {
     }
 }
 
+static int loop_infos_cmp(const void *a, const void *b) {
+    LoopInfo *loop_info_a = *(LoopInfo **)a;
+    LoopInfo *loop_info_b = *(LoopInfo **)b;
+    return NORMALCMP(loop_info_a->nodes.size, loop_info_b->nodes.size);
+}
+
+static void MTD(LoopOpt, get_loop_infos_ordered, /) {
+    for (MapHeaderToLoopInfoIterator it =
+             CALL(MapHeaderToLoopInfo, self->loop_infos, begin, /);
+         it; it = CALL(MapHeaderToLoopInfo, self->loop_infos, next, /, it)) {
+        LoopInfo *loop_info = &it->value;
+        CALL(VecPtr, self->loop_infos_ordered, push_back, /, loop_info);
+    }
+    // sort by increasing nodes size
+    qsort(self->loop_infos_ordered.data, self->loop_infos_ordered.size,
+          sizeof(void *), loop_infos_cmp);
+}
+
 void MTD(LoopOpt, prepare, /) {
     // data structures
     CALL(LoopOpt, *self, prepare_stmt_to_bb, /);
@@ -186,10 +189,9 @@ void MTD(LoopOpt, prepare, /) {
 
     // analysis
     NSCALL(DAWorkListSolver, solve, /, TOBASE(&self->dom_da), self->func);
-    CALL(DominatorDA, self->dom_da, debug_print, /, self->func);
     NSCALL(DAWorkListSolver, solve, /, TOBASE(&self->reach_def_da), self->func);
-    // CALL(ReachDefDA, self->reach_def_da, debug_print, /, self->func);
 
     // find loops
     CALL(LoopOpt, *self, prepare_loop_infos, /);
+    CALL(LoopOpt, *self, get_loop_infos_ordered, /);
 }

@@ -19,27 +19,23 @@ void MTD(IROptimizer, optimize, /) {
 }
 
 void MTD(IROptimizer, optimize_func, /, IRFunction *func) {
-    // for (usize i = 0; i < 5; i++) {
-    //     CALL(IROptimizer, *self, optimize_func_const_prop, /, func);
-    //     CALL(IROptimizer, *self, optimize_func_control_flow_opt, /, func);
-    //     CALL(IROptimizer, *self, optimize_func_simple_redundant_ops, /,
-    //     func); CALL(IROptimizer, *self, optimize_func_copy_prop, /, func);
-    //     CALL(IROptimizer, *self, optimize_func_avali_exp, /, func);
-    //     CALL(IROptimizer, *self, optimize_func_copy_prop, /, func);
-    //     CALL(IROptimizer, *self, optimize_func_dead_code_eliminate, /, func);
-    // }
-    //
-    // while (CALL(IROptimizer, *self, optimize_func_dead_code_eliminate, /,
-    // func))
-    //     ;
-    // for (usize i = 0; i < 5; i++) {
-    //     CALL(IROptimizer, *self, optimize_func_useless_label_strip, /, func);
-    //     CALL(IROptimizer, *self, optimize_func_dead_code_eliminate, /, func);
-    // }
-    // CALL(IROptimizer, *self, optimize_func_control_flow_opt, /, func);
-    // CALL(IROptimizer, *self, optimize_func_useless_label_strip, /, func);
-    // CALL(IROptimizer, *self, optimize_func_dead_code_eliminate, /, func);
-    CALL(IROptimizer, *self, optimize_loop, /, func);
+    for (usize i = 0; i < 5; i++) {
+        CALL(IROptimizer, *self, optimize_func_const_prop, /, func);
+        CALL(IROptimizer, *self, optimize_func_control_flow_opt, /, func);
+        CALL(IROptimizer, *self, optimize_func_simple_redundant_ops, /, func);
+        CALL(IROptimizer, *self, optimize_func_copy_prop, /, func);
+        CALL(IROptimizer, *self, optimize_func_avali_exp, /, func);
+        CALL(IROptimizer, *self, optimize_func_copy_prop, /, func);
+        CALL(IROptimizer, *self, optimize_func_dead_code_eliminate, /, func);
+    }
+
+    while (CALL(IROptimizer, *self, optimize_func_dead_code_eliminate, /, func))
+        ;
+    CALL(IROptimizer, *self, optimize_licm, /, func);
+    for (usize i = 0; i < 5; i++) {
+        CALL(IROptimizer, *self, optimize_func_useless_label_strip, /, func);
+        CALL(IROptimizer, *self, optimize_func_dead_code_eliminate, /, func);
+    }
 }
 
 bool MTD(IROptimizer, optimize_func_const_prop, /, IRFunction *func) {
@@ -77,11 +73,10 @@ bool MTD(IROptimizer, optimize_func_dead_code_eliminate, /,
     return updated;
 }
 
-bool MTD(IROptimizer, optimize_loop, /, IRFunction *func) {
+bool MTD(IROptimizer, optimize_licm, /, IRFunction *func) {
     LoopOpt loop_opt = CREOBJ(LoopOpt, /, func);
     CALL(LoopOpt, loop_opt, prepare, /);
     bool updated = CALL(LoopOpt, loop_opt, invariant_compute_motion, /);
-    updated = CALL(LoopOpt, loop_opt, induction_var_optimize, /) || updated;
     DROPOBJ(LoopOpt, loop_opt);
     return updated;
 }

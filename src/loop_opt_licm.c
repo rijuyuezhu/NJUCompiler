@@ -22,8 +22,6 @@ typedef struct LICMEngine {
     VecPtr itg_worklist;
 
     VecPtr invariants; //  of IRStmtBase *
-    VecPtr motions;    //  of IRStmtBase *
-
 } LICMEngine;
 
 static void MTD(LICMEngine, init, /, LoopOpt *loop_opt, LoopInfo *loop_info) {
@@ -36,11 +34,9 @@ static void MTD(LICMEngine, init, /, LoopOpt *loop_opt, LoopInfo *loop_info) {
     CALL(MapPtrUSize, self->itg_indeg, init, /);
     CALL(VecPtr, self->itg_worklist, init, /);
     CALL(VecPtr, self->invariants, init, /);
-    CALL(VecPtr, self->motions, init, /);
 }
 
 static void MTD(LICMEngine, drop, /) {
-    DROPOBJ(VecPtr, self->motions);
     DROPOBJ(VecPtr, self->invariants);
     DROPOBJ(VecPtr, self->itg_worklist);
     DROPOBJ(MapPtrUSize, self->itg_indeg);
@@ -223,17 +219,6 @@ static void MTD(LICMEngine, find_invariants, /) {
             }
         }
     }
-    // debug output:
-    printf("LICM invariants:\n");
-    for (usize i = 0; i < self->invariants.size; i++) {
-        IRStmtBase *stmt = self->invariants.data[i];
-        String s = CREOBJ(String, /);
-        VCALL(IRStmtBase, *stmt, build_str, /, &s);
-        const char *str = STRING_C_STR(s);
-        printf("%s", str);
-        DROPOBJ(String, s);
-    }
-    printf("\n");
 }
 
 static bool MTD(LICMEngine, check_motion, /, IRStmtBase *stmt) {
@@ -277,42 +262,93 @@ static bool MTD(LICMEngine, check_motion, /, IRStmtBase *stmt) {
 }
 
 static void MTD(LICMEngine, find_motions, /) {
+    ListPtr *motions = &self->loop_info->licm_motions;
     for (usize i = 0; i < self->invariants.size; i++) {
         IRStmtBase *invariant = self->invariants.data[i];
         if (CALL(LICMEngine, *self, check_motion, /, invariant)) {
-            CALL(VecPtr, self->motions, push_back, /, invariant);
+            CALL(ListPtr, *motions, push_back, /, invariant);
         }
     }
-
-    // debug output:
-    printf("LICM motions:\n");
-    for (usize i = 0; i < self->motions.size; i++) {
-        IRStmtBase *stmt = self->motions.data[i];
-        String s = CREOBJ(String, /);
-        VCALL(IRStmtBase, *stmt, build_str, /, &s);
-        const char *str = STRING_C_STR(s);
-        printf("%s", str);
-        DROPOBJ(String, s);
-    }
-    printf("\n");
 }
 
-static bool MTD(LICMEngine, optimize, /) {
+static bool MTD(LICMEngine, collect_motions, /) {
     CALL(LICMEngine, *self, collect_info, /);
     CALL(LICMEngine, *self, find_invariants, /);
     CALL(LICMEngine, *self, find_motions, /);
     return false;
 }
 
-bool MTD(LoopOpt, invariant_compute_motion, /) {
-    bool updated = false;
-    for (MapHeaderToLoopInfoIterator it =
-             CALL(MapHeaderToLoopInfo, self->loop_infos, begin, /);
-         it; it = CALL(MapHeaderToLoopInfo, self->loop_infos, next, /, it)) {
-        LoopInfo *loop_info = &it->value;
+static void MTD(LoopOpt, collect_motions, /) {
+    for (usize i = 0; i < self->loop_infos_ordered.size; i++) {
+        LoopInfo *loop_info = self->loop_infos_ordered.data[i];
         LICMEngine engine = CREOBJ(LICMEngine, /, self, loop_info);
-        updated = CALL(LICMEngine, engine, optimize, /) || updated;
+        CALL(LICMEngine, engine, collect_motions, /);
         DROPOBJ(LICMEngine, engine);
     }
+}
+
+static bool MTD(IRFunction, remove_dead_stmt_without_free_stmt_callback, /,
+                IRBasicBlock *bb, ListDynIRStmtNode *stmt_it,
+                void *extra_args) {
+    bool *updated = extra_args;
+    if (stmt_it->data->is_dead) {
+        stmt_it->data = NULL; // do not free the stmt itself
+        CALL(ListDynIRStmt, bb->stmts, remove, /, stmt_it);
+        *updated = true;
+    }
+    return false;
+}
+
+static bool MTD(IRFunction, remove_dead_stmt_without_free_stmt, /) {
+    bool updated = false;
+    CALL(IRFunction, *self, iter_stmt, /,
+         MTDNAME(IRFunction, remove_dead_stmt_without_free_stmt_callback),
+         &updated);
+    return updated;
+}
+
+static bool MTD(LoopOpt, apply_motions, /) {
+    // first tag all the motions as dead, and determine the move routine
+    for (usize i = self->loop_infos_ordered.size - 1; ~i; i--) {
+        LoopInfo *loop_info = self->loop_infos_ordered.data[i];
+        for (ListPtrNode *it = loop_info->licm_motions.head, *nxt = NULL; it;
+             it = nxt) {
+            nxt = it->next;
+
+            IRStmtBase *motion = it->data;
+            if (motion->is_dead) {
+                // this motion has been moved away in larger loops,
+                // and we do not need to move it again.
+                CALL(ListPtr, loop_info->licm_motions, remove, /, it);
+                continue;
+            }
+            motion->is_dead = true;
+        }
+    }
+
+    IRFunction *func = self->func;
+    CALL(IRFunction, *func, remove_dead_stmt_without_free_stmt, /);
+    bool updated = false;
+
+    for (usize i = 0; i < self->loop_infos_ordered.size; i++) {
+        LoopInfo *loop_info = self->loop_infos_ordered.data[i];
+        for (ListPtrNode *it = loop_info->licm_motions.head; it;
+             it = it->next) {
+            IRStmtBase *motion = it->data;
+            motion->is_dead = false;
+            CALL(LoopInfo, *loop_info, ensure_preheader, /);
+            IRBasicBlock *preheader = loop_info->preheader;
+            ASSERT(preheader);
+            CALL(IRBasicBlock, *preheader, add_stmt, /, motion);
+        }
+    }
+
+    return updated;
+}
+
+bool MTD(LoopOpt, invariant_compute_motion, /) {
+    CALL(LoopOpt, *self, collect_motions, /);
+    bool updated = CALL(LoopOpt, *self, apply_motions, /);
+    CALL(LoopOpt, *self, fix_preheader, /);
     return updated;
 }
