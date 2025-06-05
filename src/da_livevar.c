@@ -1,5 +1,5 @@
 #include "da_livevar.h"
-#include "ir_stmt.h"
+#include "ir_function.h"
 
 void MTD(LVFact, init, /) { CALL(SetUSize, self->live_vars, init, /); }
 void MTD(LVFact, drop, /) { DROPOBJ(SetUSize, self->live_vars); }

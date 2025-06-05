@@ -1,8 +1,10 @@
 #pragma once
+
 #include "dataflow_analysis.h"
 #include "general_container.h"
-#include "ir_basic_block.h"
-#include "tem_map.h"
+
+struct IRBasicBlock;
+struct IRFunction;
 
 typedef struct LVFact {
     SetUSize live_vars;
@@ -14,7 +16,7 @@ bool MTD(LVFact, get, /, usize key);
 bool MTD(LVFact, set, /, usize key, bool value);
 void MTD(LVFact, debug_print, /);
 
-DECLARE_MAPPING(MapBBToLVFact, IRBasicBlock *, LVFact *, FUNC_EXTERN,
+DECLARE_MAPPING(MapBBToLVFact, struct IRBasicBlock *, LVFact *, FUNC_EXTERN,
                 GENERATOR_PLAIN_KEY, GENERATOR_CUSTOM_VALUE,
                 GENERATOR_PLAIN_COMPARATOR);
 FUNC_STATIC void NSMTD(MapBBToLVFact, drop_value, /, LVFact **value) {
@@ -33,5 +35,5 @@ typedef struct LiveVarDA {
 } LiveVarDA;
 
 void MTD(LiveVarDA, init, /);
-bool MTD(LiveVarDA, dead_code_eliminate, /, IRFunction *func);
+bool MTD(LiveVarDA, dead_code_eliminate, /, struct IRFunction *func);
 DEFINE_DATAFLOW_ANALYSIS_STRUCT(LiveVarDA);

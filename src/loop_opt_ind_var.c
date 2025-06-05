@@ -1,8 +1,5 @@
-#include "general_container.h"
-#include "ir_basic_block.h"
 #include "ir_program.h"
 #include "loop_opt.h"
-#include "op.h"
 
 typedef struct DerivedIndVarRec {
     // key = k * base_ind + b; replaced with key = derived_copy

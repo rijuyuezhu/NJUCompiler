@@ -1,4 +1,4 @@
-#include "da_dominator.h"
+#include "ir_basic_block.h"
 #include "loop_opt.h"
 
 bool MTD(LoopOpt, is_dom_bb, /, IRBasicBlock *a, IRBasicBlock *b) {

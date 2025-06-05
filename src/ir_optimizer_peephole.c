@@ -1,6 +1,5 @@
 #include "ir_function.h"
 #include "ir_optimizer.h"
-#include "ir_stmt.h"
 
 typedef struct PeepholeEngine {
     IRFunction *func;

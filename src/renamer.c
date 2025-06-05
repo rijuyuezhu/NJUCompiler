@@ -1,4 +1,6 @@
 #include "renamer.h"
+#include "general_container.h"
+#include "idx_allocator.h"
 
 void MTD(Renamer, init, /, MapUSizeUSize *rename_map, IdxAllocator *allocator) {
     self->rename_map = rename_map;

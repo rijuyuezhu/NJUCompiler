@@ -1,4 +1,5 @@
 #include "da_reachdef.h"
+#include "ir_function.h"
 
 void MTD(RDFact, init, /) { CALL(MapUSizeToSetPtr, self->reach_defs, init, /); }
 void MTD(RDFact, drop, /) { DROPOBJ(MapUSizeToSetPtr, self->reach_defs); }

@@ -1,7 +1,5 @@
-#include "ir_basic_block.h"
 #include "ir_function.h"
 #include "ir_optimizer.h"
-#include "ir_stmt.h"
 
 static usize get_relabel(IRFunction *func, usize label) {
     if (label == (usize)-1) {

@@ -1,5 +1,4 @@
 #include "da_avaliexp.h"
-#include "general_container.h"
 #include "ir_program.h"
 
 int NSMTD(AEExp, compare, /, const AEExp *a, const AEExp *b) {

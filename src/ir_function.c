@@ -1,9 +1,5 @@
-#include "ir_function.h"
-#include "ir_basic_block.h"
-#include "ir_program.h"
-#include "ir_stmt.h"
+#include "renamer.h"
 #include "task_engine.h"
-#include "utils.h"
 
 void MTD(IRFunction, init, /, String func_name, IRProgram *program) {
     self->func_name = func_name;

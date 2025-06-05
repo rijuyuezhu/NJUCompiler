@@ -8,10 +8,9 @@ typedef struct TaskEngine {
     const char *input_ir_file;
     const char *output_ir_file;
 
-    ParseHelper parse_helper;
     IRProgram ir_program;
+    ParseHelper parse_helper;
     bool parse_err;
-
     String ir_program_str;
 } TaskEngine;
 

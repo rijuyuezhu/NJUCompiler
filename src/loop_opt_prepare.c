@@ -1,6 +1,6 @@
 #include "da_solver.h"
+#include "ir_function.h"
 #include "loop_opt.h"
-#include "stdlib.h"
 
 static bool MTD(IRFunction, prepare_stmt_to_bb_callback, /, IRBasicBlock *bb,
                 ListDynIRStmtNode *iter, void *extra_args) {

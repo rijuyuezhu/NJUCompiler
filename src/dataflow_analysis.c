@@ -1,4 +1,5 @@
 #include "dataflow_analysis.h"
+#include "ir_function.h"
 
 bool MTD(DataflowAnalysisBase, transfer_bb, /, IRBasicBlock *bb, Any in_fact,
          Any out_fact) {

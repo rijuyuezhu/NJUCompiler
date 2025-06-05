@@ -1,6 +1,6 @@
 #include "ir_value.h"
+#include "renamer.h"
 #include "str.h"
-#include "utils.h"
 
 IRValue NSMTD(IRValue, from_const, /, int const_val) {
     return (IRValue){

@@ -1,7 +1,6 @@
 #include "da_constprop.h"
-#include "ir_basic_block.h"
+#include "general_container.h"
 #include "ir_function.h"
-#include "ir_stmt.h"
 
 void MTD(CPFact, init, /) { CALL(MapVarToCPValue, self->mapping, init, /); }
 

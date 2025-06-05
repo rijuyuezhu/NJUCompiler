@@ -4,10 +4,8 @@
 #include "da_copyprop.h"
 #include "da_livevar.h"
 #include "da_solver.h"
-#include "ir_function.h"
 #include "ir_program.h"
 #include "loop_opt.h"
-#include "utils.h"
 
 void MTD(IROptimizer, init, /, IRProgram *program) { self->program = program; }
 void MTD(IROptimizer, optimize, /) {

@@ -1,12 +1,15 @@
 #pragma once
-#include "general_container.h"
-#include "idx_allocator.h"
 
+#include "utils.h"
+
+struct MapUSizeUSize;
+struct IdxAllocator;
 typedef struct Renamer {
-    MapUSizeUSize *rename_map;
-    IdxAllocator *allocator;
+    struct MapUSizeUSize *rename_map;
+    struct IdxAllocator *allocator;
 } Renamer;
 
-void MTD(Renamer, init, /, MapUSizeUSize *rename_map, IdxAllocator *allocator);
+void MTD(Renamer, init, /, struct MapUSizeUSize *rename_map,
+         struct IdxAllocator *allocator);
 FUNC_STATIC DEFAULT_DROPER(Renamer);
 void MTD(Renamer, rename, /, usize *obj);

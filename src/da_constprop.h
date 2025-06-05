@@ -1,9 +1,10 @@
 #pragma once
 
 #include "dataflow_analysis.h"
-#include "ir_function.h"
 #include "tem_map.h"
-#include "utils.h"
+
+struct IRBasicBlock;
+struct IRFunction;
 
 typedef enum CPValueKind {
     CPValueKindUndef,
@@ -56,7 +57,7 @@ CPValue MTD(CPFact, get, /, usize key);
 bool MTD(CPFact, update, /, usize key, CPValue value);
 void MTD(CPFact, debug_print, /);
 
-DECLARE_MAPPING(MapBBToCPFact, IRBasicBlock *, CPFact *, FUNC_EXTERN,
+DECLARE_MAPPING(MapBBToCPFact, struct IRBasicBlock *, CPFact *, FUNC_EXTERN,
                 GENERATOR_PLAIN_KEY, GENERATOR_CUSTOM_VALUE,
                 GENERATOR_PLAIN_COMPARATOR);
 FUNC_STATIC void NSMTD(MapBBToCPFact, drop_value, /, CPFact **value) {
@@ -74,6 +75,6 @@ typedef struct ConstPropDA {
     MapBBToCPFact out_facts;
 } ConstPropDA;
 void MTD(ConstPropDA, init, /);
-bool MTD(ConstPropDA, const_fold, /, IRFunction *func);
+bool MTD(ConstPropDA, const_fold, /, struct IRFunction *func);
 
 DEFINE_DATAFLOW_ANALYSIS_STRUCT(ConstPropDA);

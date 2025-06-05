@@ -1,4 +1,5 @@
 #pragma once
+
 #include "general_container.h"
 
 typedef struct IdxAllocator {

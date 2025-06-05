@@ -1,10 +1,9 @@
 #pragma once
-#include "ir_function.h"
+
 #include "ir_value.h"
-#include "utils.h"
 
 typedef struct ParseHelper {
-    IRFunction *now_func;
+    struct IRFunction *now_func;
     VecIRValue arglist;
 } ParseHelper;
 

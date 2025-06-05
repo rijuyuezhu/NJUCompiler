@@ -1,6 +1,5 @@
 #include "da_solver.h"
 #include "dataflow_analysis.h"
-#include "ir_basic_block.h"
 #include "ir_function.h"
 
 static void initialize_forward(DataflowAnalysisBase *analysis,

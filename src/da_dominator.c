@@ -1,6 +1,5 @@
 #include "da_dominator.h"
 #include "ir_function.h"
-#include "utils.h"
 
 void MTD(DomFact, init, /) {
     CALL(SetPtr, self->doms, init, /);

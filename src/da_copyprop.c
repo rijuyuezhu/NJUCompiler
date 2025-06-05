@@ -1,5 +1,5 @@
 #include "da_copyprop.h"
-#include "general_container.h"
+#include "ir_function.h"
 
 void MTD(CYPFact, init, /) {
     self->is_universal = false;

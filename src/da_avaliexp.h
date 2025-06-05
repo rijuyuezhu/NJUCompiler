@@ -1,8 +1,11 @@
 #pragma once
+
 #include "dataflow_analysis.h"
 #include "general_container.h"
+#include "ir_value.h"
 #include "op.h"
-#include "tem_map.h"
+
+struct IRFunction;
 
 typedef struct AEExp {
     ArithopKind op;
@@ -24,7 +27,7 @@ bool MTD(AEFact, get, /, usize key);
 bool MTD(AEFact, set, /, usize key, bool value);
 void MTD(AEFact, debug_print, /);
 
-DECLARE_MAPPING(MapBBToAEFact, IRBasicBlock *, AEFact *, FUNC_EXTERN,
+DECLARE_MAPPING(MapBBToAEFact, struct IRBasicBlock *, AEFact *, FUNC_EXTERN,
                 GENERATOR_PLAIN_KEY, GENERATOR_CUSTOM_VALUE,
                 GENERATOR_PLAIN_COMPARATOR);
 FUNC_STATIC void NSMTD(MapBBToAEFact, drop_value, /, AEFact **value) {
@@ -44,6 +47,6 @@ typedef struct AvaliExpDA {
     MapUSizeToVecUSize var_to_kills;
 } AvaliExpDA;
 void MTD(AvaliExpDA, init, /);
-void MTD(AvaliExpDA, prepare, /, IRFunction *func);
-void MTD(AvaliExpDA, clean_redundant_exp, /, IRFunction *func);
+void MTD(AvaliExpDA, prepare, /, struct IRFunction *func);
+void MTD(AvaliExpDA, clean_redundant_exp, /, struct IRFunction *func);
 DEFINE_DATAFLOW_ANALYSIS_STRUCT(AvaliExpDA);

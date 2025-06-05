@@ -1,5 +1,4 @@
 #include "idx_allocator.h"
-#include "general_container.h"
 
 void MTD(IdxAllocator, init, /) {
     CALL(MapStrUSize, self->str_to_idx, init, /);

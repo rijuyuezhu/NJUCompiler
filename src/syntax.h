@@ -1,9 +1,6 @@
 #pragma once
-#include "ir_function.h"
-#include "ir_program.h"
-#include "ir_value.h"
+
 #include "task_engine.h"
-#include "utils.h"
 
 static usize get_label(TaskEngine *engine, String label_name) {
     return CALL(IdxAllocator, engine->ir_program.label_idx_allocator, get, /,

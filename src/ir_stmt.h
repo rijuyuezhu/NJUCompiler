@@ -2,11 +2,11 @@
 
 #include "ir_value.h"
 #include "op.h"
-#include "renamer.h"
 #include "str.h"
 #include "tem_list.h"
 #include "tem_map.h"
-#include "utils.h"
+
+struct Renamer;
 
 typedef struct SliceIRValue {
     IRValue *data;
@@ -38,8 +38,8 @@ typedef struct IRStmtBaseVTable {
     void (*build_str)(IRStmtBase *self, String *builder);
     usize (*get_def)(IRStmtBase *self);
     SliceIRValue (*get_use)(IRStmtBase *self);
-    void (*rename)(IRStmtBase *self, Renamer *var_renamer,
-                   Renamer *label_renamer);
+    void (*rename)(IRStmtBase *self, struct Renamer *var_renamer,
+                   struct Renamer *label_renamer);
 } IRStmtBaseVTable;
 
 struct IRStmtBase {
@@ -165,8 +165,8 @@ void MTD(IRStmtWrite, init, /, IRValue src);
     void MTD(classname, build_str, /, String * builder);                       \
     usize MTD(classname, get_def, /);                                          \
     SliceIRValue MTD(classname, get_use, /);                                   \
-    void MTD(classname, rename, /, Renamer * var_renamer,                      \
-             Renamer * label_renamer);                                         \
+    void MTD(classname, rename, /, struct Renamer * var_renamer,               \
+             struct Renamer * label_renamer);                                  \
                                                                                \
     /* auto gen */                                                             \
     FUNC_STATIC void VMTD(classname, v_drop, /) {                              \
@@ -181,8 +181,9 @@ void MTD(IRStmtWrite, init, /, IRValue src);
     FUNC_STATIC SliceIRValue VMTD(classname, v_get_use, /) {                   \
         return CALL(classname, *(classname *)base_self, get_use, /);           \
     }                                                                          \
-    FUNC_STATIC void VMTD(classname, v_rename, /, Renamer * var_renamer,       \
-                          Renamer * label_renamer) {                           \
+    FUNC_STATIC void VMTD(classname, v_rename, /,                              \
+                          struct Renamer * var_renamer,                        \
+                          struct Renamer * label_renamer) {                    \
         CALL(classname, *(classname *)base_self, rename, /, var_renamer,       \
              label_renamer);                                                   \
     }                                                                          \

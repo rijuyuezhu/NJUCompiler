@@ -1,5 +1,6 @@
 #include "ir_stmt.h"
 #include "op.h"
+#include "renamer.h"
 #include "str.h"
 #include "utils.h"
 

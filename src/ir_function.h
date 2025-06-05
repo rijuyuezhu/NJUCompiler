@@ -1,9 +1,9 @@
 #pragma once
-#include "general_container.h"
+
 #include "ir_basic_block.h"
-#include "str.h"
 
 struct TaskEngine;
+struct Renamer;
 
 typedef struct DecInfo {
     usize addr;
@@ -60,7 +60,8 @@ bool MTD(IRFunction, remove_dead_bb, /);
 // call reestablish after this function, if change any of the goto/if stmts
 bool MTD(IRFunction, remove_dead_stmt, /);
 
-void MTD(IRFunction, rename, /, Renamer *var_renamer, Renamer *label_renamer);
+void MTD(IRFunction, rename, /, struct Renamer *var_renamer,
+         struct Renamer *label_renamer);
 
 DELETED_CLONER(IRFunction, FUNC_STATIC);
 DECLARE_CLASS_VEC(VecIRFunction, IRFunction, FUNC_EXTERN);

@@ -1,8 +1,4 @@
-#include "da_dominator.h"
-#include "da_reachdef.h"
-#include "general_container.h"
-#include "ir_basic_block.h"
-#include "ir_stmt.h"
+#include "ir_function.h"
 #include "loop_opt.h"
 
 typedef struct LICMEngine {

@@ -1,6 +1,4 @@
 #include "loop_opt.h"
-#include "idx_allocator.h"
-#include "ir_function.h"
 #include "ir_program.h"
 
 void MTD(LoopInfo, init, /, IRFunction *func, IRBasicBlock *header) {

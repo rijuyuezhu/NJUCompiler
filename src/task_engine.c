@@ -1,5 +1,4 @@
 #include "task_engine.h"
-#include "utils.h"
 
 void MTD(TaskEngine, init, /, const char *input_ir_file,
          const char *output_ir_file) {

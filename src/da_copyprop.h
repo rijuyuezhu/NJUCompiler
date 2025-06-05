@@ -1,6 +1,10 @@
 #pragma once
+
 #include "dataflow_analysis.h"
 #include "general_container.h"
+
+struct IRBasicBlock;
+struct IRFunction;
 
 typedef struct CYPFact {
     bool is_universal;
@@ -15,7 +19,7 @@ void MTD(CYPFact, add_assign, /, usize dst, usize src);
 usize MTD(CYPFact, get_src, /, usize dst);
 void MTD(CYPFact, debug_print, /);
 
-DECLARE_MAPPING(MapBBToCYPFact, IRBasicBlock *, CYPFact *, FUNC_EXTERN,
+DECLARE_MAPPING(MapBBToCYPFact, struct IRBasicBlock *, CYPFact *, FUNC_EXTERN,
                 GENERATOR_PLAIN_KEY, GENERATOR_CUSTOM_VALUE,
                 GENERATOR_PLAIN_COMPARATOR);
 FUNC_STATIC void NSMTD(MapBBToCYPFact, drop_value, /, CYPFact **value) {
@@ -33,5 +37,5 @@ typedef struct CopyPropDA {
     MapBBToCYPFact out_facts;
 } CopyPropDA;
 void MTD(CopyPropDA, init, /);
-bool MTD(CopyPropDA, copy_propagate, /, IRFunction *func);
+bool MTD(CopyPropDA, copy_propagate, /, struct IRFunction *func);
 DEFINE_DATAFLOW_ANALYSIS_STRUCT(CopyPropDA);

@@ -1,6 +1,5 @@
 #include "ir_program.h"
-#include "ir_function.h"
-#include "utils.h"
+#include "renamer.h"
 
 void MTD(IRProgram, init, /) {
     CALL(VecIRFunction, self->functions, init, /);
