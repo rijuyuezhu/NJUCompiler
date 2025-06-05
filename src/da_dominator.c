@@ -6,7 +6,9 @@ void MTD(DomFact, init, /) {
     CALL(SetPtr, self->doms, init, /);
     self->is_universal = false;
 }
+
 void MTD(DomFact, drop, /) { DROPOBJ(SetPtr, self->doms); }
+
 bool MTD(DomFact, get, /, IRBasicBlock *key) {
     if (self->is_universal) {
         return true;
@@ -14,6 +16,7 @@ bool MTD(DomFact, get, /, IRBasicBlock *key) {
     SetPtrIterator it = CALL(SetPtr, self->doms, find_owned, /, key);
     return it != NULL;
 }
+
 bool MTD(DomFact, set, /, IRBasicBlock *key, bool value) {
     if (self->is_universal) {
         if (value) {
@@ -39,6 +42,7 @@ bool MTD(DomFact, set, /, IRBasicBlock *key, bool value) {
         }
     }
 }
+
 void MTD(DomFact, debug_print, /) {
     if (self->is_universal) {
         printf("[universal set]");
@@ -69,24 +73,30 @@ Any MTD(DominatorDA, new_boundary_fact, /, IRFunction *func) {
     CALL(SetPtr, fact->doms, insert, /, func->entry, ZERO_SIZE);
     return fact;
 }
+
 Any MTD(DominatorDA, new_initial_fact, /) {
     DomFact *fact = CREOBJHEAP(DomFact, /);
     fact->is_universal = true;
     return fact;
 }
+
 void MTD(DominatorDA, drop_fact, /, Any fact) { DROPOBJHEAP(DomFact, fact); }
+
 void MTD(DominatorDA, set_in_fact, /, IRBasicBlock *bb, Any fact) {
     CALL(MapBBToDomFact, self->in_facts, insert_or_assign, /, bb, fact);
 }
+
 void MTD(DominatorDA, set_out_fact, /, IRBasicBlock *bb, Any fact) {
     CALL(MapBBToDomFact, self->out_facts, insert_or_assign, /, bb, fact);
 }
+
 Any MTD(DominatorDA, get_in_fact, /, IRBasicBlock *bb) {
     MapBBToDomFactIterator it =
         CALL(MapBBToDomFact, self->in_facts, find_owned, /, bb);
     ASSERT(it);
     return it->value;
 }
+
 Any MTD(DominatorDA, get_out_fact, /, IRBasicBlock *bb) {
     MapBBToDomFactIterator it =
         CALL(MapBBToDomFact, self->out_facts, find_owned, /, bb);

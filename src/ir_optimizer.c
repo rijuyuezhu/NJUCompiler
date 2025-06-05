@@ -19,8 +19,14 @@ void MTD(IROptimizer, optimize, /) {
 }
 
 void MTD(IROptimizer, optimize_func, /, IRFunction *func) {
-    const usize TIMES = 5;
+    const usize TIMES = 6;
     for (usize i = 0; i < TIMES; i++) {
+        if (i >= TIMES / 2) {
+            CALL(IROptimizer, *self, optimize_func_peephole, /, func);
+            CALL(IROptimizer, *self, optimize_func_copy_prop, /, func);
+            CALL(IROptimizer, *self, optimize_func_loop_ind_var, /, func);
+            CALL(IROptimizer, *self, optimize_func_licm, /, func);
+        }
         CALL(IROptimizer, *self, optimize_func_const_prop, /, func);
         CALL(IROptimizer, *self, optimize_func_control_flow_opt, /, func);
         CALL(IROptimizer, *self, optimize_func_simple_redundant_ops, /, func);
@@ -32,7 +38,6 @@ void MTD(IROptimizer, optimize_func, /, IRFunction *func) {
 
     CALL(IROptimizer, *self, optimize_func_peephole, /, func);
     CALL(IROptimizer, *self, optimize_func_copy_prop, /, func);
-    CALL(IROptimizer, *self, optimize_func_licm, /, func);
 
     while (CALL(IROptimizer, *self, optimize_func_dead_code_eliminate, /, func))
         ;

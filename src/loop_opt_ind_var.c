@@ -233,7 +233,48 @@ static bool MTD(LoopIndVar, is_derive_stmt, /, IRStmtBase *stmt,
     return true;
 }
 
+static void VMTD(ReachDefDA, find_derived_ind_vars, /, ListDynIRStmtNode *iter,
+                 Any fact, void *extra_args) {
+    LoopIndVar *engine = extra_args;
+    LoopInfo *loop_info = engine->loop_info;
+    RDFact *rd_fact = fact;
+    IRStmtBase *stmt = iter->data;
+    SliceIRValue uses = VCALL(IRStmtBase, *stmt, get_use, /);
+    for (usize i = 0; i < uses.size; i++) {
+        IRValue use = uses.data[i];
+        if (use.is_const) {
+            continue;
+        }
+        usize use_var = use.var;
+        SetPtr *reach_defs = CALL(RDFact, *rd_fact, get, /, use_var);
+        MapVarToDerivedInfoIterator derived_it =
+            CALL(MapVarToDerivedInfo, engine->var_to_derived_info, find_owned,
+                 /, use_var);
+        if (!derived_it) {
+            // not a derived ind var, skip
+            continue;
+        }
+        bool shall_evict = false;
+        for (SetPtrIterator it = CALL(SetPtr, *reach_defs, begin, /); it;
+             it = CALL(SetPtr, *reach_defs, next, /, it)) {
+            IRStmtBase *reach_def = it->key;
+            IRBasicBlock *reach_def_bb =
+                CALL(LoopOpt, *engine->loop_opt, get_bb, /, reach_def);
+            SetPtrIterator def_in_loop_it =
+                CALL(SetPtr, loop_info->nodes, find_owned, /, reach_def_bb);
+            if (!def_in_loop_it) {
+                shall_evict = true;
+                break;
+            }
+        }
+        if (shall_evict) {
+            CALL(MapVarToDerivedInfo, engine->var_to_derived_info, erase, /,
+                 derived_it);
+        }
+    }
+}
 static void MTD(LoopIndVar, find_derived_ind_vars, /) {
+    // find those statements that are derived from base ind vars
     for (MapUSizeToSetPtrIterator it =
              CALL(MapUSizeToSetPtr, self->var_to_defs, begin, /);
          it; it = CALL(MapUSizeToSetPtr, self->var_to_defs, next, /, it)) {
@@ -256,13 +297,32 @@ static void MTD(LoopIndVar, find_derived_ind_vars, /) {
                 CALL(MapVarToDerivedInfo, self->var_to_derived_info, insert, /,
                      def, derived_rec);
             ASSERT(res.inserted);
-            MapUSizeToSetUSizeIterator base_family_it =
-                CALL(MapUSizeToSetUSize, self->base_family, find_owned, /,
-                     derived_rec.base_ind);
-            ASSERT(base_family_it);
-            CALL(SetUSize, base_family_it->value, insert, /, derived_rec.key,
-                 ZERO_SIZE);
         }
+    }
+
+    // filter those derived ind vars whose uses are not reached by defs outside
+    // the loop
+    ReachDefDA *reach_def_da = &self->loop_opt->reach_def_da;
+    LoopInfo *loop_info = self->loop_info;
+    for (SetPtrIterator it = CALL(SetPtr, loop_info->nodes, begin, /); it;
+         it = CALL(SetPtr, loop_info->nodes, next, /, it)) {
+        IRBasicBlock *bb = it->key;
+        CALL(DataflowAnalysisBase, *TOBASE(reach_def_da), iter_bb, /, bb,
+             MTDNAME(ReachDefDA, find_derived_ind_vars), self);
+    }
+
+    // now we have all the derived ind vars, we can build the base family
+    for (MapVarToDerivedInfoIterator it =
+             CALL(MapVarToDerivedInfo, self->var_to_derived_info, begin, /);
+         it; it = CALL(MapVarToDerivedInfo, self->var_to_derived_info, next, /,
+                       it)) {
+        DerivedIndVarRec *rec = &it->value;
+        usize base_ind = rec->base_ind;
+        MapUSizeToSetUSizeIterator base_family_it = CALL(
+            MapUSizeToSetUSize, self->base_family, find_owned, /, base_ind);
+        ASSERT(base_family_it);
+        SetUSize *derives = &base_family_it->value;
+        CALL(SetUSize, *derives, insert, /, rec->key, ZERO_SIZE);
     }
 }
 
@@ -285,9 +345,10 @@ static void MTD(LoopIndVar, add_in_preheader, /, DerivedIndVarRec *rec) {
     } else if (rec->k == 1) {
         // derive = base_ind + b
         IRValue src1 = NSCALL(IRValue, from_var, /, rec->base_ind);
-        IRValue src2 = NSCALL(IRValue, from_const, /, rec->b);
+        IRValue src2 = NSCALL(IRValue, from_const, /, abs(rec->b));
         IRStmtBase *stmt = (IRStmtBase *)CREOBJHEAP(
-            IRStmtArith, /, rec->derived_copy, src1, src2, ArithopAdd);
+            IRStmtArith, /, rec->derived_copy, src1, src2,
+            rec->b < 0 ? ArithopSub : ArithopAdd);
         CALL(IRBasicBlock, *preheader, add_stmt, /, stmt);
     } else if (rec->k == -1) {
         // derive = b - base_ind
@@ -305,9 +366,10 @@ static void MTD(LoopIndVar, add_in_preheader, /, DerivedIndVarRec *rec) {
             IRStmtArith, /, rec->derived_copy, src1, src2, ArithopMul);
         CALL(IRBasicBlock, *preheader, add_stmt, /, stmt);
         src1 = NSCALL(IRValue, from_var, /, rec->derived_copy);
-        src2 = NSCALL(IRValue, from_const, /, rec->b);
+        src2 = NSCALL(IRValue, from_const, /, abs(rec->b));
         stmt = (IRStmtBase *)CREOBJHEAP(IRStmtArith, /, rec->derived_copy, src1,
-                                        src2, ArithopAdd);
+                                        src2,
+                                        rec->b < 0 ? ArithopSub : ArithopAdd);
         CALL(IRBasicBlock, *preheader, add_stmt, /, stmt);
     }
 }
@@ -348,10 +410,10 @@ static bool MTD(IRBasicBlock, apply_ind_var_callback, /,
             // add derived_copy = derived_copy + derived_stride
             IRValue src1 =
                 NSCALL(IRValue, from_var, /, derived_info->derived_copy);
-            IRValue src2 = NSCALL(IRValue, from_const, /, derived_stride);
+            IRValue src2 = NSCALL(IRValue, from_const, /, abs(derived_stride));
             IRStmtBase *new_stmt = (IRStmtBase *)CREOBJHEAP(
                 IRStmtArith, /, derived_info->derived_copy, src1, src2,
-                ArithopAdd);
+                derived_stride < 0 ? ArithopSub : ArithopAdd);
             CALL(ListDynIRStmt, self->stmts, insert_after, /, stmt_it,
                  new_stmt);
         }
