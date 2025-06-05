@@ -16,6 +16,13 @@ void MTD(IRBasicBlock, add_stmt, /, IRStmtBase *stmt);
 void MTD(IRBasicBlock, build_str, /, String *builder);
 void MTD(IRBasicBlock, debug_print, /);
 
+typedef bool (*BBIterStmtCallback)(IRBasicBlock *self,
+                                   ListDynIRStmtNode *stmt_it,
+                                   void *extra_args);
+
+void MTD(IRBasicBlock, iter_stmt, /, BBIterStmtCallback callback,
+         void *extra_args);
+
 DECLARE_LIST(ListBoxBB, IRBasicBlock *, FUNC_EXTERN, GENERATOR_CUSTOM_VALUE);
 FUNC_STATIC void NSMTD(ListBoxBB, drop_value, /, IRBasicBlock **value) {
     DROPOBJHEAP(IRBasicBlock, *value);

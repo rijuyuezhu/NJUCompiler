@@ -245,7 +245,7 @@ void MTD(IRFunction, build_str, /, String *builder) {
     }
 }
 
-void MTD(IRFunction, iter_stmt, /, IterStmtCallback callback,
+void MTD(IRFunction, iter_stmt, /, FunIterStmtCallback callback,
          void *extra_args) {
     for (ListBoxBBNode *bb_it = self->basic_blocks.head; bb_it;
          bb_it = bb_it->next) {
@@ -261,7 +261,7 @@ void MTD(IRFunction, iter_stmt, /, IterStmtCallback callback,
     }
 }
 
-void MTD(IRFunction, iter_bb, /, IterBBCallback callback, void *extra_args) {
+void MTD(IRFunction, iter_bb, /, FunIterBBCallback callback, void *extra_args) {
     for (ListBoxBBNode *bb_it = self->basic_blocks.head, *nxt_it = NULL; bb_it;
          bb_it = nxt_it) {
         nxt_it = bb_it->next;

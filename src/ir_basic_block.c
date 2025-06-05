@@ -40,6 +40,18 @@ void MTD(IRBasicBlock, debug_print, /) {
     DROPOBJ(String, builder);
 }
 
+void MTD(IRBasicBlock, iter_stmt, /, BBIterStmtCallback callback,
+         void *extra_args) {
+    for (ListDynIRStmtNode *stmt_it = self->stmts.head, *nxt_it = NULL; stmt_it;
+         stmt_it = nxt_it) {
+        nxt_it = stmt_it->next;
+        bool has_inserted = callback(self, stmt_it, extra_args);
+        if (has_inserted) {
+            nxt_it = stmt_it->next;
+        }
+    }
+}
+
 DEFINE_LIST(ListBoxBB, IRBasicBlock *, FUNC_EXTERN);
 DEFINE_MAPPING(MapLabelBB, usize, IRBasicBlock *, FUNC_EXTERN);
 DEFINE_MAPPING(MapBBToListBB, IRBasicBlock *, ListPtr, FUNC_EXTERN);

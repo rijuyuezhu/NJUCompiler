@@ -22,6 +22,7 @@ typedef struct LICMEngine {
     VecPtr itg_worklist;
 
     VecPtr invariants; //  of IRStmtBase *
+    ListPtr motions;
 } LICMEngine;
 
 static void MTD(LICMEngine, init, /, LoopOpt *loop_opt, LoopInfo *loop_info) {
@@ -34,9 +35,11 @@ static void MTD(LICMEngine, init, /, LoopOpt *loop_opt, LoopInfo *loop_info) {
     CALL(MapPtrUSize, self->itg_indeg, init, /);
     CALL(VecPtr, self->itg_worklist, init, /);
     CALL(VecPtr, self->invariants, init, /);
+    CALL(ListPtr, self->motions, init, /);
 }
 
 static void MTD(LICMEngine, drop, /) {
+    DROPOBJ(ListPtr, self->motions);
     DROPOBJ(VecPtr, self->invariants);
     DROPOBJ(VecPtr, self->itg_worklist);
     DROPOBJ(MapPtrUSize, self->itg_indeg);
@@ -262,7 +265,7 @@ static bool MTD(LICMEngine, check_motion, /, IRStmtBase *stmt) {
 }
 
 static void MTD(LICMEngine, find_motions, /) {
-    ListPtr *motions = &self->loop_info->licm_motions;
+    ListPtr *motions = &self->motions;
     for (usize i = 0; i < self->invariants.size; i++) {
         IRStmtBase *invariant = self->invariants.data[i];
         if (CALL(LICMEngine, *self, check_motion, /, invariant)) {
@@ -271,19 +274,25 @@ static void MTD(LICMEngine, find_motions, /) {
     }
 }
 
-static bool MTD(LICMEngine, collect_motions, /) {
+static void MTD(LICMEngine, collect_motions, /) {
     CALL(LICMEngine, *self, collect_info, /);
     CALL(LICMEngine, *self, find_invariants, /);
     CALL(LICMEngine, *self, find_motions, /);
-    return false;
+}
+
+static void MTD(LoopOpt, init_licm_engine, /) {
+    for (usize i = 0; i < self->loop_infos_ordered.size; i++) {
+        LoopInfo *loop_info = self->loop_infos_ordered.data[i];
+        LICMEngine *engine = CREOBJHEAP(LICMEngine, /, self, loop_info);
+        loop_info->aid_engine = engine;
+    }
 }
 
 static void MTD(LoopOpt, collect_motions, /) {
     for (usize i = 0; i < self->loop_infos_ordered.size; i++) {
         LoopInfo *loop_info = self->loop_infos_ordered.data[i];
-        LICMEngine engine = CREOBJ(LICMEngine, /, self, loop_info);
-        CALL(LICMEngine, engine, collect_motions, /);
-        DROPOBJ(LICMEngine, engine);
+        LICMEngine *engine = loop_info->aid_engine;
+        CALL(LICMEngine, *engine, collect_motions, /);
     }
 }
 
@@ -311,7 +320,8 @@ static bool MTD(LoopOpt, apply_motions, /) {
     // first tag all the motions as dead, and determine the move routine
     for (usize i = self->loop_infos_ordered.size - 1; ~i; i--) {
         LoopInfo *loop_info = self->loop_infos_ordered.data[i];
-        for (ListPtrNode *it = loop_info->licm_motions.head, *nxt = NULL; it;
+        LICMEngine *engine = loop_info->aid_engine;
+        for (ListPtrNode *it = engine->motions.head, *nxt = NULL; it;
              it = nxt) {
             nxt = it->next;
 
@@ -319,7 +329,7 @@ static bool MTD(LoopOpt, apply_motions, /) {
             if (motion->is_dead) {
                 // this motion has been moved away in larger loops,
                 // and we do not need to move it again.
-                CALL(ListPtr, loop_info->licm_motions, remove, /, it);
+                CALL(ListPtr, engine->motions, remove, /, it);
                 continue;
             }
             motion->is_dead = true;
@@ -332,8 +342,8 @@ static bool MTD(LoopOpt, apply_motions, /) {
 
     for (usize i = 0; i < self->loop_infos_ordered.size; i++) {
         LoopInfo *loop_info = self->loop_infos_ordered.data[i];
-        for (ListPtrNode *it = loop_info->licm_motions.head; it;
-             it = it->next) {
+        LICMEngine *engine = loop_info->aid_engine;
+        for (ListPtrNode *it = engine->motions.head; it; it = it->next) {
             IRStmtBase *motion = it->data;
             motion->is_dead = false;
             CALL(LoopInfo, *loop_info, ensure_preheader, /);
@@ -346,9 +356,20 @@ static bool MTD(LoopOpt, apply_motions, /) {
     return updated;
 }
 
+static void MTD(LoopOpt, drop_licm_engine, /) {
+    for (usize i = 0; i < self->loop_infos_ordered.size; i++) {
+        LoopInfo *loop_info = self->loop_infos_ordered.data[i];
+        LICMEngine *engine = loop_info->aid_engine;
+        DROPOBJHEAP(LICMEngine, engine);
+        loop_info->aid_engine = NULL;
+    }
+}
+
 bool MTD(LoopOpt, invariant_compute_motion, /) {
+    CALL(LoopOpt, *self, init_licm_engine, /);
     CALL(LoopOpt, *self, collect_motions, /);
     bool updated = CALL(LoopOpt, *self, apply_motions, /);
     CALL(LoopOpt, *self, fix_preheader, /);
+    CALL(LoopOpt, *self, drop_licm_engine, /);
     return updated;
 }

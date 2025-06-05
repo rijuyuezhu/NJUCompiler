@@ -43,15 +43,17 @@ ListPtr *MTD(IRFunction, get_succ, /, IRBasicBlock *bb);
 void MTD(IRFunction, build_str, /, String *builder);
 
 // return: whether or not insert after it
-typedef bool (*IterStmtCallback)(IRFunction *self, IRBasicBlock *bb,
-                                 ListDynIRStmtNode *stmt_it, void *extra_args);
+typedef bool (*FunIterStmtCallback)(IRFunction *self, IRBasicBlock *bb,
+                                    ListDynIRStmtNode *stmt_it,
+                                    void *extra_args);
 
-void MTD(IRFunction, iter_stmt, /, IterStmtCallback callback, void *extra_args);
+void MTD(IRFunction, iter_stmt, /, FunIterStmtCallback callback,
+         void *extra_args);
 
-typedef bool (*IterBBCallback)(IRFunction *self, ListBoxBBNode *bb_it,
-                               void *extra_args);
+typedef bool (*FunIterBBCallback)(IRFunction *self, ListBoxBBNode *bb_it,
+                                  void *extra_args);
 
-void MTD(IRFunction, iter_bb, /, IterBBCallback callback, void *extra_args);
+void MTD(IRFunction, iter_bb, /, FunIterBBCallback callback, void *extra_args);
 
 // call reestablish after this function
 bool MTD(IRFunction, remove_dead_bb, /);

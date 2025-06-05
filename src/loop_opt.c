@@ -10,10 +10,9 @@ void MTD(LoopInfo, init, /, IRFunction *func, IRBasicBlock *header) {
     CALL(VecPtr, self->backedge_starts, init, /);
     CALL(SetPtr, self->nodes, init, /);
     CALL(VecPtr, self->exits, init, /);
-    CALL(ListPtr, self->licm_motions, init, /);
+    self->aid_engine = NULL;
 }
 void MTD(LoopInfo, drop, /) {
-    DROPOBJ(ListPtr, self->licm_motions);
     DROPOBJ(VecPtr, self->exits);
     DROPOBJ(SetPtr, self->nodes);
     DROPOBJ(VecPtr, self->backedge_starts);
@@ -50,7 +49,5 @@ void MTD(LoopOpt, drop, /) {
     DROPOBJ(MapStmtToBBInfo, self->stmt_to_bb_info);
     DROPOBJ(MapUSizeToDynIRStmt, self->param_to_stmt);
 }
-
-bool MTD(LoopOpt, induction_var_optimize, /) { return false; }
 
 DEFINE_MAPPING(MapHeaderToLoopInfo, IRBasicBlock *, LoopInfo, FUNC_EXTERN);

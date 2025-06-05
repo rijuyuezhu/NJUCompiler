@@ -14,9 +14,7 @@ typedef struct LoopInfo {
     VecPtr backedge_starts;
     SetPtr nodes;
     VecPtr exits;
-
-    // temp data used for LICM
-    ListPtr licm_motions;
+    void *aid_engine;
 } LoopInfo;
 
 void MTD(LoopInfo, init, /, IRFunction *func, IRBasicBlock *header);
@@ -60,4 +58,5 @@ void MTD(LoopOpt, prepare, /);
 // optimize; must call fix_preheader after these optimizations;
 bool MTD(LoopOpt, invariant_compute_motion, /);
 bool MTD(LoopOpt, induction_var_optimize, /);
+
 void MTD(LoopOpt, fix_preheader, /);
