@@ -1,6 +1,19 @@
 #include "ir_function.h"
 #include "ir_optimizer.h"
 
+static void strip_gotos(IRFunction *func) {
+    IRBasicBlock *last_logical_bb = NULL;
+    for (ListBoxBBNode *it = func->basic_blocks.head; it; it = it->next) {
+        IRBasicBlock *bb = it->data;
+        if (bb->label != (usize)-1 && last_logical_bb) {
+            NSCALL(IRFunction, try_strip_gotos, /, last_logical_bb, bb->label);
+        }
+        if (bb->stmts.size != 0) {
+            last_logical_bb = bb;
+        }
+    }
+}
+
 static usize get_relabel(IRFunction *func, usize label) {
     if (label == (usize)-1) {
         return (usize)-1;
@@ -109,19 +122,6 @@ static void strip_unused_label(IRFunction *func) {
         }
     }
     DROPOBJ(SetUSize, used_labels);
-}
-
-static void strip_gotos(IRFunction *func) {
-    IRBasicBlock *last_logical_bb = NULL;
-    for (ListBoxBBNode *it = func->basic_blocks.head; it; it = it->next) {
-        IRBasicBlock *bb = it->data;
-        if (bb->label != (usize)-1 && last_logical_bb) {
-            NSCALL(IRFunction, try_strip_gotos, /, last_logical_bb, bb->label);
-        }
-        if (bb->stmts.size != 0) {
-            last_logical_bb = bb;
-        }
-    }
 }
 
 bool MTD(IROptimizer, optimize_func_useless_label_strip, /, IRFunction *func) {

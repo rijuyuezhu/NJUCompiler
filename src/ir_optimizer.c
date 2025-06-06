@@ -24,9 +24,11 @@ void MTD(IROptimizer, optimize_func, /, IRFunction *func) {
             CALL(IROptimizer, *self, optimize_func_copy_prop, /, func);
             CALL(IROptimizer, *self, optimize_func_loop_ind_var, /, func);
             CALL(IROptimizer, *self, optimize_func_licm, /, func);
+            CALL(IROptimizer, *self, optimize_func_dead_code_eliminate, /,
+                 func);
         }
         CALL(IROptimizer, *self, optimize_func_const_prop, /, func);
-        CALL(IROptimizer, *self, optimize_func_control_flow_opt, /, func);
+        CALL(IROptimizer, *self, optimize_func_control_flow, /, func);
         CALL(IROptimizer, *self, optimize_func_simple_redundant_ops, /, func);
         CALL(IROptimizer, *self, optimize_func_copy_prop, /, func);
         CALL(IROptimizer, *self, optimize_func_avali_exp, /, func);
@@ -37,8 +39,14 @@ void MTD(IROptimizer, optimize_func, /, IRFunction *func) {
     CALL(IROptimizer, *self, optimize_func_peephole, /, func);
     CALL(IROptimizer, *self, optimize_func_copy_prop, /, func);
 
-    while (CALL(IROptimizer, *self, optimize_func_dead_code_eliminate, /, func))
-        ;
+    usize UP_LIMIT = 50;
+    for (usize i = 0; i < UP_LIMIT; i++) {
+        bool updated = CALL(IROptimizer, *self,
+                            optimize_func_dead_code_eliminate, /, func);
+        if (!updated) {
+            break;
+        }
+    }
 
     for (usize i = 0; i < 5; i++) {
         CALL(IROptimizer, *self, optimize_func_useless_label_strip, /, func);
@@ -76,7 +84,6 @@ bool MTD(IROptimizer, optimize_func_dead_code_eliminate, /,
     LiveVarDA live_var = CREOBJ(LiveVarDA, /);
     NSCALL(DAWorkListSolver, solve, /, TOBASE(&live_var), func);
     bool updated = CALL(LiveVarDA, live_var, dead_code_eliminate, /, func);
-    updated = CALL(IRFunction, *func, remove_dead_stmt, /) || updated;
     DROPOBJ(LiveVarDA, live_var);
     return updated;
 }

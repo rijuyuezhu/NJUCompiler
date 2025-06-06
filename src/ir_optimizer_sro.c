@@ -22,6 +22,17 @@ static bool MTD(IRFunction, optimize_func_simple_redundant_ops_callback, /,
                 *stmt = (IRStmtBase *)CREOBJHEAP(IRStmtAssign, /, dst, src1);
                 DROPOBJHEAP(IRStmtArith, arith);
                 *updated = true;
+            } else if (src1.is_const && src1.const_val < 0) {
+                // (-#x) + src2 => src2 - #x
+                arith->src1 = src2;
+                arith->src2 = NSCALL(IRValue, from_const, /, -src1.const_val);
+                arith->aop = ArithopSub;
+                *updated = true;
+            } else if (src2.is_const && src2.const_val < 0) {
+                // src1 + (-#x) => src1 - #x
+                arith->src2 = NSCALL(IRValue, from_const, /, -src2.const_val);
+                arith->aop = ArithopSub;
+                *updated = true;
             }
         } else if (aop == ArithopSub) {
             if (src2.is_const && src2.const_val == 0) {
@@ -34,6 +45,11 @@ static bool MTD(IRFunction, optimize_func_simple_redundant_ops_callback, /,
                 *stmt = (IRStmtBase *)CREOBJHEAP(IRStmtAssign, /, dst, zero);
                 DROPOBJHEAP(IRStmtArith, arith);
                 *updated = true;
+            } else if (src2.is_const && src2.const_val < 0) {
+                // src1 - (-#x) => src1 + #x
+                arith->src2 = NSCALL(IRValue, from_const, /, -src2.const_val);
+                arith->aop = ArithopAdd;
+                *updated = true;
             }
         } else if (aop == ArithopMul) {
             if (src1.is_const && src1.const_val == 1) {
@@ -43,6 +59,27 @@ static bool MTD(IRFunction, optimize_func_simple_redundant_ops_callback, /,
             } else if (src2.is_const && src2.const_val == 1) {
                 *stmt = (IRStmtBase *)CREOBJHEAP(IRStmtAssign, /, dst, src1);
                 DROPOBJHEAP(IRStmtArith, arith);
+                *updated = true;
+            } else if (src1.is_const && src1.const_val == 2) {
+                // 2 * src2 => src2 + src2
+                arith->src1 = src2;
+                arith->aop = ArithopAdd;
+                *updated = true;
+            } else if (src2.is_const && src2.const_val == 2) {
+                // src1 * 2 => src1 + src1
+                arith->src2 = src1;
+                arith->aop = ArithopAdd;
+                *updated = true;
+            } else if (src1.is_const && src1.const_val == -1) {
+                // -1 * src2 => #0 - src2
+                arith->src1 = NSCALL(IRValue, from_const, /, 0);
+                arith->aop = ArithopSub;
+                *updated = true;
+            } else if (src2.is_const && src2.const_val == -1) {
+                // src1 * -1 => #0 - src1
+                arith->src2 = src1;
+                arith->src1 = NSCALL(IRValue, from_const, /, 0);
+                arith->aop = ArithopSub;
                 *updated = true;
             } else if ((src1.is_const && src1.const_val == 0) ||
                        (src2.is_const && src2.const_val == 0)) {
@@ -55,6 +92,13 @@ static bool MTD(IRFunction, optimize_func_simple_redundant_ops_callback, /,
             if (src2.is_const && src2.const_val == 1) {
                 *stmt = (IRStmtBase *)CREOBJHEAP(IRStmtAssign, /, dst, src1);
                 DROPOBJHEAP(IRStmtArith, arith);
+                *updated = true;
+            }
+            if (src2.is_const && src2.const_val == -1) {
+                // v / #-1 => #0 - v
+                arith->src2 = src1;
+                arith->src1 = NSCALL(IRValue, from_const, /, 0);
+                arith->aop = ArithopSub;
                 *updated = true;
             } else if (!src1.is_const && !src2.is_const &&
                        src1.var == src2.var) {
@@ -77,7 +121,9 @@ static bool MTD(IRFunction, optimize_func_simple_redundant_ops_callback, /,
         } else {
             PANIC("should not reach");
         }
-    } else if ((*stmt)->kind == IRStmtKindAssign) {
+    }
+
+    if ((*stmt)->kind == IRStmtKindAssign) {
         IRStmtAssign *assign = (IRStmtAssign *)*stmt;
         if (!assign->src.is_const) {
             usize dst = assign->dst;

@@ -55,7 +55,7 @@ void MTD(IRFunction, add_stmt, /, IRStmtBase *stmt) {
         }
     }
     // add the statement to the last block
-    CALL(ListDynIRStmt, last_bb->stmts, push_back, /, stmt);
+    CALL(IRBasicBlock, *last_bb, add_stmt, /, stmt);
 }
 
 void NSMTD(IRFunction, try_strip_gotos, /, IRBasicBlock *bb, usize next_label) {
@@ -106,7 +106,7 @@ static void MTD(IRFunction, add_edge, /, IRBasicBlock *fr, IRBasicBlock *to) {
     CALL(ListPtr, *to_pred, push_back, /, fr);
 }
 
-// engine is nullable to ignore error
+// engine set nullable to ignore error
 static void MTD(IRFunction, build_graph, /, TaskEngine *engine) {
 
     // insert all labels into the label_to_block map
@@ -127,10 +127,9 @@ static void MTD(IRFunction, build_graph, /, TaskEngine *engine) {
     // build the graph
     for (ListBoxBBNode *it = self->basic_blocks.head; it; it = it->next) {
         IRBasicBlock *bb = it->data;
-        if (bb == self->exit) {
+        if (!it->next) {
             continue;
         }
-        ASSERT(it->next);
         IRBasicBlock *nxt_bb = it->next->data;
         if (bb->stmts.size == 0) {
             CALL(IRFunction, *self, add_edge, /, bb, nxt_bb);
@@ -190,10 +189,7 @@ IRBasicBlock *MTD(IRFunction, label_to_bb, /, usize label) {
     }
     MapLabelBBIterator it =
         CALL(MapLabelBB, self->label_to_block, find_owned, /, label);
-    if (!it) {
-        return NULL;
-    }
-    return it->value;
+    return it ? it->value : NULL;
 }
 
 ListPtr *MTD(IRFunction, get_pred, /, IRBasicBlock *bb) {

@@ -152,6 +152,11 @@ static void MTD(LoopIndVar, find_base_ind_vars, /) {
     }
 }
 
+static void MTD(LoopIndVar, collect_base_ind_var, /) {
+    CALL(LoopIndVar, *self, collect_info, /);
+    CALL(LoopIndVar, *self, find_base_ind_vars, /);
+}
+
 static bool MTD(LoopIndVar, is_derive_stmt, /, IRStmtBase *stmt,
                 DerivedIndVarRec *rec) {
     if (stmt->kind != IRStmtKindArith) {
@@ -165,14 +170,14 @@ static bool MTD(LoopIndVar, is_derive_stmt, /, IRStmtBase *stmt,
     bool possible = false;
     if (op == ArithopAdd) {
         if (!src1.is_const && src2.is_const) {
-            // key = 1 * src1 + src2
+            // key = 1 * src1 + #src2
             rec->key = dst;
             rec->base_ind = src1.var;
             rec->k = 1;
             rec->b = src2.const_val;
             possible = true;
         } else if (!src2.is_const && src1.is_const) {
-            // key = 1 * src2 + src1
+            // key = 1 * src2 + #src1
             rec->key = dst;
             rec->base_ind = src2.var;
             rec->k = 1;
@@ -181,14 +186,14 @@ static bool MTD(LoopIndVar, is_derive_stmt, /, IRStmtBase *stmt,
         }
     } else if (op == ArithopSub) {
         if (!src1.is_const && src2.is_const) {
-            // key = 1 * src1 - src2
+            // key = 1 * src1 - #src2
             rec->key = dst;
             rec->base_ind = src1.var;
             rec->k = 1;
             rec->b = -src2.const_val;
             possible = true;
         } else if (!src2.is_const && src1.is_const) {
-            // key = -1 * src2 + src1
+            // key = -1 * src2 + #src1
             rec->key = dst;
             rec->base_ind = src2.var;
             rec->k = -1;
@@ -197,14 +202,14 @@ static bool MTD(LoopIndVar, is_derive_stmt, /, IRStmtBase *stmt,
         }
     } else if (op == ArithopMul) {
         if (!src1.is_const && src2.is_const) {
-            // key = c * src1 + 0
+            // key = #src2 * src1 + 0
             rec->key = dst;
             rec->base_ind = src1.var;
             rec->k = src2.const_val;
             rec->b = 0;
             possible = true;
         } else if (!src2.is_const && src1.is_const) {
-            // key = c * src2 + 0
+            // key = #src1 * src2 + 0
             rec->key = dst;
             rec->base_ind = src2.var;
             rec->k = src1.const_val;
@@ -230,8 +235,8 @@ static bool MTD(LoopIndVar, is_derive_stmt, /, IRStmtBase *stmt,
     return true;
 }
 
-static void VMTD(ReachDefDA, find_derived_ind_vars, /, ListDynIRStmtNode *iter,
-                 Any fact, void *extra_args) {
+static void VMTD(ReachDefDA, find_derived_ind_vars_callback, /,
+                 ListDynIRStmtNode *iter, Any fact, void *extra_args) {
     LoopIndVar *engine = extra_args;
     LoopInfo *loop_info = engine->loop_info;
     RDFact *rd_fact = fact;
@@ -267,6 +272,14 @@ static void VMTD(ReachDefDA, find_derived_ind_vars, /, ListDynIRStmtNode *iter,
         if (shall_evict) {
             CALL(MapVarToDerivedInfo, engine->var_to_derived_info, erase, /,
                  derived_it);
+            MapUSizeToSetPtrIterator defstmts_it = CALL(
+                MapUSizeToSetPtr, engine->var_to_defs, find_owned, /, use_var);
+            ASSERT(defstmts_it);
+            SetPtr *defstmts = &defstmts_it->value;
+            ASSERT(defstmts->size == 1);
+            IRStmtBase *def_stmt = CALL(SetPtr, *defstmts, begin, /)->key;
+            ASSERT(def_stmt->is_dead);
+            def_stmt->is_dead = false;
         }
     }
 }
@@ -286,6 +299,12 @@ static void MTD(LoopIndVar, find_derived_ind_vars, /) {
         bool is_derived_stmt =
             CALL(LoopIndVar, *self, is_derive_stmt, /, stmt, &derived_rec);
         if (is_derived_stmt) {
+            if (stmt->is_dead) {
+                // this derived ind var is eliminated in other loops.
+                continue;
+            }
+            stmt->is_dead = true;
+
             ASSERT(derived_rec.key == def);
             derived_rec.derived_copy = CALL(
                 IdxAllocator, self->loop_opt->func->program->var_idx_allocator,
@@ -305,7 +324,7 @@ static void MTD(LoopIndVar, find_derived_ind_vars, /) {
          it = CALL(SetPtr, loop_info->nodes, next, /, it)) {
         IRBasicBlock *bb = it->key;
         CALL(DataflowAnalysisBase, *TOBASE(reach_def_da), iter_bb, /, bb,
-             MTDNAME(ReachDefDA, find_derived_ind_vars), self);
+             MTDNAME(ReachDefDA, find_derived_ind_vars_callback), self);
     }
 
     // now we have all the derived ind vars, we can build the base family
@@ -323,52 +342,25 @@ static void MTD(LoopIndVar, find_derived_ind_vars, /) {
     }
 }
 
-static void MTD(LoopIndVar, collect_base_ind_var, /) {
-    CALL(LoopIndVar, *self, collect_info, /);
-    CALL(LoopIndVar, *self, find_base_ind_vars, /);
-}
-
 static void MTD(LoopIndVar, add_in_preheader, /, DerivedIndVarRec *rec) {
     LoopInfo *loop_info = self->loop_info;
     CALL(LoopInfo, *loop_info, ensure_preheader, /);
     IRBasicBlock *preheader = loop_info->preheader;
-    if (rec->b == 0) {
-        // derive = base_ind * k
-        IRValue src1 = NSCALL(IRValue, from_var, /, rec->base_ind);
-        IRValue src2 = NSCALL(IRValue, from_const, /, rec->k);
-        IRStmtBase *stmt = (IRStmtBase *)CREOBJHEAP(
-            IRStmtArith, /, rec->derived_copy, src1, src2, ArithopMul);
-        CALL(IRBasicBlock, *preheader, add_stmt, /, stmt);
-    } else if (rec->k == 1) {
-        // derive = base_ind + b
-        IRValue src1 = NSCALL(IRValue, from_var, /, rec->base_ind);
-        IRValue src2 = NSCALL(IRValue, from_const, /, abs(rec->b));
-        IRStmtBase *stmt = (IRStmtBase *)CREOBJHEAP(
-            IRStmtArith, /, rec->derived_copy, src1, src2,
-            rec->b < 0 ? ArithopSub : ArithopAdd);
-        CALL(IRBasicBlock, *preheader, add_stmt, /, stmt);
-    } else if (rec->k == -1) {
-        // derive = b - base_ind
-        IRValue src1 = NSCALL(IRValue, from_const, /, rec->b);
-        IRValue src2 = NSCALL(IRValue, from_var, /, rec->base_ind);
-        IRStmtBase *stmt = (IRStmtBase *)CREOBJHEAP(
-            IRStmtArith, /, rec->derived_copy, src1, src2, ArithopSub);
-        CALL(IRBasicBlock, *preheader, add_stmt, /, stmt);
-    } else {
-        // derive = base_ind * k
-        // derive = derive + b
-        IRValue src1 = NSCALL(IRValue, from_var, /, rec->base_ind);
-        IRValue src2 = NSCALL(IRValue, from_const, /, rec->k);
-        IRStmtBase *stmt = (IRStmtBase *)CREOBJHEAP(
-            IRStmtArith, /, rec->derived_copy, src1, src2, ArithopMul);
-        CALL(IRBasicBlock, *preheader, add_stmt, /, stmt);
-        src1 = NSCALL(IRValue, from_var, /, rec->derived_copy);
-        src2 = NSCALL(IRValue, from_const, /, abs(rec->b));
-        stmt = (IRStmtBase *)CREOBJHEAP(IRStmtArith, /, rec->derived_copy, src1,
-                                        src2,
-                                        rec->b < 0 ? ArithopSub : ArithopAdd);
-        CALL(IRBasicBlock, *preheader, add_stmt, /, stmt);
-    }
+    ASSERT(preheader);
+
+    // derive = base_ind * k
+    // derive = derive + b
+    IRValue src1 = NSCALL(IRValue, from_var, /, rec->base_ind);
+    IRValue src2 = NSCALL(IRValue, from_const, /, rec->k);
+    IRStmtBase *stmt = (IRStmtBase *)CREOBJHEAP(
+        IRStmtArith, /, rec->derived_copy, src1, src2, ArithopMul);
+    CALL(IRBasicBlock, *preheader, add_stmt, /, stmt);
+
+    src1 = NSCALL(IRValue, from_var, /, rec->derived_copy);
+    src2 = NSCALL(IRValue, from_const, /, rec->b);
+    stmt = (IRStmtBase *)CREOBJHEAP(IRStmtArith, /, rec->derived_copy, src1,
+                                    src2, ArithopAdd);
+    CALL(IRBasicBlock, *preheader, add_stmt, /, stmt);
 }
 
 static bool MTD(IRBasicBlock, apply_ind_var_callback, /,
@@ -407,10 +399,10 @@ static bool MTD(IRBasicBlock, apply_ind_var_callback, /,
             // add derived_copy = derived_copy + derived_stride
             IRValue src1 =
                 NSCALL(IRValue, from_var, /, derived_info->derived_copy);
-            IRValue src2 = NSCALL(IRValue, from_const, /, abs(derived_stride));
+            IRValue src2 = NSCALL(IRValue, from_const, /, derived_stride);
             IRStmtBase *new_stmt = (IRStmtBase *)CREOBJHEAP(
                 IRStmtArith, /, derived_info->derived_copy, src1, src2,
-                derived_stride < 0 ? ArithopSub : ArithopAdd);
+                ArithopAdd);
             CALL(ListDynIRStmt, self->stmts, insert_after, /, stmt_it,
                  new_stmt);
         }
@@ -421,6 +413,7 @@ static bool MTD(IRBasicBlock, apply_ind_var_callback, /,
     MapVarToDerivedInfoIterator derived_it = CALL(
         MapVarToDerivedInfo, engine->var_to_derived_info, find_owned, /, def);
     if (derived_it) {
+        ASSERT(stmt->is_dead);
         DerivedIndVarRec *derived_info = &derived_it->value;
         IRValue src = NSCALL(IRValue, from_var, /, derived_info->derived_copy);
         IRStmtBase *new_stmt =
@@ -428,7 +421,6 @@ static bool MTD(IRBasicBlock, apply_ind_var_callback, /,
         IRStmtBase *tmp = stmt_it->data;
         stmt_it->data = new_stmt;
         VCALL(IRStmtBase, *tmp, drop, /);
-        return false;
     }
     return false;
 }
@@ -470,32 +462,15 @@ static void MTD(LoopOpt, collect_base_ind_var, /) {
 }
 
 static bool MTD(LoopOpt, apply_ind_var, /) {
-    SetUSize considered_base = CREOBJ(SetUSize, /);
-
-    for (usize i = self->loop_infos_ordered.size - 1; ~i; i--) {
-        LoopInfo *loop_info = self->loop_infos_ordered.data[i];
-        LoopIndVar *engine = loop_info->aid_engine;
-        for (MapUSizeToSetUSizeIterator
-                 it = CALL(MapUSizeToSetUSize, engine->base_family, begin, /),
-                 nxt;
-             it; it = nxt) {
-            nxt = CALL(MapUSizeToSetUSize, engine->base_family, next, /, it);
-            usize base_ind = it->key;
-            if (CALL(SetUSize, considered_base, find_owned, /, base_ind)) {
-                // already considered this base ind var in outer loop, skip
-                CALL(MapUSizeToSetUSize, engine->base_family, erase, /, it);
-                continue;
-            }
-            CALL(SetUSize, considered_base, insert, /, base_ind, ZERO_SIZE);
-        }
-    }
-    DROPOBJ(SetUSize, considered_base);
-
-    bool updated = false;
     for (usize i = 0; i < self->loop_infos_ordered.size; i++) {
         LoopInfo *loop_info = self->loop_infos_ordered.data[i];
         LoopIndVar *engine = loop_info->aid_engine;
         CALL(LoopIndVar, *engine, find_derived_ind_vars, /);
+    }
+    bool updated = false;
+    for (usize i = 0; i < self->loop_infos_ordered.size; i++) {
+        LoopInfo *loop_info = self->loop_infos_ordered.data[i];
+        LoopIndVar *engine = loop_info->aid_engine;
         updated = CALL(LoopIndVar, *engine, apply_ind_var, /) || updated;
     }
     return updated;

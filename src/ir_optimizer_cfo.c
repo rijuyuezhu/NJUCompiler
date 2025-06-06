@@ -64,8 +64,7 @@ static void run_cfo(struct IRFunction *func) {
     func->exit->is_dead = false;
 }
 
-bool MTD(IROptimizer, optimize_func_control_flow_opt, /,
-         struct IRFunction *func) {
+bool MTD(IROptimizer, optimize_func_control_flow, /, struct IRFunction *func) {
     run_cfo(func);
     bool updated = CALL(IRFunction, *func, remove_dead_bb, /);
     CALL(IRFunction, *func, reestablish, /);

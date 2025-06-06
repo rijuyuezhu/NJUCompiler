@@ -11,7 +11,7 @@ typedef struct CYPFact {
     MapUSizeUSize dst_to_src;
     MapUSizeToSetUSize src_to_dst;
 } CYPFact;
-void MTD(CYPFact, init, /);
+void MTD(CYPFact, init, /, bool is_universal);
 void MTD(CYPFact, drop, /);
 bool MTD(CYPFact, kill_dst, /, usize dst);
 bool MTD(CYPFact, kill_src, /, usize src);

@@ -21,7 +21,7 @@ typedef struct AEFact {
     SetUSize avaliset;
 } AEFact;
 
-void MTD(AEFact, init, /);
+void MTD(AEFact, init, /, bool is_universal);
 void MTD(AEFact, drop, /);
 bool MTD(AEFact, get, /, usize key);
 bool MTD(AEFact, set, /, usize key, bool value);
@@ -30,9 +30,11 @@ void MTD(AEFact, debug_print, /);
 DECLARE_MAPPING(MapBBToAEFact, struct IRBasicBlock *, AEFact *, FUNC_EXTERN,
                 GENERATOR_PLAIN_KEY, GENERATOR_CUSTOM_VALUE,
                 GENERATOR_PLAIN_COMPARATOR);
+
 FUNC_STATIC void NSMTD(MapBBToAEFact, drop_value, /, AEFact **value) {
     DROPOBJHEAP(AEFact, *value);
 }
+
 FUNC_STATIC AEFact *NSMTD(MapBBToAEFact, clone_value, /,
                           ATTR_UNUSED AEFact *const *other) {
     PANIC("Disable clone");

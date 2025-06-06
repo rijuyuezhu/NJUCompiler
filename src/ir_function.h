@@ -32,7 +32,7 @@ void MTD(IRFunction, init, /, String func_name, struct IRProgram *program);
 void MTD(IRFunction, drop, /);
 void MTD(IRFunction, add_stmt, /, IRStmtBase *stmt);
 
-// call reestablish after this function
+// call establish/reestablish after this function
 void NSMTD(IRFunction, try_strip_gotos, /, IRBasicBlock *bb, usize next_label);
 void MTD(IRFunction, add_label, /, usize label);
 void MTD(IRFunction, establish, /, struct TaskEngine *engine);

@@ -11,7 +11,6 @@ static usize get_var(TaskEngine *engine, String var_name) {
                 var_name);
 }
 static IRFunction *get_func(TaskEngine *engine) {
-
     return engine->parse_helper.now_func;
 }
 static void add_label(TaskEngine *engine, usize label) {
@@ -65,8 +64,7 @@ static VecIRValue take_arglist(TaskEngine *engine) {
 }
 
 static void add_dec(TaskEngine *engine, usize var, int size) {
-    MapVarToDecInfo *var_to_dec_info =
-        &engine->parse_helper.now_func->var_to_dec_info;
+    MapVarToDecInfo *var_to_dec_info = &get_func(engine)->var_to_dec_info;
     usize addr =
         CALL(IdxAllocator, engine->ir_program.var_idx_allocator, allocate, /);
     MapVarToDecInfoInsertResult res =

@@ -25,15 +25,15 @@ void MTD(LoopInfo, ensure_preheader, /) {
 
     usize preheader_label =
         CALL(IdxAllocator, *label_idx_allocator, allocate, /);
-    self->preheader = CREOBJHEAP(
-        IRBasicBlock, /, preheader_label); // this is owned at this time!
+    // Owned at this time!
+    self->preheader = CREOBJHEAP(IRBasicBlock, /, preheader_label);
 }
 
 void MTD(LoopOpt, init, /, IRFunction *func) {
     self->func = func;
     self->bb_info_acc = 0;
-    CALL(MapUSizeToDynIRStmt, self->param_to_stmt, init, /);
     CALL(MapStmtToBBInfo, self->stmt_to_bb_info, init, /);
+    CALL(MapUSizeToDynIRStmt, self->param_to_stmt, init, /);
     CALL(DominatorDA, self->dom_da, init, /, &self->stmt_to_bb_info);
     CALL(ReachDefDA, self->reach_def_da, init, /, &self->param_to_stmt);
     CALL(MapHeaderToLoopInfo, self->loop_infos, init, /);
@@ -44,8 +44,8 @@ void MTD(LoopOpt, drop, /) {
     DROPOBJ(MapHeaderToLoopInfo, self->loop_infos);
     DROPOBJ(ReachDefDA, self->reach_def_da);
     DROPOBJ(DominatorDA, self->dom_da);
-    DROPOBJ(MapStmtToBBInfo, self->stmt_to_bb_info);
     DROPOBJ(MapUSizeToDynIRStmt, self->param_to_stmt);
+    DROPOBJ(MapStmtToBBInfo, self->stmt_to_bb_info);
 }
 
 DEFINE_MAPPING(MapHeaderToLoopInfo, IRBasicBlock *, LoopInfo, FUNC_EXTERN);

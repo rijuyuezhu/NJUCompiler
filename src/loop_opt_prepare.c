@@ -23,10 +23,13 @@ static void MTD(LoopOpt, prepare_stmt_to_bb, /) {
 static void MTD(LoopOpt, prepare_param_to_stmt, /) {
     for (usize i = 0; i < self->func->params.size; i++) {
         usize param = self->func->params.data[i];
+
+        // a mocked statement
         VecIRValue empty_args = CREOBJ(VecIRValue, /);
         String func_name = NSCALL(String, from_f, /, "param[%zu]", i);
         IRStmtBase *stmt = (IRStmtBase *)CREOBJHEAP(IRStmtCall, /, param,
                                                     func_name, empty_args);
+
         CALL(MapUSizeToDynIRStmt, self->param_to_stmt, insert, /, param, stmt);
         usize bb_info_idx = self->bb_info_acc++;
         CALL(MapStmtToBBInfo, self->stmt_to_bb_info, insert, /, stmt,
@@ -72,8 +75,10 @@ static void MTD(LoopOpt, loop_infos_try_find_backedge, /, IRBasicBlock *fr,
     CALL(VecPtr, loop_info->backedge_starts, push_back, /, fr);
 }
 
-static void MTD(LoopOpt, prepare_find_loop_nodes, /, IRBasicBlock *header,
-                LoopInfo *loop_info, usize col) {
+static void MTD(LoopOpt, prepare_find_loop_nodes, /, LoopInfo *loop_info,
+                usize col) {
+    IRBasicBlock *header = loop_info->header;
+
     CALL(SetPtr, loop_info->nodes, insert, /, header, ZERO_SIZE);
     header->tag = col;
 
@@ -115,6 +120,7 @@ static void MTD(LoopOpt, prepare_find_loop_nodes, /, IRBasicBlock *header,
             if (succ_bb->tag != col) {
                 // this is an exit
                 CALL(VecPtr, loop_info->exits, push_back, /, bb);
+                break;
             }
         }
     }
@@ -157,9 +163,7 @@ static void MTD(LoopOpt, prepare_loop_infos, /) {
              CALL(MapHeaderToLoopInfo, self->loop_infos, begin, /);
          it; it = CALL(MapHeaderToLoopInfo, self->loop_infos, next, /, it)) {
         LoopInfo *loop_info = &it->value;
-        IRBasicBlock *header = loop_info->header;
-        CALL(LoopOpt, *self, prepare_find_loop_nodes, /, header, loop_info,
-             col);
+        CALL(LoopOpt, *self, prepare_find_loop_nodes, /, loop_info, col);
         col++;
     }
 }
@@ -179,7 +183,7 @@ static void MTD(LoopOpt, get_loop_infos_ordered, /) {
     }
     // sort by increasing nodes size
     qsort(self->loop_infos_ordered.data, self->loop_infos_ordered.size,
-          sizeof(void *), loop_infos_cmp);
+          sizeof(self->loop_infos_ordered.data[0]), loop_infos_cmp);
 }
 
 void MTD(LoopOpt, prepare, /) {

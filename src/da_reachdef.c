@@ -65,8 +65,8 @@ void MTD(RDFact, debug_print, /) {
 }
 
 void MTD(ReachDefDA, init, /, MapUSizeToDynIRStmt *param_to_stmt) {
-    self->param_to_stmt = param_to_stmt;
     CALL(ReachDefDA, *self, base_init, /);
+    self->param_to_stmt = param_to_stmt;
     CALL(MapBBToRDFact, self->in_facts, init, /);
     CALL(MapBBToRDFact, self->out_facts, init, /);
 }

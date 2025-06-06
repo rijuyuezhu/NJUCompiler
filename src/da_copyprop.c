@@ -1,8 +1,8 @@
 #include "da_copyprop.h"
 #include "ir_function.h"
 
-void MTD(CYPFact, init, /) {
-    self->is_universal = false;
+void MTD(CYPFact, init, /, bool is_universal) {
+    self->is_universal = is_universal;
     CALL(MapUSizeUSize, self->dst_to_src, init, /);
     CALL(MapUSizeToSetUSize, self->src_to_dst, init, /);
 }
@@ -60,7 +60,7 @@ void MTD(CYPFact, add_assign, /, usize dst, usize src) {
     }
     MapUSizeUSizeInsertResult res =
         CALL(MapUSizeUSize, self->dst_to_src, insert, /, dst, src);
-    ASSERT(res.inserted);
+    ASSERT(res.inserted, "Cannot add assignment to a fact that already has it");
     MapUSizeToSetUSizeIterator it2 =
         CALL(MapUSizeToSetUSize, self->src_to_dst, find_owned, /, src);
     if (!it2) {
@@ -73,7 +73,8 @@ void MTD(CYPFact, add_assign, /, usize dst, usize src) {
     SetUSize *dsts = &it2->value;
     SetUSizeInsertResult res3 =
         CALL(SetUSize, *dsts, insert, /, dst, ZERO_SIZE);
-    ASSERT(res3.inserted);
+    ASSERT(res3.inserted,
+           "Cannot add assignment to a fact that already has it");
 }
 
 usize MTD(CYPFact, get_src, /, usize dst) {
@@ -88,6 +89,7 @@ usize MTD(CYPFact, get_src, /, usize dst) {
         return (usize)-1;
     }
 }
+
 void MTD(CYPFact, debug_print, /) {
     if (self->is_universal) {
         printf("[universal map]");
@@ -116,12 +118,10 @@ void MTD(CopyPropDA, drop, /) {
 bool MTD(CopyPropDA, is_forward, /) { return true; }
 
 Any MTD(CopyPropDA, new_boundary_fact, /, ATTR_UNUSED IRFunction *func) {
-    return CREOBJHEAP(CYPFact, /);
+    return CREOBJHEAP(CYPFact, /, false);
 }
 Any MTD(CopyPropDA, new_initial_fact, /) {
-    CYPFact *fact = CREOBJHEAP(CYPFact, /);
-    fact->is_universal = true;
-    return fact;
+    return CREOBJHEAP(CYPFact, /, true);
 }
 void MTD(CopyPropDA, drop_fact, /, Any fact) { DROPOBJHEAP(CYPFact, fact); }
 void MTD(CopyPropDA, set_in_fact, /, IRBasicBlock *bb, Any fact) {
@@ -187,22 +187,23 @@ void MTD(CopyPropDA, transfer_stmt, /, IRStmtBase *stmt, Any fact) {
         // so we wait until then
         return;
     }
-    usize def = VCALL(IRStmtBase, *stmt, get_def, /);
-    if (def == (usize)-1) {
-        goto FINISH_KILL;
-    }
-    CALL(CYPFact, *cyp_fact, kill_dst, /, def);
-    CALL(CYPFact, *cyp_fact, kill_src, /, def);
 
-FINISH_KILL:;
+    // kill
+    usize def = VCALL(IRStmtBase, *stmt, get_def, /);
+    if (def != (usize)-1) {
+        CALL(CYPFact, *cyp_fact, kill_dst, /, def);
+        CALL(CYPFact, *cyp_fact, kill_src, /, def);
+    }
+
+    // add
     if (stmt->kind == IRStmtKindAssign) {
         IRStmtAssign *assign = (IRStmtAssign *)stmt;
         if (!assign->src.is_const) {
             usize dst = assign->dst;
             usize src = assign->src.var;
             if (dst != src) {
-                // here dst must have been killed above
-                // also, we prevent self-assignments
+                // Here dst must have been killed above.
+                // Also, we prevent self-assignments
                 CALL(CYPFact, *cyp_fact, add_assign, /, dst, src);
             }
         }

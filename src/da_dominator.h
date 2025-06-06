@@ -12,7 +12,7 @@ typedef struct DomFact {
     SetPtr doms; // the set of dominators (ptr to bbs)
 } DomFact;
 
-void MTD(DomFact, init, /);
+void MTD(DomFact, init, /, bool is_universal);
 void MTD(DomFact, drop, /);
 bool MTD(DomFact, get, /, struct IRBasicBlock *key);
 bool MTD(DomFact, set, /, struct IRBasicBlock *key, bool value);

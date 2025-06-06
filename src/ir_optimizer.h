@@ -18,8 +18,7 @@ bool MTD(IROptimizer, optimize_func_simple_redundant_ops, /,
          struct IRFunction *func);
 bool MTD(IROptimizer, optimize_func_avali_exp, /, struct IRFunction *func);
 bool MTD(IROptimizer, optimize_func_copy_prop, /, struct IRFunction *func);
-bool MTD(IROptimizer, optimize_func_control_flow_opt, /,
-         struct IRFunction *func);
+bool MTD(IROptimizer, optimize_func_control_flow, /, struct IRFunction *func);
 bool MTD(IROptimizer, optimize_func_useless_label_strip, /,
          struct IRFunction *func);
 bool MTD(IROptimizer, optimize_func_dead_code_eliminate, /,

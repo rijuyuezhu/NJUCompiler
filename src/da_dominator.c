@@ -1,9 +1,9 @@
 #include "da_dominator.h"
 #include "ir_function.h"
 
-void MTD(DomFact, init, /) {
+void MTD(DomFact, init, /, bool is_universal) {
+    self->is_universal = is_universal;
     CALL(SetPtr, self->doms, init, /);
-    self->is_universal = false;
 }
 
 void MTD(DomFact, drop, /) { DROPOBJ(SetPtr, self->doms); }
@@ -59,43 +59,32 @@ void MTD(DominatorDA, init, /, MapStmtToBBInfo *stmt_to_bb_info) {
     CALL(MapBBToDomFact, self->in_facts, init, /);
     CALL(MapBBToDomFact, self->out_facts, init, /);
 }
-
 void MTD(DominatorDA, drop, /) {
     DROPOBJ(MapBBToDomFact, self->out_facts);
     DROPOBJ(MapBBToDomFact, self->in_facts);
 }
-
 bool MTD(DominatorDA, is_forward, /) { return true; }
-
 Any MTD(DominatorDA, new_boundary_fact, /, IRFunction *func) {
-    DomFact *fact = CREOBJHEAP(DomFact, /);
+    DomFact *fact = CREOBJHEAP(DomFact, /, false);
     CALL(SetPtr, fact->doms, insert, /, func->entry, ZERO_SIZE);
     return fact;
 }
-
 Any MTD(DominatorDA, new_initial_fact, /) {
-    DomFact *fact = CREOBJHEAP(DomFact, /);
-    fact->is_universal = true;
-    return fact;
+    return CREOBJHEAP(DomFact, /, true);
 }
-
 void MTD(DominatorDA, drop_fact, /, Any fact) { DROPOBJHEAP(DomFact, fact); }
-
 void MTD(DominatorDA, set_in_fact, /, IRBasicBlock *bb, Any fact) {
     CALL(MapBBToDomFact, self->in_facts, insert_or_assign, /, bb, fact);
 }
-
 void MTD(DominatorDA, set_out_fact, /, IRBasicBlock *bb, Any fact) {
     CALL(MapBBToDomFact, self->out_facts, insert_or_assign, /, bb, fact);
 }
-
 Any MTD(DominatorDA, get_in_fact, /, IRBasicBlock *bb) {
     MapBBToDomFactIterator it =
         CALL(MapBBToDomFact, self->in_facts, find_owned, /, bb);
     ASSERT(it);
     return it->value;
 }
-
 Any MTD(DominatorDA, get_out_fact, /, IRBasicBlock *bb) {
     MapBBToDomFactIterator it =
         CALL(MapBBToDomFact, self->out_facts, find_owned, /, bb);
@@ -104,9 +93,9 @@ Any MTD(DominatorDA, get_out_fact, /, IRBasicBlock *bb) {
 }
 
 bool MTD(DominatorDA, meet_into, /, Any fact, Any target) {
-    // target = target sect fact
     DomFact *from = fact;
     DomFact *to = target;
+    // to = to sect from
     if (from->is_universal) {
         return false;
     }

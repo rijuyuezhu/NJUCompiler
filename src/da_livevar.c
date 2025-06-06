@@ -32,17 +32,16 @@ void MTD(LVFact, debug_print, /) {
         printf("v%zu ", it->key);
     }
 }
+
 void MTD(LiveVarDA, init, /) {
     CALL(LiveVarDA, *self, base_init, /);
     CALL(MapBBToLVFact, self->in_facts, init, /);
     CALL(MapBBToLVFact, self->out_facts, init, /);
 }
-
 void MTD(LiveVarDA, drop, /) {
     DROPOBJ(MapBBToLVFact, self->out_facts);
     DROPOBJ(MapBBToLVFact, self->in_facts);
 }
-
 bool MTD(LiveVarDA, is_forward, /) { return false; }
 Any MTD(LiveVarDA, new_boundary_fact, /, ATTR_UNUSED IRFunction *func) {
     return CREOBJHEAP(LVFact, /);
@@ -130,9 +129,7 @@ static void VMTD(LiveVarDA, dead_code_eliminate_bb_callback, /,
     if (stmt->kind == IRStmtKindAssign || stmt->kind == IRStmtKindLoad ||
         stmt->kind == IRStmtKindArith) {
         usize def = VCALL(IRStmtBase, *stmt, get_def, /);
-        if (def == (usize)-1) {
-            return;
-        }
+        ASSERT(def != (usize)-1);
         if (!CALL(LVFact, *lv_fact, get, /, def)) {
             stmt->is_dead = true;
         }
@@ -159,7 +156,7 @@ bool MTD(LiveVarDA, dead_code_eliminate, /, IRFunction *func) {
             updated = true;
         }
     }
-    return updated;
+    return CALL(IRFunction, *func, remove_dead_stmt, /) || updated;
 }
 
 DEFINE_MAPPING(MapBBToLVFact, IRBasicBlock *, LVFact *, FUNC_EXTERN);

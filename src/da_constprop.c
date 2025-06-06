@@ -9,10 +9,10 @@ void MTD(CPFact, drop, /) { DROPOBJ(MapVarToCPValue, self->mapping); }
 CPValue MTD(CPFact, get, /, usize key) {
     MapVarToCPValueIterator it =
         CALL(MapVarToCPValue, self->mapping, find_owned, /, key);
-    if (it == NULL) {
-        return NSCALL(CPValue, get_undef, /);
-    } else {
+    if (it) {
         return it->value;
+    } else {
+        return NSCALL(CPValue, get_undef, /);
     }
 }
 
@@ -20,25 +20,26 @@ bool MTD(CPFact, update, /, usize key, CPValue value) {
     MapVarToCPValueIterator it =
         CALL(MapVarToCPValue, self->mapping, find_owned, /, key);
     if (value.kind == CPValueKindUndef) {
-        if (it == NULL) {
-            return false;
-        } else {
+        if (it) {
             CALL(MapVarToCPValue, self->mapping, erase, /, it);
             return true;
+        } else {
+            return false;
         }
     } else {
-        if (it == NULL) {
+        if (it) {
+            bool same = NSCALL(CPValue, eq, /, it->value, value);
+            it->value = value;
+            return !same;
+        } else {
             MapVarToCPValueInsertResult res =
                 CALL(MapVarToCPValue, self->mapping, insert, /, key, value);
             ASSERT(res.inserted);
             return true;
-        } else {
-            bool same = NSCALL(CPValue, eq, /, it->value, value);
-            it->value = value;
-            return !same;
         }
     }
 }
+
 void MTD(CPFact, debug_print, /) {
     for (MapVarToCPValueIterator it =
              CALL(MapVarToCPValue, self->mapping, begin, /);

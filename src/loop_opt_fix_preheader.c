@@ -10,6 +10,7 @@ static void MTD(LoopOpt, fix_preheader_bb, /, ListBoxBBNode *bb_it,
     IRBasicBlock *header = loop_info->header;
     IRBasicBlock *preheader = loop_info->preheader; // owned
     loop_info->preheader = NULL;
+
     usize header_label = header->label;
     usize preheader_label = preheader->label;
     ASSERT(header_label != (usize)-1);

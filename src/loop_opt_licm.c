@@ -93,6 +93,7 @@ static void MTD(LICMEngine, collect_info, /) {
         }
     }
 
+    // dom_all_exit
     LoopOpt *loop_opt = self->loop_opt;
     DominatorDA *dom_da = &loop_opt->dom_da;
 
@@ -137,47 +138,49 @@ static void VMTD(ReachDefDA, find_invariants_callback, /,
             }
         }
 
-        if (inside_loop_def) {
-            is_invariant = false;
-
-            if (reach_defs->size == 1) {
-                // only a inner-loop is reachable
-                // add an edge from inside_loop to stmt;
-                // add into succ (inside_loop_def -> stmt)
-                MapPtrToVecPtrIterator it =
-                    CALL(MapPtrToVecPtr, engine->itg_succ, find_owned, /,
-                         inside_loop_def);
-                if (!it) {
-                    VecPtr vec = CREOBJ(VecPtr, /);
-                    MapPtrToVecPtrInsertResult res =
-                        CALL(MapPtrToVecPtr, engine->itg_succ, insert, /,
-                             inside_loop_def, vec);
-                    ASSERT(res.inserted);
-                    it = res.node;
-                }
-                VecPtr *succs = &it->value;
-                CALL(VecPtr, *succs, push_back, /, stmt);
-
-            } else {
-                // hack below to prevent the stmt from being invariant
-            }
-
-            // in both cases, we add an in-deg for stmt.
-            // For the former, the pred becomes invariant helps
-            // the indeg decreasing by 1;
-            // for the latter, the self-loop prevents the stmt
-            // from being invariant.
-            MapPtrUSizeIterator indeg_it =
-                CALL(MapPtrUSize, engine->itg_indeg, find_owned, /, stmt);
-            if (!indeg_it) {
-                MapPtrUSizeInsertResult res =
-                    CALL(MapPtrUSize, engine->itg_indeg, insert, /, stmt, 0);
-                ASSERT(res.inserted);
-                indeg_it = res.node;
-            }
-            indeg_it->value++;
+        if (!inside_loop_def) {
+            continue;
         }
+
+        is_invariant = false;
+
+        if (reach_defs->size == 1) {
+            // only a inner-loop is reachable
+            // add an edge from inside_loop to stmt;
+            // add into succ (inside_loop_def -> stmt)
+            MapPtrToVecPtrIterator it = CALL(MapPtrToVecPtr, engine->itg_succ,
+                                             find_owned, /, inside_loop_def);
+            if (!it) {
+                VecPtr vec = CREOBJ(VecPtr, /);
+                MapPtrToVecPtrInsertResult res =
+                    CALL(MapPtrToVecPtr, engine->itg_succ, insert, /,
+                         inside_loop_def, vec);
+                ASSERT(res.inserted);
+                it = res.node;
+            }
+            VecPtr *succs = &it->value;
+            CALL(VecPtr, *succs, push_back, /, stmt);
+
+        } else {
+            // hack below to prevent the stmt from being invariant
+        }
+
+        // in both cases, we add an in-deg for stmt.
+        // For the former, the pred becomes invariant helps
+        // the indeg decreasing by 1;
+        // for the latter, the self-loop prevents the stmt
+        // from being invariant.
+        MapPtrUSizeIterator indeg_it =
+            CALL(MapPtrUSize, engine->itg_indeg, find_owned, /, stmt);
+        if (!indeg_it) {
+            MapPtrUSizeInsertResult res =
+                CALL(MapPtrUSize, engine->itg_indeg, insert, /, stmt, 0);
+            ASSERT(res.inserted);
+            indeg_it = res.node;
+        }
+        indeg_it->value += 1;
     }
+
     if (is_invariant) {
         CALL(VecPtr, engine->itg_worklist, push_back, /, stmt);
     }
@@ -346,6 +349,7 @@ static bool MTD(LoopOpt, apply_motions, /) {
             IRBasicBlock *preheader = loop_info->preheader;
             ASSERT(preheader);
             CALL(IRBasicBlock, *preheader, add_stmt, /, motion);
+            updated = true;
         }
     }
 
