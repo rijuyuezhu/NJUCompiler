@@ -30,13 +30,17 @@ void MTD(IROptimizer, optimize_func, /, IRFunction *func) {
         CALL(IROptimizer, *self, optimize_func_const_prop, /, func);
         CALL(IROptimizer, *self, optimize_func_control_flow, /, func);
         CALL(IROptimizer, *self, optimize_func_simple_redundant_ops, /, func);
+        CALL(IROptimizer, *self, optimize_func_peephole, /, func);
+        CALL(IROptimizer, *self, optimize_func_simple_redundant_ops, /, func);
         CALL(IROptimizer, *self, optimize_func_copy_prop, /, func);
         CALL(IROptimizer, *self, optimize_func_avali_exp, /, func);
         CALL(IROptimizer, *self, optimize_func_copy_prop, /, func);
         CALL(IROptimizer, *self, optimize_func_dead_code_eliminate, /, func);
     }
 
+    CALL(IROptimizer, *self, optimize_func_simple_redundant_ops, /, func);
     CALL(IROptimizer, *self, optimize_func_peephole, /, func);
+    CALL(IROptimizer, *self, optimize_func_simple_redundant_ops, /, func);
     CALL(IROptimizer, *self, optimize_func_copy_prop, /, func);
 
     usize UP_LIMIT = 50;
