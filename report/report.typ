@@ -30,8 +30,9 @@
 #let indent = h(2em)
 #set underline(offset: .1em, stroke: .05em, evade: false)
 
+#show link: set text(fill: blue)
 
-= #text(font: ("Libertinus Serif", "STZhongsong"))[编译原理 Project 4 实验报告]
+= #text(font: ("Libertinus Serif", "STZhongsong"))[编译原理 Project 5 实验报告]
 
 #align(center)[
   #v(1em)
@@ -47,68 +48,12 @@
 
 == 程序实现功能 <impl>
 
-我在项目中实现了编译原理 Project 4 的全部内容，即从 IR 生成能够在 spim 上运行的 Mips32 汇编代码。
+我在项目中实现了编译原理 Project 5 的全部内容，包括:
 
-+ *指令选择*: 主要采用了模板法进行指令选择，对每一种 IR 生成相应的汇编：
-  #table(
-    columns: (1fr, 1.8fr),
-    align: horizon,
-    table.header[*IR*][*MIPS instructions*],
-    [`LABEL l1:`], [`_L1:`],
-    [`FUNCTION foo:`],
-    [
-      `_Ffoo:`
-      #footnote[此处加上前缀 `_F` 是因为 spim 的一些 parse 问题，比如 label 名为 `add` 会报错。`_R` 则标记了 Epilogue 的起始处，用于 return 的跳转。]\
-      #h(1em)Prologue\
-      #h(1em)Asm of body\
-      `_Rfoo:`\
-      #h(1em)Epilogue],
-
-    [`x := y`], [`move reg(x), reg(y)`],
-    [`x := #imm`], [`li reg(x), imm`],
-    [`x := &y`], [`addi reg(x), $fp, offset(y)`],
-    [`x := *y`], [`lw reg(x), 0(reg(y))`],
-    [`*x := y`], [`sw reg(y), 0(reg(x))`],
-    [
-      `x := oprd1 op oprd2`\
-      其中 `oprd1` and `oprd2` 可以是变量或立即数；\
-      `op` 可以是 `+`, `-`, `*`, `/`。\
-    ],
-    [
-      对于立即数操作数，先用 `li` 指令将其加载到寄存器中。\
-      `add/sub/mul reg(x), reg(oprd1), reg(oprd2)`\
-      对于除法：\
-      `div reg(oprd1), reg(oprd2)`\
-      `mflo reg(x)`
-    ],
-
-    [`GOTO l1`], [`j _L1`],
-    [
-      `IF oprd1 rop oprd2 GOTO l1`\
-      其中 `oprd1` and `oprd2` 可以是变量或立即数。
-    ],
-    [
-      对于立即数操作数，先用 `li` 指令将其加载到寄存器中。\
-      `beq/bne/bgt/blt/bge/ble reg(oprd1), reg(oprd2), _L1`\
-    ],
-
-    [`RETURN x`], [`move $v0, reg(x)`\ `j _Rfoo`],
-    [`DEC x size`], [生成 `offset(x)`，且分配 `size` 大小的空间],
-    [`ARG x`], [$"arglist"."append"(x)$],
-    [`x := CALL bar`],
-    [
-      保存 Caller saved registers;\
-      减少 `sp` 用于存放 $"pos">= 5$ 的参数\
-      从 $"arglist"$ 末尾弹出 $"arity"("bar")$ 个参数\
-      将参数放置到 `$a0~$a3` 寄存器和栈上\
-      `jal _Fbar`\
-      恢复 `sp`
-    ],
-
-    [`PARAM x`], [按照 $x$ 的编号，记录其在寄存器/栈上的地址],
-    [`READ, WRITE`], [包装成函数处理],
-  )
-+ *寄存器分配*: 采用了局部寄存器分配的方法，在每一个基块中进行寄存器的分配（使用 LRU）；在基块末尾进行写回。
+/ 选做 (6.1): 基于数据流分析的全局优化，包括常量折叠（基于常量传播），复制折叠（基于复制传播），公用表达式消除（基于可用表达式传播），死代码消除（基于活跃变量分析），控制流优化（基于常量传播和 DFS）。
+/ 选做 (6.2): 循环不变式外提，主要参考了 #link("https://www.cs.cmu.edu/afs/cs/academic/class/15745-s19/www/lectures/L9-LICM.pdf")。
+/ 选做 (6.3): 循环归纳变量强度削减，只要参考了 #link("https://www.cs.cmu.edu/afs/cs/academic/class/15745-s19/www/lectures/L8-Induction-Variables.pdf")。
+/ 其他: 除此以外，还实现了一些窥孔优化和 Label 的消除等，进一步提升了基本块内的优化效果。
 
 
 == 程序编译指令 <compile>
@@ -134,9 +79,52 @@
 
 == 实验感想 <thought>
 
-这一次实验较为简单，只需要按照 Mips32 的 ABI 进行代码的生成即可，也没有写复杂的寄存器分配策略。四次 Project 的代码增量（含 `.c`, `.h`, `.l`, `.y` 的、非自动生成的文件）如下：
+本次实验我并未使用框架，而是从头实现了所有部分，所有代码（不含自动生成的代码）共 7825 行。
 
-- Project 1: 2328 行；
-- Project 2: 2204 行；
-- Project 3: 1643 行。
-- Project 4: 846 行。
+大部分优化都可以按部就班地按照定义去实现，故在此省略。
+
+值得一提的是全局的优化管线，我最终使用了如下的优化管线：
+
+```c
+void MTD(IROptimizer, optimize_func, /, IRFunction *func) {
+    const usize TIMES = 6;
+    for (usize i = 0; i < TIMES; i++) {
+        if (i >= TIMES / 2) {
+            CALL(IROptimizer, *self, optimize_func_peephole, /, func);
+            CALL(IROptimizer, *self, optimize_func_copy_prop, /, func);
+            CALL(IROptimizer, *self, optimize_func_loop_ind_var, /, func);
+            CALL(IROptimizer, *self, optimize_func_licm, /, func);
+            CALL(IROptimizer, *self, optimize_func_dead_code_eliminate, /,
+                 func);
+        }
+        CALL(IROptimizer, *self, optimize_func_const_prop, /, func);
+        CALL(IROptimizer, *self, optimize_func_control_flow, /, func);
+        CALL(IROptimizer, *self, optimize_func_simple_redundant_ops, /, func);
+        CALL(IROptimizer, *self, optimize_func_peephole, /, func);
+        CALL(IROptimizer, *self, optimize_func_simple_redundant_ops, /, func);
+        CALL(IROptimizer, *self, optimize_func_copy_prop, /, func);
+        CALL(IROptimizer, *self, optimize_func_avali_exp, /, func);
+        CALL(IROptimizer, *self, optimize_func_copy_prop, /, func);
+        CALL(IROptimizer, *self, optimize_func_dead_code_eliminate, /, func);
+    }
+
+    CALL(IROptimizer, *self, optimize_func_simple_redundant_ops, /, func);
+    CALL(IROptimizer, *self, optimize_func_peephole, /, func);
+    CALL(IROptimizer, *self, optimize_func_simple_redundant_ops, /, func);
+    CALL(IROptimizer, *self, optimize_func_copy_prop, /, func);
+
+    usize UP_LIMIT = 50;
+    for (usize i = 0; i < UP_LIMIT; i++) {
+        bool updated = CALL(IROptimizer, *self,
+                            optimize_func_dead_code_eliminate, /, func);
+        if (!updated) {
+            break;
+        }
+    }
+
+    for (usize i = 0; i < 5; i++) {
+        CALL(IROptimizer, *self, optimize_func_useless_label_strip, /, func);
+        CALL(IROptimizer, *self, optimize_func_dead_code_eliminate, /, func);
+    }
+}
+```
