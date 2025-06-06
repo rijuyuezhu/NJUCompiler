@@ -420,7 +420,7 @@ static bool MTD(IRBasicBlock, apply_ind_var_callback, /,
             (IRStmtBase *)CREOBJHEAP(IRStmtAssign, /, derived_info->key, src);
         IRStmtBase *tmp = stmt_it->data;
         stmt_it->data = new_stmt;
-        VCALL(IRStmtBase, *tmp, drop, /);
+        VDROPOBJHEAP(IRStmtBase, tmp);
     }
     return false;
 }
